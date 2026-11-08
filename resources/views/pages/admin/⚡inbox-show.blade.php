@@ -83,7 +83,7 @@ return new class extends Component
             }
         }
 
-        foreach (is_array($this->submission->metadata) ? $this->submission->metadata : [] as $field) {
+        foreach ($this->submission->orderedMetadata() as $field) {
             if (! is_array($field)) {
                 continue;
             }

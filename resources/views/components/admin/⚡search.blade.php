@@ -137,7 +137,7 @@ return new class extends Component
         }
 
         return User::query()
-            ->whereAny(['name', 'email'], 'like', "%{$term}%")
+            ->where(fn ($inner) => $inner->whereLike('name', "%{$term}%")->orWhereLike('email', "%{$term}%"))
             ->orderBy('name')
             ->limit(self::PER_GROUP)
             ->get()

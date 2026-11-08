@@ -17,7 +17,7 @@ test('to array', function (): void {
     $media = Media::factory()->create()->fresh();
 
     expect(array_keys($media->toArray()))
-        ->toEqual([
+        ->toEqualCanonicalizing([
             'id',
             'type',
             'source',

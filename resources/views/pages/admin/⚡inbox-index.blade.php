@@ -182,7 +182,7 @@ return new class extends Component
         return Submission::query()
             ->when($this->status === 'unread', fn (Builder $query): Builder => $query->whereNull('read_at'))
             ->when($this->status === 'read', fn (Builder $query): Builder => $query->whereNotNull('read_at'))
-            ->when($this->search, fn (Builder $query, string $search): Builder => $query->whereAny(['name', 'email', 'form_name'], 'like', "%{$search}%"))
+            ->when($this->search, fn (Builder $query, string $search): Builder => $query->where(fn (Builder $inner): Builder => $inner->whereLike('name', "%{$search}%")->orWhereLike('email', "%{$search}%")->orWhereLike('form_name', "%{$search}%")))
             ->orderBy($this->sortBy, $this->sortDirection);
     }
 
@@ -201,7 +201,7 @@ return new class extends Component
     {
         $fields = [];
 
-        foreach (is_array($submission->metadata) ? $submission->metadata : [] as $field) {
+        foreach ($submission->orderedMetadata() as $field) {
             $label = is_array($field) && is_string($field['label'] ?? null) ? $field['label'] : '';
             $value = is_array($field) ? ($field['value'] ?? null) : null;
 

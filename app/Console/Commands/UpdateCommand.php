@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Enums\ActivityEvent;
 use App\Services\ActivityLog;
+use App\Services\BackupService;
 use App\Services\DatabaseDumper;
 use App\Services\ReleaseAssets;
 use App\Services\UpdateService;
@@ -14,6 +15,8 @@ use Closure;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Number;
+use RuntimeException;
 
 #[Description('Update Wire Up to the latest release')]
 #[Signature('wireup:update {--tag= : The release tag to install} {--force : Run even when already on the target version}')]
@@ -21,7 +24,26 @@ final class UpdateCommand extends Command
 {
     use RunsSteps;
 
-    public function handle(UpdateService $updates, ReleaseAssets $assets, DatabaseDumper $dumper): int
+    public const int MINIMUM_FREE_BYTES = 500 * 1024 * 1024;
+
+    public function handle(UpdateService $updates, ReleaseAssets $assets, DatabaseDumper $dumper, BackupService $backups): int
+    {
+        $lock = $updates->updateLock();
+
+        if (! $lock->get()) {
+            $this->components->error('Another update is already running.');
+
+            return self::FAILURE;
+        }
+
+        try {
+            return $this->update($updates, $assets, $dumper, $backups);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function update(UpdateService $updates, ReleaseAssets $assets, DatabaseDumper $dumper, BackupService $backups): int
     {
         $tag = $this->targetTag($updates);
 
@@ -54,6 +76,7 @@ final class UpdateCommand extends Command
         $backup = 'db-backup-'.now()->format('Y-m-d-His').'-before-'.$tag.'.'.$dumper->extension();
 
         $preparation = [
+            'Check free disk space' => fn () => $this->ensureDiskSpace($backups),
             ...($prebuilt
                 ? ['Download frontend assets' => fn (): string => $assets->download($tag)]
                 : ['Check Node.js' => ['npm', '--version']]),
@@ -82,6 +105,7 @@ final class UpdateCommand extends Command
                 : ['Install frontend dependencies' => ['npm', 'ci'], 'Build frontend assets' => ['npm', 'run', 'build']]),
             'Cache configuration' => [PHP_BINARY, 'artisan', 'optimize'],
             'Restart queue workers' => [PHP_BINARY, 'artisan', 'queue:restart'],
+            'Record the new version' => fn () => $updates->writeCurrentVersion($tag),
         ];
 
         $started = [];
@@ -112,7 +136,6 @@ final class UpdateCommand extends Command
             }
         }
 
-        $updates->writeCurrentVersion($tag);
         $updates->check();
         $assets->discardSnapshot();
 
@@ -132,6 +155,13 @@ final class UpdateCommand extends Command
         $this->info("Wire Up is now on {$tag}.");
 
         return self::SUCCESS;
+    }
+
+    private function ensureDiskSpace(BackupService $backups): void
+    {
+        $free = $backups->freeBytes();
+
+        throw_if($free !== null && $free < self::MINIMUM_FREE_BYTES, RuntimeException::class, 'Only '.Number::fileSize($free, precision: 1).' is free on the server. An update needs at least '.Number::fileSize(self::MINIMUM_FREE_BYTES).', so it did not start.');
     }
 
     private function targetTag(UpdateService $updates): ?string

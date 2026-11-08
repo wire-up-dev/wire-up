@@ -13,6 +13,7 @@ use App\Mcp\Tools\UpdateContentTypeTool;
 use App\Models\Record;
 use App\Models\RecordType;
 use App\Services\ContentMarkdown;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 /**
@@ -132,7 +133,7 @@ it('removes a deleted record from every field that links to it', function (): vo
     resolve(DeleteRecordAction::class)->handle($ada);
 
     expect($both->refresh()->data['speakers'])->toBe([$grace->id])
-        ->and($only->refresh()->data)->toBe(['speakers' => null, 'notes' => 'kept']);
+        ->and($only->refresh()->data)->toEqual(['speakers' => null, 'notes' => 'kept']);
 });
 
 it('keeps a content type that other types link to, but lets a type that only links to itself go', function (): void {
@@ -206,4 +207,36 @@ it('lets agents create linked records fields and fill them with ids of the right
     ])->assertOk();
 
     expect(Record::query()->where('record_type_id', $talks->id)->firstOrFail()->data['speakers'])->toBe([$grace->id]);
+});
+
+it('lists linked records in the records table without a query per row', function (): void {
+    $this->actingAsAdmin();
+    $speakers = speakerType();
+    $events = eventType();
+    $ada = linkedRecord($speakers, 'Ada');
+    $grace = linkedRecord($speakers, 'Grace');
+
+    $addEvent = function (string $title) use ($events, $ada, $grace): void {
+        linkedRecord($events, $title)->update(['data' => ['speakers' => [$ada->id, $grace->id]]]);
+    };
+
+    $countQueries = function () use ($events): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        Livewire::test('pages::admin.records-index', ['recordType' => $events])->assertSee('Ada, Grace');
+        DB::disableQueryLog();
+
+        return collect(DB::getQueryLog())->filter(fn (array $entry): bool => preg_match('/records[`"]\.[`"]id[`"] in/', $entry['query']) === 1)->count();
+    };
+
+    $addEvent('Launch');
+    $addEvent('Meetup');
+    $withTwoRows = $countQueries();
+
+    $addEvent('Summit');
+    $addEvent('Workshop');
+    $addEvent('Hackathon');
+
+    expect($withTwoRows)->toBe(1)
+        ->and($countQueries())->toBe(1);
 });

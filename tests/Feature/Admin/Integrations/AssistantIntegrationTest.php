@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Ai\Agents\ConnectionCheck;
+use App\Integrations\IntegrationSettings;
 use App\Models\Settings;
-use App\Providers\IntegrationServiceProvider;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
@@ -89,7 +89,7 @@ it('connects the AI Assistant through openrouter', function (): void {
     expect(Settings::get('ai_provider'))->toBe('openrouter')
         ->and(Settings::get('ai_model'))->toBe('anthropic/claude-fable-5.1');
 
-    new IntegrationServiceProvider(app())->applySavedSettings();
+    new IntegrationSettings()->apply();
 
     expect(config('ai.default'))->toBe('openrouter')
         ->and(config('ai.providers.openrouter.key'))->toBe('sk-or-key');

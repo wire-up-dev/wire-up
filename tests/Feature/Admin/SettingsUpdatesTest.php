@@ -110,6 +110,19 @@ it('checks for updates on demand', function (): void {
     expect(resolve(UpdateService::class)->latestVersion())->toBe('v1.0.0');
 });
 
+it('says so when the check could not reach the release server', function (): void {
+    Process::fake(['*ls-remote*' => Process::result(errorOutput: 'Host key verification failed.', exitCode: 128), '*' => Process::result()]);
+
+    $this->actingAsAdmin();
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+
+    Livewire::test('pages::admin.settings-updates')
+        ->call('checkNow')
+        ->assertDispatched('toast-show', toastSays('Couldn’t reach the release server. Check that this server can run git and connect to GitHub.'));
+
+    expect(resolve(UpdateService::class)->lastCheckFailed())->toBeTrue();
+});
+
 it('forbids checking for updates without the edit permission', function (): void {
     $this->actingAs(settingsViewer());
 

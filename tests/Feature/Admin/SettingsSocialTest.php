@@ -57,7 +57,7 @@ it('persists the provided social links to metadata', function (): void {
         ->assertHasNoErrors();
 
     expect(Settings::get('social'))
-        ->toBe(['facebook' => 'https://facebook.com/acme', 'youtube' => 'https://youtube.com/@acme']);
+        ->toEqual(['facebook' => 'https://facebook.com/acme', 'youtube' => 'https://youtube.com/@acme']);
 });
 
 it('stores only the non-empty links', function (): void {

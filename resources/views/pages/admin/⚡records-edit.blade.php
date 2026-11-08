@@ -1,13 +1,10 @@
 <?php
 
 declare(strict_types=1);
-
-use App\Actions\CreateCategoryAction;
 use App\Actions\UpdateRecordAction;
 use App\Enums\BlockType;
 use App\Enums\ContentStatus;
 use App\Enums\FieldType;
-use App\Models\Category;
 use App\Models\Media;
 use App\Models\Page;
 use App\Models\Record;
@@ -19,13 +16,11 @@ use App\Traits\HasRevisionHistory;
 use Flux\Flux;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -149,37 +144,6 @@ return new class extends Component
         $this->loadRequestedRevision();
     }
 
-    public function createCategory(CreateCategoryAction $action): void
-    {
-        $this->authorize('categories.create');
-
-        $name = mb_trim($this->categorySearch);
-
-        if ($name === '') {
-            return;
-        }
-
-        $category = $action->handle(['name' => [$this->locale => $name]]);
-
-        $this->categories[] = (string) $category->id;
-        $this->categorySearch = '';
-
-        unset($this->categoryOptions);
-    }
-
-    /**
-     * @return EloquentCollection<int, Category>
-     */
-    #[Computed]
-    public function categoryOptions(): EloquentCollection
-    {
-        return Category::query()
-            ->with('translations')
-            ->get()
-            ->sortBy(fn (Category $category): string => $category->name)
-            ->values();
-    }
-
     public function addTag(string $key): void
     {
         $field = $this->recordType->fieldByKey($key);
@@ -227,6 +191,7 @@ return new class extends Component
             'blocks' => $this->blocks,
             'media' => $this->media,
             'categories' => array_map(intval(...), $this->categories),
+            ...$this->changedStock(),
             'metadata' => [
                 ...($this->record->metadata ?? []),
                 'published_locales' => array_values($validated['publishedLocales'] ?? []),
@@ -236,11 +201,8 @@ return new class extends Component
             ],
         ]);
 
-        if ($this->recordType->sellable) {
-            $this->saveStock();
-        }
-
         $this->record->refresh()->load('translations', 'media', 'blocks', 'slugs');
+        $this->loadedStock = $this->record->stock;
         $this->forgetRestoredRevision();
 
         Flux::toast(__('Changes saved.'), variant: 'success');
@@ -271,22 +233,6 @@ return new class extends Component
         ], now()->addMinutes(30));
 
         $this->showPreview = true;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    #[Computed]
-    public function pageLinkOptions(): array
-    {
-        $pages = Page::query()
-            ->with('translations')
-            ->get()
-            ->sortBy(fn (Page $page): string => $page->title)
-            ->mapWithKeys(fn (Page $page): array => [$page->id => $page->title])
-            ->all();
-
-        return $pages + SettingsService::current()->authPageOptions();
     }
 
     public function render(): View
@@ -339,17 +285,14 @@ return new class extends Component
         }
     }
 
-    private function saveStock(): void
+    /**
+     * @return array{stock?: int|null}
+     */
+    private function changedStock(): array
     {
         $stock = $this->stock === '' ? null : (int) $this->stock;
 
-        if ($stock === $this->loadedStock) {
-            return;
-        }
-
-        Record::query()->whereKey($this->record->id)->update(['stock' => $stock]);
-
-        $this->loadedStock = $stock;
+        return $this->recordType->sellable && $stock !== $this->loadedStock ? ['stock' => $stock] : [];
     }
 
     /**

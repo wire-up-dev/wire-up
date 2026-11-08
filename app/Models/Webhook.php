@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ActivityEvent;
 use App\Enums\WebhookEvent;
+use App\Services\ActivityLog;
 use Carbon\CarbonInterface;
 use Database\Factories\WebhookFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -65,5 +67,16 @@ final class Webhook extends Model
     public function subscribesTo(WebhookEvent $event): bool
     {
         return $event === WebhookEvent::PING || in_array($event->value, $this->events, true);
+    }
+
+    protected static function booted(): void
+    {
+        self::created(fn (self $webhook) => ActivityLog::record(ActivityEvent::WEBHOOK_CREATED, $webhook));
+        self::updated(function (self $webhook): void {
+            if ($webhook->wasChanged(['name', 'url', 'events', 'active', 'secret'])) {
+                ActivityLog::record(ActivityEvent::WEBHOOK_UPDATED, $webhook);
+            }
+        });
+        self::deleted(fn (self $webhook) => ActivityLog::record(ActivityEvent::WEBHOOK_DELETED, $webhook));
     }
 }

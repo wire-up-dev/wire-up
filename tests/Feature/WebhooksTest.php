@@ -171,7 +171,7 @@ it('retries a failed delivery with growing pauses, then gives up and logs it', f
     $last->assertFailed();
     $last->failed(null);
 
-    $activity = Activity::query()->sole();
+    $activity = Activity::query()->where('event', ActivityEvent::WEBHOOK_FAILED)->sole();
 
     expect($activity->event)->toBe(ActivityEvent::WEBHOOK_FAILED)
         ->and($activity->subject_label)->toBe('CRM')
@@ -201,4 +201,17 @@ it('keeps only the latest deliveries for each webhook', function (): void {
 
     expect($webhook->deliveries()->count())->toBe(Webhook::DELIVERIES_KEPT)
         ->and($webhook->deliveries()->first()?->id)->toBe($newest->id);
+});
+
+it('logs adding, changing and deleting a webhook, but not each delivery', function (): void {
+    $webhook = Webhook::factory()->create(['name' => 'Zapier']);
+    $webhook->update(['last_status' => 200, 'last_delivered_at' => now()]);
+    $webhook->update(['active' => false]);
+    $webhook->delete();
+
+    expect(Activity::query()->orderBy('id')->pluck('event')->all())->toBe([
+        ActivityEvent::WEBHOOK_CREATED,
+        ActivityEvent::WEBHOOK_UPDATED,
+        ActivityEvent::WEBHOOK_DELETED,
+    ]);
 });

@@ -224,4 +224,4 @@ it('creates the sqlite database file when it is missing', function (): void {
         ->assertExitCode(0);
 
     expect(File::exists($dir.'/database.sqlite'))->toBeTrue();
-});
+})->group('sqlite-only');

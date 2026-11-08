@@ -15,6 +15,7 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Services\SettingsService;
 use App\Services\StripeService;
+use App\Services\SystemHealth;
 use App\Services\VisitorCounter;
 use Carbon\CarbonInterface;
 use Flux\DateRange;
@@ -31,6 +32,23 @@ return new class extends Component
     public function mount(): void
     {
         $this->datesFilter = new DateRange(now()->subDays(30)->startOfDay(), now()->endOfDay());
+    }
+
+    /**
+     * @return array{showsWarnings: bool, schedulerRunning: bool, schedulerLastRan: ?CarbonInterface, waitingJobs: int, failedJobs: int}
+     */
+    #[Computed]
+    public function health(): array
+    {
+        $health = resolve(SystemHealth::class);
+
+        return [
+            'showsWarnings' => ! app()->environment('local'),
+            'schedulerRunning' => $health->schedulerIsRunning(),
+            'schedulerLastRan' => $health->schedulerLastRan(),
+            'waitingJobs' => $health->waitingJobs(),
+            'failedJobs' => $health->failedJobsThisWeek(),
+        ];
     }
 
     #[Computed]
@@ -270,6 +288,40 @@ return new class extends Component
                 </x-slot>
             </flux:callout>
         @endunless
+
+        @php($health = $this->health())
+        @if ($health['showsWarnings'] && ! $health['schedulerRunning'])
+            <flux:callout inline icon="clock" color="amber">
+                <flux:callout.heading>{{ __('The scheduler isn’t running') }}</flux:callout.heading>
+                <flux:callout.text>
+                    {{ __('Backups, update checks and releasing stock from abandoned checkouts need a cron entry that runs php artisan schedule:run every minute.') }} {{ $health['schedulerLastRan'] ? __('It last ran :time.', ['time' => $health['schedulerLastRan']->diffForHumans()]) : __('It has never run.') }}
+                </flux:callout.text>
+            </flux:callout>
+        @endif
+
+        @if ($health['showsWarnings'] && $health['waitingJobs'] > 0)
+            <flux:callout inline icon="inbox-stack" color="amber">
+                <flux:callout.heading>
+                    {{ trans_choice('{1} :count email or webhook is waiting|[2,*] :count emails and webhooks are waiting', $health['waitingJobs'], ['count' => $health['waitingJobs']]) }}</flux:callout.heading>
+                <flux:callout.text>
+                    {{ __('They have waited over 15 minutes. Start a queue worker with php artisan queue:work.') }}</flux:callout.text>
+            </flux:callout>
+        @endif
+
+        @if ($health['failedJobs'] > 0)
+            <flux:callout inline icon="exclamation-triangle" color="red">
+                <flux:callout.heading>
+                    {{ trans_choice('{1} :count background task failed this week|[2,*] :count background tasks failed this week', $health['failedJobs'], ['count' => $health['failedJobs']]) }}</flux:callout.heading>
+                @can('developer')
+                    <x-slot name="actions">
+                        <flux:button
+                            :href="route('admin.settings-errors')"
+                            wire:navigate
+                        >{{ __('See errors') }}</flux:button>
+                    </x-slot>
+                @endcan
+            </flux:callout>
+        @endif
     @endcan
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

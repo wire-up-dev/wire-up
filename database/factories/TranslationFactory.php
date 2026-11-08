@@ -24,7 +24,7 @@ final class TranslationFactory extends Factory
             'body' => fake()->sentence(),
             'locale' => fn () => Locale::query()->inRandomOrder()->first()->code ?? 'en',
             'translatable_id' => fn () => Page::factory()->create()->id,
-            'translatable_type' => Page::class,
+            'translatable_type' => new Page()->getMorphClass(),
         ];
     }
 }

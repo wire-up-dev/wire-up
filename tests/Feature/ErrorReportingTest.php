@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Notifications\ErrorReported;
 use App\Services\ErrorReporter;
 use App\Services\SlackWebhookChannel;
+use App\Services\UpdateService;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Notifications\Events\NotificationSending;
@@ -81,6 +82,17 @@ it('sends each distinct error at most once an hour', function (): void {
     report(errorAtLine(10));
 
     Notification::assertSentOnDemandTimes(ErrorReported::class, 3);
+});
+
+it('keeps errors in the log but sends no reports while an update is running', function (): void {
+    Notification::fake();
+    reportErrorsTo(slack: '');
+    resolve(UpdateService::class)->markRunning('v1.0.0', 'Install PHP dependencies');
+
+    report(errorAtLine(20));
+
+    Notification::assertNothingSent();
+    expect(ErrorLog::query()->count())->toBe(1);
 });
 
 it('sends no more than twenty error reports an hour', function (): void {

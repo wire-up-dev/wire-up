@@ -298,7 +298,7 @@ it('applies a full custom palette', function (): void {
         ->assertOk();
 
     expect(Settings::get('theme'))->toBe('custom')
-        ->and(Settings::get('colors'))->toBe($colors);
+        ->and(Settings::get('colors'))->toEqual($colors);
 });
 
 it('rejects incomplete or unknown custom colors', function (): void {
@@ -338,7 +338,7 @@ it('applies a full custom dark palette and rejects an incomplete one', function 
     WireUpServer::tool(UpdateDesignTool::class, ['colors_dark' => $colors])
         ->assertOk();
 
-    expect(Settings::get('colors_dark'))->toBe($colors);
+    expect(Settings::get('colors_dark'))->toEqual($colors);
 
     Settings::set(['colors_dark' => []]);
 

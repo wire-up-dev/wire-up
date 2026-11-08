@@ -14,7 +14,7 @@ final class UiStrings
      */
     public static function catalog(): array
     {
-        return cache()->rememberForever('ui-strings-catalog', self::scan(...));
+        return cache()->rememberForever('ui-strings-catalog:'.(resolve(UpdateService::class)->currentVersion() ?? 'unversioned'), self::scan(...));
     }
 
     /**

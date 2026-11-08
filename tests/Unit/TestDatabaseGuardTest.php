@@ -9,7 +9,16 @@ it('allows the suite to run on the sqlite connection', function (): void {
         ->not->toThrow(RuntimeException::class);
 });
 
-it('refuses to run the suite against a non-sqlite (real) database connection', function (): void {
+it('refuses to run the suite against a real database', function (): void {
+    config(['database.connections.mysql.database' => 'wireup']);
+
     expect(fn () => TestCase::assertTestDatabaseIsIsolated('mysql'))
         ->toThrow(RuntimeException::class, 'Refusing to run the test suite');
 });
+
+it('allows a mysql or postgres database set aside for tests', function (string $connection): void {
+    config(["database.connections.{$connection}.database" => 'wireup_test']);
+
+    expect(fn () => TestCase::assertTestDatabaseIsIsolated($connection))
+        ->not->toThrow(RuntimeException::class);
+})->with(['mysql', 'pgsql']);

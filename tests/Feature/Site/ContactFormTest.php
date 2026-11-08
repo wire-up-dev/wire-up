@@ -286,8 +286,8 @@ it('persists custom field values into metadata', function (): void {
 
     $submission = Submission::query()->latest('id')->firstOrFail();
 
-    expect($submission->metadata)->toBe([
-        'colour' => ['label' => 'Colour', 'value' => 'Blue'],
-        'terms' => ['label' => 'Accept terms', 'value' => true],
+    expect($submission->orderedMetadata())->toBe([
+        'colour' => ['label' => 'Colour', 'value' => 'Blue', 'position' => 0],
+        'terms' => ['label' => 'Accept terms', 'value' => true, 'position' => 1],
     ]);
 });

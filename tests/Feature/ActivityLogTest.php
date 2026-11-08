@@ -241,7 +241,7 @@ it('logs invitations, role changes, disabled and enabled accounts and deleted ac
         ActivityEvent::USER_ENABLED,
         ActivityEvent::USER_DELETED,
     ])->and(Activity::query()->where('event', ActivityEvent::USER_INVITED)->sole()->properties)->toBe(['role' => 'Editor'])
-        ->and(Activity::query()->where('event', ActivityEvent::USER_ROLE_CHANGED)->sole()->properties)->toBe(['from' => 'Editor', 'to' => 'Administrator']);
+        ->and(Activity::query()->where('event', ActivityEvent::USER_ROLE_CHANGED)->sole()->properties)->toEqual(['from' => 'Editor', 'to' => 'Administrator']);
 });
 
 it('logs roles added, changed and removed in the roles screen', function (): void {

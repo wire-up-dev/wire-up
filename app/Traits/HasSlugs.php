@@ -10,8 +10,11 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Throwable;
 
 trait HasSlugs
 {
@@ -44,9 +47,7 @@ trait HasSlugs
         resolve('localization')->getActiveLocaleCodes()->each(function (string $locale): void {
             app()->setLocale($locale);
             $rawValue = $this->buildRawValueForLocale($locale);
-            $slug = $this->resolveUniqueSlug(Str::slug($rawValue), $locale);
-
-            $this->upsertSlug($locale, $slug);
+            $this->storeUniqueSlug($locale, Str::slug($rawValue));
         });
 
         app()->setLocale($currentLocale);
@@ -58,7 +59,7 @@ trait HasSlugs
     public function updateSlugs(array $slugs): void
     {
         foreach ($slugs as $locale => $slug) {
-            $this->upsertSlug($locale, $this->resolveUniqueSlug($slug, $locale));
+            $this->storeUniqueSlug($locale, $slug);
         }
     }
 
@@ -109,6 +110,11 @@ trait HasSlugs
         }
 
         return is_string($value) ? $value : null;
+    }
+
+    protected function storeUniqueSlug(string $locale, string $baseSlug): void
+    {
+        retry(3, fn () => DB::transaction(fn () => $this->upsertSlug($locale, $this->resolveUniqueSlug($baseSlug, $locale))), when: fn (Throwable $exception): bool => $exception instanceof UniqueConstraintViolationException);
     }
 
     protected function upsertSlug(string $locale, string $slug): void

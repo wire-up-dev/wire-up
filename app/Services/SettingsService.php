@@ -8,7 +8,6 @@ use App\Integrations\Mail;
 use App\Models\Page;
 use App\Models\Settings;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Number;
 
@@ -138,22 +137,23 @@ final class SettingsService
      */
     public function menuForDisplay(string $key): ?array
     {
-        $menu = collect($this->allMenus())->firstWhere('key', $key);
+        return new MenuResolver($this)->menuForDisplay($key);
+    }
 
-        if ($menu === null) {
-            return null;
-        }
+    /**
+     * @return array<int, array{type: string, label: string, url: string, target: string, appearance: string, icon: ?string, icon_svg: string, badge: string, badgeColor: string}>
+     */
+    public function menu(string $key): array
+    {
+        return new MenuResolver($this)->menu($key);
+    }
 
-        $items = $this->menu($key);
-
-        if ($items === []) {
-            return null;
-        }
-
-        return [
-            'display' => $menu['display'],
-            'items' => $items,
-        ];
+    /**
+     * @return array<int, array{key: string, name: string, builtin: bool, display: array{background: bool, position: string, sticky: bool, mobile: string}, items: array<string, array<int, mixed>>}>
+     */
+    public function allMenus(): array
+    {
+        return self::normalizeMenus(config('site.menus'));
     }
 
     public function homePage(bool $publishedOnly = true): ?Page
@@ -521,123 +521,12 @@ final class SettingsService
 
     public function themeCss(): string
     {
-        $source = $this->themeColors() ?: config()->array('theme.presets.default.colors');
-        $palette = [];
-        foreach ($source as $slot => $hex) {
-            if (is_string($slot) && is_string($hex)) {
-                $palette[$slot] = $hex;
-            }
-        }
+        return new ThemeCss($this)->css();
+    }
 
-        $root = $this->colorDeclarations($palette);
-
-        $dark = [];
-        $accent = $this->accentDeclarations($palette);
-        if ($accent !== []) {
-            $root = [...$root, ...$accent];
-            $dark = $accent;
-        }
-
-        $radiusKey = (string) config('site.radius', '') ?: config()->string('theme.default_radius');
-        $radius = config()->string("theme.radii.$radiusKey", '');
-        if ($radius !== '') {
-            $root[] = "--wire-radius:$radius";
-
-            foreach (['sm', 'md', 'lg', 'xl'] as $size) {
-                $root[] = "--radius-$size:$radius";
-            }
-        }
-
-        $buttonRadiusKey = (string) config('site.button_radius', '') ?: config()->string('theme.default_button_radius');
-        $buttonRadius = config()->string("theme.button_radii.$buttonRadiusKey", '');
-        $root[] = '--wire-btn-radius:'.($buttonRadius !== '' ? $buttonRadius : 'var(--wire-radius)');
-
-        $borderWidthKey = (string) config('site.border_width', '') ?: config()->string('theme.default_border_width');
-        $borderWidth = config()->string("theme.border_widths.$borderWidthKey", '');
-        if ($borderWidth !== '') {
-            $root[] = "--wire-border-width:$borderWidth";
-        }
-
-        $headingStack = $this->fontFor('heading')['stack'];
-        $bodyStack = $this->fontFor('body')['stack'];
-        if ($headingStack !== '') {
-            $root[] = "--wire-heading-font:$headingStack";
-        }
-        if ($bodyStack !== '') {
-            $root[] = "--wire-body-font:$bodyStack";
-            $root[] = "--font-sans:$bodyStack";
-        }
-
-        $containerKey = (string) config('site.container', '') ?: config()->string('theme.default_container');
-        $container = config()->string("theme.containers.$containerKey", '');
-
-        if ($containerKey === 'custom') {
-            $width = $this->pixelSetting('container_width', 'theme.container_width_min', 'theme.container_width_max')
-                ?? config()->integer('theme.default_container_width');
-            $container = "{$width}px";
-        }
-
-        if ($container !== '') {
-            $root[] = "--wire-container:$container";
-        }
-
-        $gutter = $this->pixelSetting('gutter', 'theme.gutter_min', 'theme.gutter_max');
-        $root[] = '--wire-gutter:'.($gutter === null ? '1.5rem' : "{$gutter}px");
-        $fullGutter = $containerKey === 'full'
-            ? match ($this->blockSpacing()) {
-                'small' => '3rem',
-                'large' => '5rem',
-                default => '4rem',
-            }
-        : '';
-
-        $headingSizeKey = (string) config('site.heading_size', '') ?: config()->string('theme.default_heading_size');
-        $bodySizeKey = (string) config('site.body_size', '') ?: config()->string('theme.default_body_size');
-        $headingSize = config()->string("theme.heading_sizes.$headingSizeKey", '');
-        $bodySize = config()->string("theme.body_sizes.$bodySizeKey", '');
-        if ($headingSize !== '') {
-            $root[] = "--wire-heading-size:$headingSize";
-        }
-        if ($bodySize !== '') {
-            $root[] = "--wire-body-size:$bodySize";
-        }
-
-        $leadingKey = (string) config('site.body_leading', '') ?: config()->string('theme.default_body_leading');
-        $leading = config()->string("theme.body_leadings.$leadingKey", '');
-        if ($leading !== '') {
-            $root[] = "--wire-body-leading:$leading";
-        }
-
-        $indentKey = (string) config('site.list_indent', '') ?: config()->string('theme.default_list_indent');
-        $indent = config()->string("theme.list_indents.$indentKey", '');
-        if ($indent !== '') {
-            $root[] = "--wire-list-indent:$indent";
-        }
-
-        $headerHeight = $this->headerHeight();
-        if ($headerHeight !== null) {
-            $root[] = "--wire-header-height:{$headerHeight}px";
-        }
-
-        $logoHeight = $this->headerLogoHeight();
-        if ($logoHeight !== null) {
-            $root[] = "--wire-logo-height:{$logoHeight}px";
-        }
-
-        $css = ':root{'.implode(';', $root).'}'.($dark === [] ? '' : '.dark{'.implode(';', $dark).'}');
-
-        $darkPalette = $this->darkThemeColors();
-        if ($darkPalette !== []) {
-            $darkVars = implode(';', [...$this->colorDeclarations($darkPalette), ...$this->accentDeclarations($darkPalette)]);
-            $css .= ':root.dark{'.$darkVars.'}';
-            $css .= '@media(prefers-color-scheme:dark){:root:where(:not(.light)){'.$darkVars.'}}';
-        }
-
-        if ($fullGutter !== '') {
-            $css .= '@media(min-width:768px){:root{--wire-gutter:'.$fullGutter.'}}';
-        }
-
-        return $css;
+    public function googleFontsUrl(): ?string
+    {
+        return new ThemeCss($this)->googleFontsUrl();
     }
 
     public function customCss(): string
@@ -653,80 +542,6 @@ final class SettingsService
     public function bodyScripts(): string
     {
         return mb_trim((string) config('site.body_scripts', ''));
-    }
-
-    public function googleFontsUrl(): ?string
-    {
-        $families = [];
-        foreach (['heading', 'body'] as $slot) {
-            $key = (string) config("site.{$slot}_font", '');
-
-            if ($key === '') {
-                continue;
-            }
-
-            $family = $key === 'custom'
-                ? mb_trim((string) config("site.{$slot}_font_custom", ''))
-                : config()->string("theme.fonts.$key.google", '');
-
-            if ($family !== '') {
-                $families[$family] = $family;
-            }
-        }
-
-        if ($families === []) {
-            return null;
-        }
-
-        $params = implode('&', array_map(
-            fn (string $family): string => 'family='.str_replace(' ', '+', $family).':wght@400;500;600;700',
-            $families,
-        ));
-
-        return "https://fonts.googleapis.com/css2?$params&display=swap";
-    }
-
-    /**
-     * @return array<int, array{type: string, label: string, url: string, target: string, appearance: string, icon: ?string, icon_svg: string, badge: string, badgeColor: string}>
-     */
-    public function menu(string $key): array
-    {
-        $menu = collect($this->allMenus())->firstWhere('key', $key);
-
-        if ($menu === null) {
-            return [];
-        }
-
-        $items = $this->localeMenuItems($menu['items']);
-        $pages = $this->menuPages($items);
-
-        $resolved = [];
-        foreach ($items as $item) {
-            if (! is_array($item)) {
-                continue;
-            }
-
-            if (($item['type'] ?? null) === 'account') {
-                array_push($resolved, ...$this->resolveAccountItems($item));
-
-                continue;
-            }
-
-            $entry = $this->resolveMenuItem($item, $pages);
-            if ($entry !== null) {
-                $resolved[] = $entry;
-            }
-        }
-
-        return $resolved;
-    }
-
-    /**
-     * @return array<int, array{key: string, name: string, builtin: bool, display: array{background: bool, position: string, sticky: bool, mobile: string}, items: array<string, array<int, mixed>>}>
-     */
-    public function allMenus(): array
-    {
-        return self::normalizeMenus(config('site.menus'));
     }
 
     /**
@@ -803,6 +618,19 @@ final class SettingsService
             'stack' => config()->string("theme.fonts.$key.stack", ''),
             'google' => config()->string("theme.fonts.$key.google", ''),
         ];
+    }
+
+    public function pixelSetting(string $key, string $minKey, string $maxKey): ?int
+    {
+        $value = config("site.{$key}");
+
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        $pixels = (int) $value;
+
+        return $pixels >= config()->integer($minKey) && $pixels <= config()->integer($maxKey) ? $pixels : null;
     }
 
     /**
@@ -894,65 +722,6 @@ final class SettingsService
         }
 
         return $palette;
-    }
-
-    private function pixelSetting(string $key, string $minKey, string $maxKey): ?int
-    {
-        $value = config("site.{$key}");
-
-        if (! is_numeric($value)) {
-            return null;
-        }
-
-        $pixels = (int) $value;
-
-        return $pixels >= config()->integer($minKey) && $pixels <= config()->integer($maxKey) ? $pixels : null;
-    }
-
-    /**
-     * @param  array<string, string>  $palette
-     * @return list<string>
-     */
-    private function colorDeclarations(array $palette): array
-    {
-        $declarations = [];
-        foreach ($palette as $slot => $hex) {
-            if ($hex === '') {
-                continue;
-            }
-
-            $name = match ($slot) {
-                'background' => 'body-bg',
-                'text' => 'body-text',
-                default => str_replace('_', '-', $slot),
-            };
-            $declarations[] = "--wire-$name:$hex";
-        }
-
-        if (($palette['heading'] ?? '') === '') {
-            $declarations[] = '--wire-heading:var(--wire-body-text)';
-        }
-
-        return $declarations;
-    }
-
-    /**
-     * @param  array<string, string>  $palette
-     * @return list<string>
-     */
-    private function accentDeclarations(array $palette): array
-    {
-        $accentColor = $palette['accent'] ?? $palette['primary_bg'] ?? null;
-
-        if ($accentColor === null || ! isset($palette['primary_text'])) {
-            return [];
-        }
-
-        return [
-            "--color-accent:{$accentColor}",
-            "--color-accent-content:{$accentColor}",
-            "--color-accent-foreground:{$palette['primary_text']}",
-        ];
     }
 
     private function localeValue(mixed $value): string
@@ -1051,158 +820,5 @@ final class SettingsService
             "q={$values['q']}",
             "fm={$values['fm']}",
         ]);
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $menus
-     * @return array<int, mixed>
-     */
-    private function localeMenuItems(array $menus): array
-    {
-        $locale = app()->getLocale();
-        $items = $menus[$locale] ?? null;
-
-        if (is_array($items) && $items !== []) {
-            return array_values($items);
-        }
-
-        $default = config()->string('app.fallback_locale', 'en');
-        if ($locale !== $default && is_array($menus[$default] ?? null)) {
-            return array_values($menus[$default]);
-        }
-
-        return [];
-    }
-
-    /**
-     * @param  array<int, mixed>  $items
-     * @return Collection<int, Page>
-     */
-    private function menuPages(array $items): Collection
-    {
-        $ids = [];
-        foreach ($items as $item) {
-            if (is_array($item) && ($item['type'] ?? null) === 'page' && isset($item['page_id'])) {
-                $ids[] = (int) $item['page_id'];
-            }
-        }
-
-        if ($ids === []) {
-            return new Collection;
-        }
-
-        return Page::query()
-            ->published()
-            ->whereIn('id', $ids)
-            ->with('slugs')
-            ->get()
-            ->keyBy('id');
-    }
-
-    /**
-     * @param  array<string, mixed>  $item
-     * @param  Collection<int, Page>  $pages
-     * @return array{type: string, label: string, url: string, target: string, appearance: string, icon: ?string, icon_svg: string, badge: string, badgeColor: string}|null
-     */
-    private function resolveMenuItem(array $item, Collection $pages): ?array
-    {
-        $label = is_string($item['label'] ?? null) ? $item['label'] : '';
-        if ($label === '') {
-            return null;
-        }
-
-        $type = $item['type'] ?? null;
-
-        if ($type === 'heading') {
-            return [
-                'type' => 'heading',
-                'label' => $label,
-                'url' => '',
-                'target' => '_self',
-                'appearance' => 'link',
-                'icon' => null,
-                'icon_svg' => '',
-                'badge' => '',
-                'badgeColor' => 'zinc',
-            ];
-        }
-
-        $url = null;
-
-        if ($type === 'link') {
-            $url = is_string($item['url'] ?? null) && $item['url'] !== '' ? $item['url'] : null;
-        } elseif ($type === 'page') {
-            $raw = is_scalar($item['page_id'] ?? null) ? (string) $item['page_id'] : '';
-
-            if (str_starts_with($raw, self::AUTH_LINK_PREFIX)) {
-                $url = $this->resolveAuthLink($raw);
-            } else {
-                $page = $raw !== '' ? $pages->get((int) $raw) : null;
-                if ($page instanceof Page && $page->slug !== '') {
-                    $url = route('page', $page->slug);
-                }
-            }
-        }
-
-        if ($url === null) {
-            return null;
-        }
-
-        $icon = is_string($item['icon'] ?? null) ? $item['icon'] : '';
-        $badgeColor = is_string($item['badgeColor'] ?? null) ? $item['badgeColor'] : 'zinc';
-        $iconSvg = is_string($item['icon_svg'] ?? null) ? $item['icon_svg'] : '';
-        $appearance = in_array($item['appearance'] ?? null, ['button', 'icon'], true) ? (string) $item['appearance'] : 'link';
-
-        if ($appearance === 'icon' && $iconSvg === '') {
-            $appearance = 'link';
-        }
-
-        return [
-            'type' => 'link',
-            'label' => $label,
-            'url' => $url,
-            'target' => ($item['target'] ?? null) === '_blank' ? '_blank' : '_self',
-            'appearance' => $appearance,
-            'icon' => in_array($icon, config()->array('menu.icons'), true) ? $icon : null,
-            'icon_svg' => $appearance === 'icon' ? $iconSvg : '',
-            'badge' => is_string($item['badge'] ?? null) ? $item['badge'] : '',
-            'badgeColor' => in_array($badgeColor, config()->array('menu.badge_colors'), true) ? $badgeColor : 'zinc',
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $item
-     * @return array<int, array{type: string, label: string, url: string, target: string, appearance: string, icon: ?string, icon_svg: string, badge: string, badgeColor: string}>
-     */
-    private function resolveAccountItems(array $item): array
-    {
-        $appearance = ($item['appearance'] ?? null) === 'button' ? 'button' : 'link';
-
-        $entry = fn (string $type, string $label, string $url): array => [
-            'type' => $type,
-            'label' => $label,
-            'url' => $url,
-            'target' => '_self',
-            'appearance' => $appearance,
-            'icon' => null,
-            'icon_svg' => '',
-            'badge' => '',
-            'badgeColor' => 'zinc',
-        ];
-
-        if (auth()->check()) {
-            return [
-                $entry('link', __('Account'), route('account')),
-                $entry('logout', __('Log out'), route('logout')),
-            ];
-        }
-
-        $links = [$entry('link', __('Log in'), route('login'))];
-
-        if ($this->allowsRegistration()) {
-            $links[] = $entry('link', __('Sign up'), route('register'));
-        }
-
-        return $links;
     }
 }

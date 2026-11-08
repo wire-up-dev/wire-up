@@ -6,10 +6,12 @@ namespace App\Services;
 
 use App\Notifications\SystemUpdateCompleted;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
+use RuntimeException;
 use Throwable;
 
 final readonly class UpdateService
@@ -17,6 +19,8 @@ final readonly class UpdateService
     private const string CACHE_LATEST = 'wireup:update:latest';
 
     private const string CACHE_STATE = 'wireup:update:state';
+
+    private const string LOCK = 'wireup:update:lock';
 
     public function __construct(private ReleaseAssets $assets = new ReleaseAssets()) {}
 
@@ -38,7 +42,31 @@ final readonly class UpdateService
         $path = $this->versionFile();
 
         File::ensureDirectoryExists(dirname($path));
-        File::put($path, $version);
+
+        throw_if(File::put($path, $version) === false, RuntimeException::class, "The version file {$path} could not be written. Check that the user running updates can write to the storage folder.");
+    }
+
+    public function updateLock(): Lock
+    {
+        return Cache::lock(self::LOCK, 3600);
+    }
+
+    public function updateIsLocked(): bool
+    {
+        $probe = Cache::lock(self::LOCK, 1);
+
+        if ($probe->get()) {
+            $probe->release();
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public function lastCheckFailed(): bool
+    {
+        return data_get(Cache::get(self::CACHE_LATEST), 'failed') === true;
     }
 
     public function refreshCurrentVersionFromGit(): ?string
@@ -97,6 +125,7 @@ final readonly class UpdateService
             'version' => $latest,
             'checked_at' => now()->toIso8601String(),
             'notes' => $notes,
+            'failed' => $result->failed(),
         ]);
 
         return $latest;
@@ -171,7 +200,7 @@ final readonly class UpdateService
 
         if ($at instanceof CarbonImmutable && (
             ($status === 'pending' && $at->lt(now()->subMinutes(10)))
-            || ($status === 'running' && $at->lt(now()->subMinutes(30)))
+            || ($status === 'running' && $at->lt(now()->subMinutes(30)) && ! $this->updateIsLocked())
         )) {
             $status = 'stalled';
         }

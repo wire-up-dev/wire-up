@@ -170,14 +170,18 @@ final readonly class OffsiteBackupService
 
         File::ensureDirectoryExists($this->backups->directory());
 
+        $destination = $this->backups->directory().'/'.$chosen['file'];
+        $partial = $destination.'.part';
         $source = $this->readStream($chosen['file']);
-        $target = fopen($this->backups->directory().'/'.$chosen['file'], 'wb');
+        $target = fopen($partial, 'wb');
 
         throw_if($target === false, RuntimeException::class, __('The backup could not be saved in :path.', ['path' => $this->backups->directory()]));
 
         stream_copy_to_stream($source, $target);
         fclose($target);
         fclose($source);
+
+        throw_unless(File::move($partial, $destination), RuntimeException::class, __('The backup could not be saved in :path.', ['path' => $this->backups->directory()]));
 
         return $chosen['file'];
     }

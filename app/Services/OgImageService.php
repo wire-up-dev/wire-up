@@ -93,7 +93,9 @@ final readonly class OgImageService
 
         try {
             return $this->screenshot->capture('file://'.$source, '1200,630');
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            report($exception);
+
             return null;
         } finally {
             File::delete($source);

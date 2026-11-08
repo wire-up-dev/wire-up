@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\CreateCategoryAction;
 use App\Enums\ContentStatus;
 use App\Enums\MediaType;
+use App\Models\Category;
 use App\Models\Locale;
 use App\Models\Media;
 use App\Models\Page;
@@ -333,7 +334,7 @@ it('hydrates og_image from existing media on mount', function (): void {
     expect($og)->toHaveKey('en')
         ->and($og['en'])->toHaveCount(1)
         ->and($og['en'][0]['id'])->toBe($media->id)
-        ->and($og['en'][0]['crop'])->toBe(['default' => ['crop_w' => 1200, 'crop_h' => 630, 'crop_x' => 0, 'crop_y' => 0]])
+        ->and($og['en'][0]['crop'])->toEqual(['default' => ['crop_w' => 1200, 'crop_h' => 630, 'crop_x' => 0, 'crop_y' => 0]])
         ->and($og['en'][0]['metadata'])->toBe(['caption' => 'Hydrated caption']);
 });
 
@@ -354,7 +355,7 @@ it('persists og_image caption metadata on update', function (): void {
 
     $pivot = $page->fresh()->media()->wherePivot('role', 'og_image')->first()->pivot;
 
-    expect($pivot->metadata)->toBe(['caption' => 'My caption', 'alt' => 'My alt']);
+    expect($pivot->metadata)->toEqual(['caption' => 'My caption', 'alt' => 'My alt']);
 });
 
 it('persists a single (non-list) og_image item from a single-select selector', function (): void {
@@ -638,6 +639,19 @@ it('syncs selected categories on save', function (): void {
 
     expect($page->refresh()->categories()->pluck('categories.id')->all())
         ->toEqualCanonicalizing([$first->id, $second->id]);
+});
+
+it('ignores creating a category with a blank name', function (): void {
+    $page = Page::factory()->create();
+
+    $this->actingAsAdmin();
+
+    Livewire::test('pages::admin.pages-edit', ['page' => $page])
+        ->set('categorySearch', '   ')
+        ->call('createCategory')
+        ->assertSet('categories', []);
+
+    expect(Category::query()->count())->toBe(0);
 });
 
 it('creates a category on the fly and attaches it to the page on save', function (): void {

@@ -252,10 +252,18 @@ return new class extends Component
     #[Computed]
     public function records(): LengthAwarePaginator
     {
-        return $this->recordsQuery()
+        $records = $this->recordsQuery()
             ->when($this->recordType->hasMediaColumns() || $this->recordType->hasImageField(), fn (Builder $query): Builder => $query->with('media'))
             ->when($this->recordType->hasImageField(), fn (Builder $query): Builder => $query->with('recordType'))
             ->paginate($this->perPage);
+
+        foreach ($this->columnFields() as $field) {
+            if (($field['type'] ?? null) === FieldType::RELATIONSHIP->value) {
+                Record::preloadLinkedRecords(new EloquentCollection($records->items()), $field, publishedOnly: false);
+            }
+        }
+
+        return $records;
     }
 
     /**

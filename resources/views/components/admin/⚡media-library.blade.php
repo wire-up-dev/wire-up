@@ -331,7 +331,7 @@ return new class extends Component
             ->when($this->typeFilter, fn ($q, $t) => $q->where('type', $t))
             ->when($this->usage === 'unused', fn ($q) => $q->whereKey(resolve(MediaUsageService::class)->unusedIds()))
             ->when($this->usage === 'used', fn ($q) => $q->whereKeyNot(resolve(MediaUsageService::class)->unusedIds()))
-            ->when($this->search, fn ($q, $s) => $q->whereAny(['filename', 'alt_text'], 'like', "%{$s}%")
+            ->when($this->search, fn ($q, $s) => $q->where(fn ($inner) => $inner->whereLike('filename', "%{$s}%")->orWhereLike('alt_text', "%{$s}%"))
             );
 
         $offset = $loadMore ? $this->medias->count() : 0;

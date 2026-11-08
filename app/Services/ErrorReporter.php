@@ -32,7 +32,7 @@ final class ErrorReporter
 
             rescue(fn (): bool => $error->describe($exception)->save(), false, report: false);
 
-            if ($this->routes() !== [] && ($this->isFirstInAnHour($error->fingerprint) || $reopened)) {
+            if ($this->routes() !== [] && ! resolve(UpdateService::class)->updating() && ($this->isFirstInAnHour($error->fingerprint) || $reopened)) {
                 $this->deliver(new ErrorReported($error));
             }
         } finally {

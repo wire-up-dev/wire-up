@@ -132,6 +132,21 @@ it('shows submission details including custom field values', function (): void {
         ->assertSee('Blue');
 });
 
+it('lists custom fields in the order the form asks them, whatever order the database returns them in', function (): void {
+    $submission = Submission::factory()->create([
+        'metadata' => [
+            'terms' => ['label' => 'Accept terms', 'value' => true, 'position' => 2],
+            'budget' => ['label' => 'Budget', 'value' => '500', 'position' => 1],
+            'colour' => ['label' => 'Favourite colour', 'value' => 'Blue', 'position' => 0],
+        ],
+    ]);
+
+    $this->actingAsAdmin();
+
+    Livewire::test('pages::admin.inbox-show', ['submission' => $submission])
+        ->assertSeeInOrder(['Favourite colour', 'Budget', 'Accept terms']);
+});
+
 it('shows the visitor country on the detail page', function (): void {
     $submission = Submission::factory()->create(['country' => 'GB']);
 

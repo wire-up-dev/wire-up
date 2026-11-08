@@ -18,7 +18,7 @@ it('stamps last access for a user who has never been seen', function (): void {
 });
 
 it('refreshes last access once it is stale', function (): void {
-    $user = User::factory()->create(['last_seen_at' => now()->subMinutes(5), 'last_ip' => 'old']);
+    $user = User::factory()->create(['last_seen_at' => now()->subMinutes(5), 'last_ip' => '198.51.100.7']);
 
     (new UpdateUserLastAccessAction)->handle($user, 'Mozilla/5.0', '9.9.9.9');
 
@@ -26,9 +26,9 @@ it('refreshes last access once it is stale', function (): void {
 });
 
 it('does not rewrite last access within the throttle window', function (): void {
-    $user = User::factory()->create(['last_seen_at' => now()->subSeconds(20), 'last_ip' => 'old']);
+    $user = User::factory()->create(['last_seen_at' => now()->subSeconds(20), 'last_ip' => '198.51.100.7']);
 
     (new UpdateUserLastAccessAction)->handle($user, 'Mozilla/5.0', '9.9.9.9');
 
-    expect($user->fresh()->last_ip)->toBe('old');
+    expect($user->fresh()->last_ip)->toBe('198.51.100.7');
 });

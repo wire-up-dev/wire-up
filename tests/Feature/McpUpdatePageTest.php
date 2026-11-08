@@ -28,6 +28,22 @@ it('advertises the update-page tool with its schema', function (): void {
         ->and(WireUpServer::TOOLS)->toContain(UpdatePageTool::class);
 });
 
+it('refuses a web address another page already uses, like the admin does', function (): void {
+    $taken = Page::factory()->create();
+    $taken->slugs()->delete();
+    $taken->slugs()->create(['locale' => 'en', 'slug' => 'pricing']);
+    $page = Page::factory()->create();
+    $page->slugs()->delete();
+    $page->slugs()->create(['locale' => 'en', 'slug' => 'plans']);
+
+    WireUpServer::tool(UpdatePageTool::class, ['page' => $page->id, 'slug' => 'pricing'])
+        ->assertHasErrors(['The web address "pricing" is already used by another page. Choose a different slug.']);
+
+    expect($page->refresh()->getSlug())->toBe('plans');
+
+    WireUpServer::tool(UpdatePageTool::class, ['page' => $page->id, 'slug' => 'plans'])->assertOk();
+});
+
 it('replaces the meta description the installer left on a page', function (): void {
     $page = pageTitled('Home');
 

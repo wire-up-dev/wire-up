@@ -60,7 +60,7 @@ it('refuses to back up an in-memory sqlite database', function (): void {
     $this->artisan(BackupDatabaseCommand::class)
         ->expectsOutputToContain('in-memory')
         ->assertExitCode(1);
-});
+})->group('sqlite-only');
 
 it('fails with the sqlite error when the target cannot be written', function (): void {
     $this->travelTo(now());

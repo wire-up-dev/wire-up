@@ -36,7 +36,7 @@ final class ListOrdersTool extends Tool implements HiddenFromAssistant
 
         $orders = Order::query()
             ->when(isset($validated['status']), fn (Builder $query): Builder => $query->where('status', $validated['status']))
-            ->when(isset($validated['search']), fn (Builder $query): Builder => $query->whereAny(['reference', 'email', 'name'], 'like', '%'.$validated['search'].'%'))
+            ->when(isset($validated['search']), fn (Builder $query): Builder => $query->where(fn (Builder $inner): Builder => $inner->whereLike('reference', '%'.$validated['search'].'%')->orWhereLike('email', '%'.$validated['search'].'%')->orWhereLike('name', '%'.$validated['search'].'%')))
             ->latest('id')
             ->limit((int) ($validated['limit'] ?? 25))
             ->get()

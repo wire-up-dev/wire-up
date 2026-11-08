@@ -16,6 +16,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 
 /**
  * @property-read int $id
@@ -118,7 +119,9 @@ final class Settings extends Model
 
         try {
             return Crypt::decryptString($value);
-        } catch (DecryptException) {
+        } catch (DecryptException $exception) {
+            report(new RuntimeException("The saved {$key} setting can’t be decrypted, usually because APP_KEY changed. Enter it again.", previous: $exception));
+
             return '';
         }
     }

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\UpdateActiveLocalesAction;
 use App\Actions\UpdateSettingsAction;
 use App\Models\Locale;
 use App\Models\Page;
@@ -10,7 +11,6 @@ use App\Services\SettingsService;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -97,21 +97,7 @@ return new class extends Component
             'contact_email' => __('communication email'),
         ]);
 
-        $codes = array_values(array_unique($validated['languages']));
-
-        $default = resolve('localization')->getDefaultLocale();
-        if (! in_array($default, $codes, true)) {
-            $codes[] = $default;
-        }
-
-        DB::transaction(function () use ($codes): void {
-            Locale::query()->whereIn('code', $codes)->update(['active' => true]);
-            Locale::query()->whereNotIn('code', $codes)->update(['active' => false]);
-        });
-
-        cache()->forget('site-locales');
-
-        $this->languages = $codes;
+        $this->languages = resolve(UpdateActiveLocalesAction::class)->handle($validated['languages']);
 
         $action->handle([
             'home_page_id' => $validated['home_page_id'],

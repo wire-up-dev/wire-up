@@ -58,11 +58,14 @@ return new class extends Component
     {
         $this->authorize('settings.edit');
 
-        resolve(UpdateService::class)->check();
+        $updates = resolve(UpdateService::class);
+        $updates->check();
 
         $this->dispatch('updates-checked');
 
-        Flux::toast(__('Checked for updates.'), variant: 'success');
+        $updates->lastCheckFailed()
+            ? Flux::toast(__('Couldn’t reach the release server. Check that this server can run git and connect to GitHub.'), variant: 'danger')
+            : Flux::toast(__('Checked for updates.'), variant: 'success');
     }
 
     public function startUpdate(): void

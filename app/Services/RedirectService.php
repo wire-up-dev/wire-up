@@ -134,7 +134,7 @@ final class RedirectService
             NotFoundPath::query()->upsert(
                 [['path' => $path, 'hits' => 1, 'referrer' => $referrer === null ? null : mb_substr($referrer, 0, self::MAX_PATH_LENGTH)]],
                 ['path'],
-                ['hits' => DB::raw('hits + 1')],
+                ['hits' => DB::raw(DB::getQueryGrammar()->wrapTable(new NotFoundPath()->getTable()).'.hits + 1')],
             );
         })->always();
     }

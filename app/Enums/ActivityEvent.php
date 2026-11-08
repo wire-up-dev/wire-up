@@ -64,6 +64,10 @@ enum ActivityEvent: string
     case BACKUP_OFFSITE_FAILED = 'system.backup_offsite_failed';
     case SYSTEM_UPDATED = 'system.updated';
     case WEBHOOK_FAILED = 'system.webhook_failed';
+    case WEBHOOK_CREATED = 'settings.webhook_created';
+    case WEBHOOK_UPDATED = 'settings.webhook_updated';
+    case WEBHOOK_DELETED = 'settings.webhook_deleted';
+    case LANGUAGES_UPDATED = 'settings.languages_updated';
 
     public function label(): string
     {
@@ -126,6 +130,10 @@ enum ActivityEvent: string
             self::BACKUP_OFFSITE_FAILED => __('Off-site copy failed'),
             self::SYSTEM_UPDATED => __('Updated Wire Up'),
             self::WEBHOOK_FAILED => __('Webhook failed'),
+            self::WEBHOOK_CREATED => __('Added webhook'),
+            self::WEBHOOK_UPDATED => __('Changed webhook'),
+            self::WEBHOOK_DELETED => __('Deleted webhook'),
+            self::LANGUAGES_UPDATED => __('Changed site languages'),
         };
     }
 

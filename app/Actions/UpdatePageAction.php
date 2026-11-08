@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
-use App\Enums\ContentStatus;
 use App\Models\Page;
 use App\Services\ActivityLog;
 use Illuminate\Support\Arr;
@@ -26,7 +25,7 @@ final readonly class UpdatePageAction
 
             $page->update([
                 ...Arr::except($attributes, ['slugs', 'status', 'og_image', 'blocks', 'categories']),
-                ...$this->handlePublication($page, $attributes),
+                ...$page->publicationAttributes($attributes),
                 'updated_at' => now(),
             ]);
 
@@ -59,19 +58,5 @@ final readonly class UpdatePageAction
         foreach ($localizedItems as $locale => $items) {
             $page->syncMediaForRole($role, $locale, $items);
         }
-    }
-
-    /**
-     * @param  array<string, mixed>  $attributes
-     * @return array<string, mixed>
-     */
-    private function handlePublication(Page $page, array $attributes): array
-    {
-        return match ($attributes['status'] ?? 'draft') {
-            ContentStatus::PUBLISHED => ['status' => ContentStatus::PUBLISHED->value, 'published_at' => $page->status === ContentStatus::PUBLISHED && $page->published_at?->isPast() ? $page->published_at : now()],
-            ContentStatus::SCHEDULED => ['status' => ContentStatus::PUBLISHED->value, 'published_at' => $attributes['published_at']],
-            ContentStatus::PRIVATE => ['status' => ContentStatus::PRIVATE->value, 'published_at' => null],
-            default => ['status' => ContentStatus::DRAFT->value, 'published_at' => null],
-        };
     }
 }

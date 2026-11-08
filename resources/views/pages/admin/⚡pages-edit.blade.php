@@ -1,12 +1,9 @@
 <?php
 
 declare(strict_types=1);
-
-use App\Actions\CreateCategoryAction;
 use App\Actions\UpdatePageAction;
 use App\Enums\BlockType;
 use App\Enums\ContentStatus;
-use App\Models\Category;
 use App\Models\Media;
 use App\Models\Page;
 use App\Services\SettingsService;
@@ -16,7 +13,6 @@ use App\Traits\HasRevisionHistory;
 use Flux\Flux;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -110,37 +106,6 @@ return new class extends Component
         }
 
         $this->loadRequestedRevision();
-    }
-
-    public function createCategory(CreateCategoryAction $action): void
-    {
-        $this->authorize('categories.create');
-
-        $name = mb_trim($this->categorySearch);
-
-        if ($name === '') {
-            return;
-        }
-
-        $category = $action->handle(['name' => [$this->locale => $name]]);
-
-        $this->categories[] = (string) $category->id;
-        $this->categorySearch = '';
-
-        unset($this->categoryOptions);
-    }
-
-    /**
-     * @return EloquentCollection<int, Category>
-     */
-    #[Computed]
-    public function categoryOptions(): EloquentCollection
-    {
-        return Category::query()
-            ->with('translations')
-            ->get()
-            ->sortBy(fn (Category $category): string => $category->name)
-            ->values();
     }
 
     public function update(UpdatePageAction $action): void
@@ -272,22 +237,6 @@ return new class extends Component
     public function isHomePage(): bool
     {
         return $this->page->id === SettingsService::current()->homePageId();
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    #[Computed]
-    public function pageLinkOptions(): array
-    {
-        $pages = Page::query()
-            ->with('translations')
-            ->get()
-            ->sortBy(fn (Page $page): string => $page->title)
-            ->mapWithKeys(fn (Page $page): array => [$page->id => $page->title])
-            ->all();
-
-        return $pages + SettingsService::current()->authPageOptions();
     }
 
     public function render(): View

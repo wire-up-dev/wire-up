@@ -25,21 +25,15 @@ abstract class TestCase extends BaseTestCase
         self::assertTestDatabaseIsIsolated((string) config('database.default'));
     }
 
-    /**
-     * Guard against the suite ever running on a real database. Tests must use
-     * sqlite (see phpunit.xml); a stale config cache is the usual way the
-     * connection silently becomes the dev MySQL database — in which case
-     * RefreshDatabase would drop every table. Abort loudly instead.
-     */
     public static function assertTestDatabaseIsIsolated(string $connection): void
     {
         $driver = (string) config("database.connections.{$connection}.driver");
 
-        if ($driver === 'sqlite') {
+        $database = (string) config("database.connections.{$connection}.database");
+
+        if ($driver === 'sqlite' || str_contains($database, '_test')) {
             return;
         }
-
-        $database = (string) config("database.connections.{$connection}.database");
 
         throw new RuntimeException(
             "Refusing to run the test suite against the '{$driver}' connection (database: '{$database}'). "

@@ -68,7 +68,7 @@ it('refuses anything that is not a database backup for this database', function 
     'missing' => 'db-backup-2020-01-01-000000.sqlite',
     'another database' => 'db-backup-2026-11-06-120000.sql',
     'a full backup' => 'backup-2026-11-06-120000-manual.zip',
-]);
+])->group('sqlite-only');
 
 it('clears the database before loading a mysql or postgres backup into it', function (string $driver, string $client): void {
     Process::fake();

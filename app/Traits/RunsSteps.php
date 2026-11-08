@@ -11,6 +11,11 @@ use Throwable;
 trait RunsSteps
 {
     /**
+     * @var list<string>
+     */
+    private const array SLOW_TOOLS = ['composer', 'npm'];
+
+    /**
      * @param  list<string>|Closure(): mixed  $step
      * @return array{bool, string}
      */
@@ -26,7 +31,7 @@ trait RunsSteps
             }
         }
 
-        $result = Process::path(base_path())->env(['PATH' => $this->searchPath()])->timeout(600)->run($step);
+        $result = Process::path(base_path())->env(['PATH' => $this->searchPath()])->timeout(in_array($step[0], self::SLOW_TOOLS, true) ? 1200 : 600)->run($step);
 
         return [$result->successful(), mb_trim($result->output()."\n".$result->errorOutput())];
     }

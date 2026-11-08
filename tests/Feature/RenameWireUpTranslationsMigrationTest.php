@@ -32,7 +32,7 @@ it('keeps a rewording already saved under the new spelling', function (): void {
 
     renameWireUpTranslationsMigration()->up();
 
-    expect(Settings::get('ui_translations'))->toBe($saved);
+    expect(Settings::get('ui_translations'))->toEqual($saved);
 });
 
 it('does nothing on a site without saved rewordings', function (): void {

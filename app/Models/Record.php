@@ -60,6 +60,11 @@ final class Record extends Model
     use ClearsPageCache, HasBlocks, HasCategories, HasFactory, HasMedia, HasPublishing, HasRevisions, HasSeo, HasSlugs, HasTranslations, HasUserstamps;
 
     /**
+     * @var array<string, Collection<int, self>>
+     */
+    private array $linkedRecordCache = [];
+
+    /**
      * @return array<int, int>|null
      */
     public static function normalizeIds(mixed $value): ?array
@@ -86,6 +91,33 @@ final class Record extends Model
         )));
 
         return $clean === [] ? null : $clean;
+    }
+
+    /**
+     * @param  Collection<int, self>  $records
+     * @param  array<string, mixed>  $field
+     */
+    public static function preloadLinkedRecords(Collection $records, array $field, bool $publishedOnly = true): void
+    {
+        $idsByRecord = $records->mapWithKeys(fn (self $record): array => [$record->id => $record->linkedIds($field)]);
+        $allIds = array_values(array_unique(array_merge([], ...array_values($idsByRecord->all()))));
+
+        $found = $allIds === [] ? new Collection : self::query()
+            ->whereKey($allIds)
+            ->whereHas('recordType', fn (Builder $query): Builder => $query
+                ->where('key', (string) ($field['record_type'] ?? ''))
+                ->when($publishedOnly, fn (Builder $query): Builder => $query->where('admin_only', false)))
+            ->when($publishedOnly, fn (Builder $query): Builder => $query->publishedInLocale())
+            ->with(['translations', 'slugs', 'recordType'])
+            ->get()
+            ->keyBy('id');
+
+        foreach ($records as $record) {
+            $record->linkedRecordCache[self::linkedCacheKey($field, $idsByRecord[$record->id] ?? [], $publishedOnly)] = new Collection(array_values(array_filter(array_map(
+                fn (int $id): ?self => $found->get($id),
+                $idsByRecord[$record->id] ?? [],
+            ))));
+        }
     }
 
     /**
@@ -266,23 +298,13 @@ final class Record extends Model
      */
     public function linkedRecords(array $field, bool $publishedOnly = true): Collection
     {
-        $stored = $this->data[(string) $field['key']] ?? null;
-        $ids = array_values(array_filter(array_map(intval(...), is_array($stored) ? $stored : [])));
+        $cacheKey = self::linkedCacheKey($field, $this->linkedIds($field), $publishedOnly);
 
-        if ($ids === []) {
-            return new Collection;
+        if (! isset($this->linkedRecordCache[$cacheKey])) {
+            self::preloadLinkedRecords(new Collection([$this]), $field, $publishedOnly);
         }
 
-        return self::query()
-            ->whereKey($ids)
-            ->whereHas('recordType', fn (Builder $query): Builder => $query
-                ->where('key', (string) ($field['record_type'] ?? ''))
-                ->when($publishedOnly, fn (Builder $query): Builder => $query->where('admin_only', false)))
-            ->when($publishedOnly, fn (Builder $query): Builder => $query->publishedInLocale())
-            ->with(['translations', 'slugs', 'recordType'])
-            ->get()
-            ->sortBy(fn (self $record): int => (int) array_search($record->id, $ids, true))
-            ->values();
+        return $this->linkedRecordCache[$cacheKey];
     }
 
     /**
@@ -390,15 +412,15 @@ final class Record extends Model
         $locale = app()->getLocale();
 
         $query->where(function (Builder $inner) use ($search, $recordType, $locale): void {
-            $inner->whereTranslationLike('title', $search)
-                ->orWhereLike("data->heading->{$locale}", "%{$search}%");
+            $inner->whereTranslationLike('title', $search);
+            $this->orWhereJsonLike($inner, "data->heading->{$locale}", $search);
 
             foreach ($recordType->searchableFields() as $field) {
                 $path = ($field['translatable'] ?? false)
                     ? "data->{$field['key']}->{$locale}"
                     : "data->{$field['key']}";
 
-                $inner->orWhereLike($path, "%{$search}%");
+                $this->orWhereJsonLike($inner, $path, $search);
             }
         });
     }
@@ -416,6 +438,36 @@ final class Record extends Model
         $this->loadMissing('recordType');
 
         return $this->recordType->slug_prefix;
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @param  list<int>  $ids
+     */
+    private static function linkedCacheKey(array $field, array $ids, bool $publishedOnly): string
+    {
+        return $field['key'].'|'.($publishedOnly ? 'published' : 'all').'|'.implode(',', $ids);
+    }
+
+    /**
+     * @param  Builder<Record>  $query
+     */
+    private function orWhereJsonLike(Builder $query, string $path, string $search): void
+    {
+        $lowered = 'lower('.$query->getQuery()->getGrammar()->wrap($path).') like ?';
+
+        in_array($query->getModel()->getConnection()->getDriverName(), ['mysql', 'mariadb'], true) ? $query->orWhereRaw($lowered, ['%'.mb_strtolower($search).'%']) : $query->orWhereLike($path, "%{$search}%");
+    }
+
+    /**
+     * @param  array<string, mixed>  $field
+     * @return list<int>
+     */
+    private function linkedIds(array $field): array
+    {
+        $stored = $this->data[(string) $field['key']] ?? null;
+
+        return array_values(array_filter(array_map(intval(...), is_array($stored) ? $stored : [])));
     }
 
     private function primaryImage(): ?Media

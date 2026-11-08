@@ -96,7 +96,7 @@ final class MediaUsageService
      */
     private function blockQuery(Media $media): Builder
     {
-        return Block::query()->where('content', 'like', '%'.$this->needle($media).'%');
+        return $this->mentioning(Block::query(), 'content', $media);
     }
 
     /**
@@ -104,7 +104,7 @@ final class MediaUsageService
      */
     private function settingsQuery(Media $media): Builder
     {
-        return Settings::query()->where('value', 'like', '%'.$this->needle($media).'%');
+        return $this->mentioning(Settings::query(), 'value', $media);
     }
 
     /**
@@ -112,11 +112,9 @@ final class MediaUsageService
      */
     private function layoutOwners(Media $media): array
     {
-        $needle = '%'.$this->needle($media).'%';
-
         return [
-            ...Page::query()->where('metadata', 'like', $needle)->get()->all(),
-            ...Record::query()->where('metadata', 'like', $needle)->get()->all(),
+            ...$this->mentioning(Page::query(), 'metadata', $media)->get()->all(),
+            ...$this->mentioning(Record::query(), 'metadata', $media)->get()->all(),
         ];
     }
 
@@ -138,6 +136,21 @@ final class MediaUsageService
         }
 
         return $names;
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
+    private function mentioning(Builder $query, string $column, Media $media): Builder
+    {
+        $needle = '%'.$this->needle($media).'%';
+
+        $asText = $query->getQuery()->getGrammar()->wrap($column).'::text like ?';
+
+        return $query->getModel()->getConnection()->getDriverName() === 'pgsql' ? $query->whereRaw($asText, [$needle]) : $query->where($column, 'like', $needle);
     }
 
     private function needle(Media $media): string

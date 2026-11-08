@@ -19,7 +19,7 @@ it('returns no active locales in console before the locales table is migrated', 
     Schema::enableForeignKeyConstraints();
 
     expect(resolve(LocalizationService::class)->getActiveLocales())->toBeEmpty();
-});
+})->group('sqlite-only');
 
 it('returns no active locales when the database is unreachable', function (): void {
     Cache::forget('site-locales');

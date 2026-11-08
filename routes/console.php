@@ -7,6 +7,7 @@ use App\Console\Commands\CleanTempUploadsCommand;
 use App\Console\Commands\CreateBackupCommand;
 use App\Console\Commands\PruneAbandonedOrdersCommand;
 use App\Console\Commands\PruneImageCacheCommand;
+use App\Console\Commands\PruneStaleDataCommand;
 use App\Console\Commands\ReconcileOrdersCommand;
 use App\Models\Activity;
 use App\Models\ErrorLog;
@@ -39,6 +40,14 @@ Schedule::command(PruneAbandonedOrdersCommand::class)
     ->withoutOverlapping();
 
 Schedule::command('model:prune', ['--model' => [NotFoundPath::class, Activity::class, ErrorLog::class]])
+    ->daily()
+    ->withoutOverlapping();
+
+Schedule::command(PruneStaleDataCommand::class)
+    ->daily()
+    ->withoutOverlapping();
+
+Schedule::command('queue:prune-failed', ['--hours' => 720])
     ->daily()
     ->withoutOverlapping();
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Models\Locale;
 use App\Models\Media;
 use App\Models\Mediable;
 use App\Models\Page;
@@ -20,13 +19,11 @@ final class MediableFactory extends Factory
      */
     public function definition(): array
     {
-        $page = Page::factory()->create();
-
         return [
             'media_id' => Media::factory(),
-            'mediable_id' => $page->id,
-            'mediable_type' => $page->getMorphClass(),
-            'locale' => fn () => Locale::query()->inRandomOrder()->first()->code,
+            'mediable_id' => Page::factory(),
+            'mediable_type' => new Page()->getMorphClass(),
+            'locale' => 'en',
             'role' => fake()->randomElement(['poster', 'banner', 'thumbnail']),
             'crop' => [
                 'desktop' => [
@@ -44,7 +41,6 @@ final class MediableFactory extends Factory
             ],
             'metadata' => null,
             'position' => fake()->numberBetween(0, 10),
-            'published' => fake()->boolean(80),
         ];
     }
 }

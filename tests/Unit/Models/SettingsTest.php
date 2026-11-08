@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Settings;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Schema;
 
 it('caches settings as a key/value map', function (): void {
@@ -55,12 +56,15 @@ it('counts saving the same secret again as no change', function (): void {
 });
 
 it('treats a secret it can no longer decrypt as not set, and can still clear it', function (): void {
+    Exceptions::fake();
     DB::table('settings')->insert(['key' => 'ai_api_key', 'value' => json_encode('not-encrypted-with-this-key')]);
     Settings::flush();
 
     expect(Settings::get('ai_api_key'))->toBe('')
         ->and(Settings::set(['ai_api_key' => '']))->toBe(['ai_api_key'])
         ->and(DB::table('settings')->where('key', 'ai_api_key')->value('value'))->toBe('""');
+
+    Exceptions::assertReported(fn (RuntimeException $exception): bool => str_contains($exception->getMessage(), 'ai_api_key setting can’t be decrypted'));
 });
 
 it('reads chosen settings straight from the database, decrypted, without touching the cache', function (): void {

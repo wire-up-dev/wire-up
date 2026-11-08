@@ -7,7 +7,6 @@ namespace App\Traits;
 use App\Models\Block;
 use App\Services\BlockHtmlSanitizer;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Str;
 
 trait HasBlocks
 {
@@ -56,13 +55,9 @@ trait HasBlocks
                 'content' => BlockHtmlSanitizer::forBlock($block['type'], $block['content'] ?? []),
             ];
 
-            if (! isset($block['id']) || Str::startsWith($block['id'], 'new-')) {
-                $this->blocks()->create($attributes);
+            $existing = is_numeric($block['id'] ?? null) ? $this->blocks()->whereKey((int) $block['id'])->first() : null;
 
-                continue;
-            }
-
-            $this->blocks()->whereKey($block['id'])->first()?->update($attributes);
+            $existing === null ? $this->blocks()->create($attributes) : $existing->update($attributes);
         }
     }
 

@@ -145,7 +145,7 @@ return new class extends Component
         return ErrorLog::query()
             ->when($this->status === '', fn (Builder $query): Builder => $query->whereNull('resolved_at'))
             ->when($this->status === 'resolved', fn (Builder $query): Builder => $query->whereNotNull('resolved_at'))
-            ->when($this->search, fn (Builder $query, string $search): Builder => $query->whereAny(['type', 'message', 'file', 'address'], 'like', "%{$search}%"))
+            ->when($this->search, fn (Builder $query, string $search): Builder => $query->where(fn (Builder $inner): Builder => $inner->whereLike('type', "%{$search}%")->orWhereLike('message', "%{$search}%")->orWhereLike('file', "%{$search}%")->orWhereLike('address', "%{$search}%")))
             ->latest('last_seen_at')
             ->paginate(20);
     }

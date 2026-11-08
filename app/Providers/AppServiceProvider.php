@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Listeners\RecordSchedulerHeartbeat;
 use App\Models\Role;
 use App\Models\Settings;
 use App\Models\User;
@@ -12,11 +13,13 @@ use App\Services\LocalizationService;
 use App\Services\PageCache;
 use App\Services\SettingsService;
 use Carbon\CarbonImmutable;
+use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
@@ -55,6 +58,12 @@ final class AppServiceProvider extends ServiceProvider
         $this->configurePasswordValidation();
         $this->configureSettings();
         $this->configureGates();
+        $this->configureEvents();
+    }
+
+    private function configureEvents(): void
+    {
+        Event::listen(ScheduledTaskStarting::class, RecordSchedulerHeartbeat::class);
     }
 
     private function configureGates(): void

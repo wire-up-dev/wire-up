@@ -146,7 +146,7 @@ return new class extends Component
 
         return Order::query()
             ->when($status, fn (Builder $query, OrderStatus $status): Builder => $query->where('status', $status))
-            ->when($this->search, fn (Builder $query, string $search): Builder => $query->whereAny(['reference', 'email', 'name'], 'like', "%{$search}%"))
+            ->when($this->search, fn (Builder $query, string $search): Builder => $query->where(fn (Builder $inner): Builder => $inner->whereLike('reference', "%{$search}%")->orWhereLike('email', "%{$search}%")->orWhereLike('name', "%{$search}%")))
             ->orderBy($sortBy, $this->sortDirection === 'asc' ? 'asc' : 'desc');
     }
 

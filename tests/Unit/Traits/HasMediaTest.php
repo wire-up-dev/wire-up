@@ -187,7 +187,7 @@ it('syncs media for a role storing order, crop and position', function (): void 
     expect($items)->toHaveCount(2)
         ->and($items[0]->id)->toBe($first->id)
         ->and($items[0]->pivot->position)->toBe(0)
-        ->and($items[0]->pivot->crop)->toBe(['default' => ['crop_w' => 1200, 'crop_h' => 630, 'crop_x' => 0, 'crop_y' => 0]])
+        ->and($items[0]->pivot->crop)->toEqual(['default' => ['crop_w' => 1200, 'crop_h' => 630, 'crop_x' => 0, 'crop_y' => 0]])
         ->and($items[1]->id)->toBe($second->id)
         ->and($items[1]->pivot->position)->toBe(1)
         ->and($items[1]->pivot->crop)->toBeNull();
@@ -205,7 +205,7 @@ it('stores metadata on the pivot when syncing', function (): void {
 
     $items = $page->media()->wherePivot('role', 'og_image')->wherePivot('locale', 'en')->get();
 
-    expect($items[0]->pivot->metadata)->toBe(['caption' => 'A caption', 'alt' => 'An alt'])
+    expect($items[0]->pivot->metadata)->toEqual(['caption' => 'A caption', 'alt' => 'An alt'])
         ->and($items[1]->pivot->metadata)->toBeNull();
 });
 

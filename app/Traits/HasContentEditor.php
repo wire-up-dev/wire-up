@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
+use App\Actions\CreateCategoryAction;
 use App\Enums\ContentStatus;
+use App\Models\Category;
 use App\Models\Media;
+use App\Models\Page;
 use App\Services\MediaItem;
+use App\Services\SettingsService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
@@ -38,6 +44,53 @@ trait HasContentEditor
     abstract protected function editorMedia(): Collection;
 
     #[On('change-locale')]
+    public function createCategory(CreateCategoryAction $action): void
+    {
+        $this->authorize('categories.create');
+
+        $name = mb_trim($this->categorySearch);
+
+        if ($name === '') {
+            return;
+        }
+
+        $category = $action->handle(['name' => [$this->locale => $name]]);
+
+        $this->categories[] = (string) $category->id;
+        $this->categorySearch = '';
+
+        unset($this->categoryOptions);
+    }
+
+    /**
+     * @return EloquentCollection<int, Category>
+     */
+    #[Computed]
+    public function categoryOptions(): EloquentCollection
+    {
+        return Category::query()
+            ->with('translations')
+            ->get()
+            ->sortBy(fn (Category $category): string => $category->name)
+            ->values();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    #[Computed]
+    public function pageLinkOptions(): array
+    {
+        $pages = Page::query()
+            ->with('translations')
+            ->get()
+            ->sortBy(fn (Page $page): string => $page->title)
+            ->mapWithKeys(fn (Page $page): array => [$page->id => $page->title])
+            ->all();
+
+        return $pages + SettingsService::current()->authPageOptions();
+    }
+
     public function changeLocale(): void
     {
         $codes = array_keys($this->activeLocales);

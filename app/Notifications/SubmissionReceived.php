@@ -140,15 +140,9 @@ final class SubmissionReceived extends Notification implements ShouldQueue
      */
     private function customRows(): array
     {
-        $metadata = $this->submission->metadata;
-
-        if (! is_array($metadata)) {
-            return [];
-        }
-
         $rows = [];
 
-        foreach ($metadata as $field) {
+        foreach ($this->submission->orderedMetadata() as $field) {
             if (! is_array($field)) {
                 continue;
             }

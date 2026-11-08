@@ -497,7 +497,7 @@ it('refuses a backup from another database, a newer version or without a databas
     'an unknown database' => [['database' => null], [], 'holds a different database'],
     'a newer version' => [['database' => 'sqlite', 'migrations' => 99999], ['database.sqlite' => ''], 'comes from a newer version'],
     'no database' => [['database' => 'sqlite', 'migrations' => 1], [], 'has no database in it'],
-]);
+])->group('sqlite-only');
 
 it('clears a mysql or postgres database before loading the backup, and stays in maintenance mode when loading fails', function (string $driver, string $client): void {
     config()->set('database.default', $driver);

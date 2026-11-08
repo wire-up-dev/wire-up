@@ -5,12 +5,14 @@ declare(strict_types=1);
 use App\Enums\ContentStatus;
 use App\Models\Locale;
 use App\Models\Page;
+use App\Models\Slug;
 use App\Traits\HasSlugs;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Schema;
 
 it('has a morphMany relationship with page model', function (): void {
@@ -29,7 +31,7 @@ it('has slug attribute accessor', function (): void {
 });
 
 it('generates slugs for all active locales on save', function (): void {
-    Locale::query()->whereIn('code', ['en', 'es'])->update(['active' => true]);
+    Locale::query()->whereIn('code', ['en', 'es'])->get()->each->update(['active' => true]);
 
     $page = Page::factory()->create([
         'title' => [
@@ -156,8 +158,28 @@ it('resolves slug conflicts by appending counter', function (): void {
     expect($page3->slug)->toBe('test-page-2');
 });
 
+it('tries the slug again when another save claims it at the same moment', function (): void {
+    $attempts = 0;
+
+    Slug::saving(function () use (&$attempts): void {
+        throw_if(++$attempts === 1, UniqueConstraintViolationException::class, 'sqlite', 'insert into slugs', [], new PDOException('UNIQUE constraint failed'));
+    });
+
+    $page = Page::factory()->create();
+    $page->updateSlugs(['en' => 'race-page']);
+
+    expect($attempts)->toBe(2)
+        ->and($page->fresh()->getSlug('en'))->toBe('race-page');
+});
+
+it('gives up after three tries so a persistent conflict still surfaces', function (): void {
+    Slug::saving(fn (): never => throw new UniqueConstraintViolationException('sqlite', 'insert into slugs', [], new PDOException('UNIQUE constraint failed')));
+
+    Page::factory()->create()->updateSlugs(['en' => 'race-page']);
+})->throws(UniqueConstraintViolationException::class);
+
 it('returns slug attribute accessor in current locale', function (): void {
-    Locale::query()->whereIn('code', ['en', 'fr'])->update(['active' => true]);
+    Locale::query()->whereIn('code', ['en', 'fr'])->get()->each->update(['active' => true]);
 
     $page = Page::factory()->create(['title' => [
         'en' => 'Test Page',
@@ -176,7 +198,7 @@ it('returns slug attribute accessor in current locale', function (): void {
 });
 
 it('returns correct slug for specific locale', function (): void {
-    Locale::query()->whereIn('code', ['en', 'fr'])->update(['active' => true]);
+    Locale::query()->whereIn('code', ['en', 'fr'])->get()->each->update(['active' => true]);
 
     $page = Page::factory()->create(['title' => [
         'en' => 'Test Page',
@@ -190,7 +212,7 @@ it('returns correct slug for specific locale', function (): void {
 });
 
 it('returns slugs array', function (): void {
-    Locale::query()->whereIn('code', ['en', 'fr'])->update(['active' => true]);
+    Locale::query()->whereIn('code', ['en', 'fr'])->get()->each->update(['active' => true]);
 
     $page = Page::factory()->create(['title' => [
         'en' => 'Test Page',
@@ -208,7 +230,7 @@ it('returns slugs array', function (): void {
 });
 
 it('queries by slug with forSlug scope', function (): void {
-    Locale::query()->whereIn('code', ['en', 'fr'])->update(['active' => true]);
+    Locale::query()->whereIn('code', ['en', 'fr'])->get()->each->update(['active' => true]);
 
     $page1 = Page::factory()->create(['title' => [
         'en' => 'Test Slug1',

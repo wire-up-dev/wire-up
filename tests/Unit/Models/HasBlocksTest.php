@@ -88,3 +88,15 @@ it('deletes blocks when the page is deleted', function (): void {
 
     expect($page->blocks()->count())->toBe(0);
 });
+
+it('keeps a block whose id is not one the database gave it, instead of dropping it', function (): void {
+    $page = Page::factory()->create();
+
+    $page->updateBlocks([
+        ['id' => 'hero-from-an-agent', 'type' => 'rich-text', 'content' => ['body' => ['en' => '<p>Kept</p>']]],
+        ['id' => '999999', 'type' => 'rich-text', 'content' => ['body' => ['en' => '<p>Also kept</p>']]],
+    ]);
+
+    expect($page->blocks()->orderBy('position')->get()->map(fn (Block $block): string => $block->content['body']['en'])->all())
+        ->toBe(['<p>Kept</p>', '<p>Also kept</p>']);
+});

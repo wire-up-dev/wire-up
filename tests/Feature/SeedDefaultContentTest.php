@@ -39,7 +39,7 @@ it('marks the configured default locale active when seeding locales', function (
     $migration->up();
 
     expect(DB::table('locales')->where('active', true)->pluck('code')->all())->toBe(['ro']);
-});
+})->group('sqlite-only');
 
 it('falls back to english when the configured locale is not in the catalog', function (): void {
     config()->set('app.locale', 'xx');
@@ -49,4 +49,4 @@ it('falls back to english when the configured locale is not in the catalog', fun
     $migration->up();
 
     expect(DB::table('locales')->where('active', true)->pluck('code')->all())->toBe(['en']);
-});
+})->group('sqlite-only');

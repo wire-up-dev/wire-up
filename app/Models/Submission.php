@@ -59,6 +59,19 @@ final class Submission extends Model
         ];
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
+    public function orderedMetadata(): array
+    {
+        $metadata = is_array($this->metadata) ? $this->metadata : [];
+        $position = fn (mixed $field): int => is_array($field) && is_int($field['position'] ?? null) ? $field['position'] : PHP_INT_MAX;
+
+        uasort($metadata, fn (mixed $first, mixed $second): int => $position($first) <=> $position($second));
+
+        return $metadata;
+    }
+
     public function isRead(): bool
     {
         return $this->read_at !== null;

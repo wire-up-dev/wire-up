@@ -152,6 +152,8 @@ final class SiteImporter
                     DB::table($table)->insert($chunk);
                 }
             }
+
+            new DatabaseSequences()->reset(DB::connection(), SiteBundle::TABLES);
         });
     }
 

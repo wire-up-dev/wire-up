@@ -157,13 +157,16 @@ it('downloads the newest or a named off-site copy into the backups folder', func
     expect(fn (): string => $offsite->fetch())->toThrow(RuntimeException::class, 'There are no backups in off-site storage yet.');
 });
 
-it('says when a backup cannot be saved after downloading it', function (): void {
+it('says when a backup cannot be saved after downloading it', function (string $blocked): void {
     $disk = FakeOffsiteStorage::connect();
     $disk->put('example.com/backup-2026-01-03-030000-manual.zip', 'newest');
-    File::ensureDirectoryExists(config()->string('wireup.backup_path').'/backup-2026-01-03-030000-manual.zip');
+    File::ensureDirectoryExists(config()->string('wireup.backup_path').'/'.$blocked);
 
     expect(fn (): string => @resolve(OffsiteBackupService::class)->fetch())->toThrow(RuntimeException::class, 'The backup could not be saved in');
-});
+})->with([
+    'while downloading' => 'backup-2026-01-03-030000-manual.zip.part',
+    'when moving it into place' => 'backup-2026-01-03-030000-manual.zip',
+]);
 
 it('says when an off-site copy cannot be read', function (): void {
     FakeOffsiteStorage::connectRefusing('NoSuchKey', 'The key does not exist');

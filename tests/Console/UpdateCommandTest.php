@@ -6,8 +6,12 @@ use App\Console\Commands\UpdateCommand;
 use App\Enums\ActivityEvent;
 use App\Enums\RevisionSource;
 use App\Models\Activity;
+use App\Services\BackupService;
+use App\Services\DatabaseDumper;
+use App\Services\SiteBundle;
 use App\Services\UpdateService;
 use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -27,7 +31,7 @@ beforeEach(function (): void {
 
 function preUpdateBackup(string $tag): string
 {
-    return 'db-backup-'.now()->format('Y-m-d-His')."-before-{$tag}.sqlite";
+    return 'db-backup-'.now()->format('Y-m-d-His')."-before-{$tag}.".resolve(DatabaseDumper::class)->extension();
 }
 
 afterEach(function (): void {
@@ -373,4 +377,59 @@ it('finds composer and git in the usual places when started by cron', function (
 
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['composer', 'install', '--no-dev', '--no-interaction', '--prefer-dist']
         && in_array('/usr/local/bin', explode(':', (string) ($process->environment['PATH'] ?? '')), true));
+});
+
+it('refuses to start while another update is running', function (): void {
+    $running = Cache::lock('wireup:update:lock', 60);
+    $running->get();
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])
+        ->expectsOutputToContain('Another update is already running.')
+        ->assertExitCode(1);
+
+    Process::assertNotRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'down']);
+
+    $running->release();
+});
+
+it('does not call a long update stalled while it still holds the lock', function (): void {
+    $updates = resolve(UpdateService::class);
+    $updates->markRunning('v1.0.0', 'Install PHP dependencies');
+    $this->travel(31)->minutes();
+
+    $running = Cache::lock('wireup:update:lock', 3600);
+    $running->get();
+
+    expect($updates->state()['status'])->toBe('running');
+
+    $running->release();
+
+    expect($updates->state()['status'])->toBe('stalled');
+});
+
+it('stops before maintenance mode when the server is nearly out of disk space', function (): void {
+    Process::fake(['*rev-parse*' => Process::result(output: "abc1234def\n"), '*' => Process::result()]);
+    app()->instance(BackupService::class, new BackupService(resolve(DatabaseDumper::class), resolve(SiteBundle::class), fn (): int => 40 * 1024 * 1024));
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])
+        ->expectsOutputToContain('is free on the server')
+        ->assertExitCode(1);
+
+    Process::assertNotRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'down']);
+
+    expect(resolve(UpdateService::class)->state())->toMatchArray(['status' => 'failed', 'step' => 'Check free disk space', 'site_down' => false]);
+});
+
+it('rolls back when the new version cannot be recorded, instead of offering the same update every day', function (): void {
+    Process::fake(['*rev-parse*' => Process::result(output: "abc1234def\n"), '*' => Process::result()]);
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+    File::delete((string) config('wireup.version_file'));
+    File::ensureDirectoryExists((string) config('wireup.version_file'));
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])
+        ->expectsOutputToContain('Rolling back')
+        ->assertExitCode(1);
+
+    expect(resolve(UpdateService::class)->state())->toMatchArray(['status' => 'failed', 'step' => 'Record the new version', 'site_down' => false]);
 });

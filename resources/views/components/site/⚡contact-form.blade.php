@@ -394,16 +394,17 @@ return new class extends Component
     }
 
     /**
-     * @return array<string, array{label: string, value: mixed}>
+     * @return array<string, array{label: string, value: mixed, position: int}>
      */
     private function customMetadata(): array
     {
         $data = [];
 
-        foreach ($this->customFields() as $field) {
+        foreach (array_values($this->customFields()) as $position => $field) {
             $data[$field['id']] = [
                 'label' => $field['label'],
                 'value' => $this->custom[$field['id']] ?? null,
+                'position' => $position,
             ];
         }
 

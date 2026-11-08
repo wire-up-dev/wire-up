@@ -8,6 +8,7 @@ use App\Enums\MediaType;
 use App\Mcp\Support\Pages;
 use App\Models\Media;
 use App\Models\Page;
+use App\Models\Slug;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\JsonSchema\Types\Type;
@@ -80,6 +81,17 @@ final class UpdatePageTool extends Tool
         }
 
         if (isset($validated['slug'])) {
+            $taken = Slug::query()
+                ->where('locale', $locale)
+                ->where('slug', $validated['slug'])
+                ->where('base_path', '')
+                ->whereNot(fn (Builder $query): Builder => $query->where('sluggable_type', $page->getMorphClass())->where('sluggable_id', $page->id))
+                ->exists();
+
+            if ($taken) {
+                return Response::error("The web address \"{$validated['slug']}\" is already used by another page. Choose a different slug.");
+            }
+
             $attributes['slugs'] = [$locale => $validated['slug']];
         }
 

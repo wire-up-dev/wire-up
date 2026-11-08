@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Image;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
@@ -111,8 +112,11 @@ final class ImageService
 
         $file = self::cacheFile($options, $path);
 
+        $partial = $file.'.'.Str::random(8).'.tmp';
+
         File::ensureDirectoryExists(dirname($file));
-        File::put($file, $contents);
+        File::put($partial, $contents);
+        File::move($partial, $file);
 
         return self::fileResponse($file, self::outputFormat($options, $path));
     }

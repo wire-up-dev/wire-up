@@ -68,10 +68,9 @@ return new class extends Component
         $guard = resolve(UserGuard::class);
 
         return $this->roles ??= Role::query()
-            ->where(fn (Builder $query): Builder => $query->where('bypass', true)->orWhere('abilities', '<>', '[]'))
             ->orderBy('id')
             ->get()
-            ->filter(fn (Role $role): bool => $guard->canAssign(auth()->user(), $role))
+            ->filter(fn (Role $role): bool => $role->canAccessAdmin() && $guard->canAssign(auth()->user(), $role))
             ->values();
     }
 
@@ -169,7 +168,7 @@ return new class extends Component
             ->with('role')
             ->visibleToViewer()
             ->when($this->status, fn (Builder $query, string $status): Builder => $query->where('active', $status === 'active'))
-            ->when($this->search, fn (Builder $query, string $search): Builder => $query->whereAny(['name', 'email'], 'like', "%{$search}%"))
+            ->when($this->search, fn (Builder $query, string $search): Builder => $query->where(fn (Builder $inner): Builder => $inner->whereLike('name', "%{$search}%")->orWhereLike('email', "%{$search}%")))
             ->orderBy($this->sortBy, $this->sortDirection)
             ->paginate($this->perPage);
     }

@@ -4,6 +4,19 @@ Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater sh
 
 ## Unreleased
 
+- Sites on PostgreSQL: deleting media, importing a site, pages that don't exist, the Users screen and searches in the admin now work. Before, each of these failed with an error, and searches only matched the exact capitalisation. Wire Up is now tested on MySQL and PostgreSQL as well as SQLite.
+- Sites on MySQL: searching records now ignores capitalisation in their fields, contact form answers in the inbox and in notification emails keep the order of the form, and page summaries for search engines start with the block's heading again.
+- The dashboard warns when the scheduler hasn't run for ten minutes, when e-mails and webhooks have waited more than fifteen minutes for a queue worker, and when background tasks failed in the last week.
+- Updates are safer: only one runs at a time, an update won't start with less than 500 MB of free disk space, installing PHP and frontend dependencies may take up to twenty minutes before it counts as failed, and an update that can't record its new version rolls back instead of being offered again every day. Check now says when it couldn't reach the release server. Error report e-mails and Slack messages pause while an update runs.
+- Behind Cloudflare or another proxy, set `TRUSTED_PROXIES` in `.env` so rate limits, the activity log and the visitor count use visitors' real addresses.
+- Changing the site's languages now refreshes cached pages straight away and shows in the activity log. Adding, changing and deleting webhooks shows in the activity log too.
+- The queue worker now picks up settings saved in the admin, such as a new e-mail provider, without being restarted.
+- Expired cache entries, failed background tasks older than 30 days and AI assistant chats nobody has opened for six months are now cleared out daily.
+- A saved integration key that can no longer be decrypted, usually after `APP_KEY` changed, is now reported as an error instead of quietly acting as if it was never set.
+- An AI agent changing a page's web address to one another page already uses now gets an error, as in the admin, instead of the address quietly getting `-1` added.
+- A block an AI agent adds with an id of its own is now saved instead of being dropped.
+- Two pages saved at the same moment with the same web address no longer fail; the second one gets the next free address.
+- Downloading an off-site backup onto a server no longer leaves a half-written backup in the list if the download is interrupted, and share images that fail to generate are now reported as errors.
 - Security: uploaded files are now saved under the extension that matches what they really contain, not the name they were given, and only image, video, audio and document types are accepted from every upload route. Before, a file named like a web page could be stored as one and run on the site. A file that is really an SVG is always cleaned, whatever it is called.
 - Security: the AI assistant can now only do what the signed-in person's role allows. Before, anyone allowed to use the assistant could have it change design, menus or settings, or publish and delete content, that their role does not permit.
 - Security: stronger cleaning of the HTML in blocks. Links and attributes hidden with encoded characters, tabs or SVG animations can no longer slip a script onto a public page. Content that was already safe is saved exactly as before.

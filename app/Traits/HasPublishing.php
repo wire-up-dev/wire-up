@@ -37,6 +37,20 @@ trait HasPublishing
         return in_array($locale ?? app()->getLocale(), $this->published_locales, true);
     }
 
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array{status: string, published_at: mixed}
+     */
+    public function publicationAttributes(array $attributes): array
+    {
+        return match ($attributes['status'] ?? 'draft') {
+            ContentStatus::PUBLISHED => ['status' => ContentStatus::PUBLISHED->value, 'published_at' => $this->status === ContentStatus::PUBLISHED && $this->published_at?->isPast() ? $this->published_at : now()],
+            ContentStatus::SCHEDULED => ['status' => ContentStatus::PUBLISHED->value, 'published_at' => $attributes['published_at']],
+            ContentStatus::PRIVATE => ['status' => ContentStatus::PRIVATE->value, 'published_at' => null],
+            default => ['status' => ContentStatus::DRAFT->value, 'published_at' => null],
+        };
+    }
+
     protected static function bootHasPublishing(): void
     {
         static::saved(function (self $model): void {

@@ -346,6 +346,10 @@ final class Block extends Model
      */
     private function harvestText(array $node, string $locale, string $default, array &$parts): void
     {
+        $rank = fn (int|string $key): int => is_string($key) && in_array($key, self::PROSE_FIELDS, true) ? (int) array_search($key, self::PROSE_FIELDS, true) : count(self::PROSE_FIELDS);
+
+        uksort($node, fn (int|string $first, int|string $second): int => $rank($first) <=> $rank($second));
+
         foreach ($node as $key => $value) {
             if (! is_array($value)) {
                 continue;
