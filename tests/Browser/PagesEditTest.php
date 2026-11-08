@@ -480,7 +480,7 @@ it('keeps block items collapsed on load and opens only a newly added one', funct
     $browser->assertScript($openStates, 'false,false');
 
     $comp = "window.Livewire.all().find(c => c.\$wire.get('blocks') !== undefined)";
-    $browser->script("$comp.\$wire.addSponsorItem(Object.keys($comp.\$wire.get('blocks'))[0]); void 0");
+    $browser->script("$comp.\$wire.addBlockItem(Object.keys($comp.\$wire.get('blocks'))[0]); void 0");
     $browser->wait(0.6);
 
     $browser->assertScript($openStates, 'false,false,true')

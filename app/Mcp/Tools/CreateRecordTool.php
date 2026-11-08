@@ -10,6 +10,7 @@ use App\Mcp\Support\Blocks;
 use App\Mcp\Support\Pages;
 use App\Mcp\Support\Records;
 use App\Models\RecordType;
+use App\Services\ContentRules;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
@@ -27,8 +28,8 @@ final class CreateRecordTool extends Tool
         $validated = $request->validate(
             [
                 'type' => ['required', 'string'],
-                'title' => ['required', 'string', 'min:3', 'max:255'],
-                'description' => ['nullable', 'string', 'max:160'],
+                'title' => ['required', ...ContentRules::TITLE],
+                'description' => ContentRules::DESCRIPTION,
                 'data' => ['array'],
                 'media' => ['array'],
                 'media.*' => ['array'],

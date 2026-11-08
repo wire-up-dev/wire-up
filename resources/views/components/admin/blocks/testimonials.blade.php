@@ -25,7 +25,7 @@
         <flux:label>{{ __('Testimonials') }}</flux:label>
 
         <div
-            wire:sort="reorderTestimonialItems"
+            wire:sort="reorderBlockItems"
             wire:sort:group="testimonials-{{ $block['id'] }}"
             class="flex flex-col gap-3"
         >
@@ -71,7 +71,7 @@
                                 variant="subtle"
                                 icon="trash"
                                 square
-                                wire:click="removeTestimonialItem('{{ $block['id'] }}', {{ $i }})"
+                                wire:click="removeBlockItem('{{ $block['id'] }}', {{ $i }})"
                                 :tooltip="__('Remove testimonial')"
                             />
                         </div>
@@ -134,7 +134,7 @@
             <flux:button
                 size="sm"
                 icon="plus"
-                wire:click="addTestimonialItem('{{ $block['id'] }}')"
+                wire:click="addBlockItem('{{ $block['id'] }}')"
             >{{ __('Add testimonial') }}</flux:button>
         </div>
     </div>

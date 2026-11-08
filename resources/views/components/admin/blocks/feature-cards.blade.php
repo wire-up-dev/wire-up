@@ -25,7 +25,7 @@
         <flux:label>{{ __('Cards') }}</flux:label>
 
         <div
-            wire:sort="reorderFeatureItems"
+            wire:sort="reorderBlockItems"
             wire:sort:group="feature-cards-{{ $block['id'] }}"
             class="flex flex-col gap-3"
         >
@@ -71,7 +71,7 @@
                                 variant="subtle"
                                 icon="trash"
                                 square
-                                wire:click="removeFeatureItem('{{ $block['id'] }}', {{ $i }})"
+                                wire:click="removeBlockItem('{{ $block['id'] }}', {{ $i }})"
                                 :tooltip="__('Remove card')"
                             />
                         </div>
@@ -217,7 +217,7 @@
             <flux:button
                 size="sm"
                 icon="plus"
-                wire:click="addFeatureItem('{{ $block['id'] }}')"
+                wire:click="addBlockItem('{{ $block['id'] }}')"
             >{{ __('Add card') }}</flux:button>
         </div>
     </div>

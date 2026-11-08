@@ -9,11 +9,15 @@ use App\Enums\ContentStatus;
 use App\Models\Category;
 use App\Models\Media;
 use App\Models\Page;
+use App\Models\Record;
+use App\Services\ContentRules;
 use App\Services\MediaItem;
 use App\Services\SettingsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -162,5 +166,56 @@ trait HasContentEditor
                 return;
             }
         }
+    }
+
+    /**
+     * @return array{0: array<string, mixed>, 1: array<string, string>, 2: array<string, string>}
+     */
+    protected function contentValidation(Page|Record $content, string $basePath, string $scheduleMessage): array
+    {
+        $rules = [
+            ...ContentRules::publication($this->status, array_keys($this->activeLocales)),
+            ...ContentRules::blocks(),
+            ...ContentRules::categories(),
+            ...ContentRules::layout(['nullable', 'array']),
+            'noindex' => ['boolean'],
+            'members_only' => ['boolean'],
+        ];
+
+        $attributes = [
+            'publishedLocales.*' => (string) __('language'),
+            'published_at' => (string) __('scheduled date'),
+            'layout.customCss' => (string) __('custom CSS'),
+        ];
+
+        foreach (array_keys($this->activeLocales) as $locale) {
+            $isLive = in_array($locale, $this->publishedLocales, true);
+
+            $slugUnique = Rule::unique('slugs', 'slug')
+                ->where('locale', $locale)
+                ->where('base_path', $basePath)
+                ->where(fn (Builder $query): Builder => $query->whereNot(fn (Builder $own): Builder => $own
+                    ->where('sluggable_id', $content->getKey())
+                    ->where('sluggable_type', $content->getMorphClass())));
+
+            $rules["title.$locale"] = $isLive ? ['required', ...ContentRules::TITLE] : ['nullable', 'string', 'max:255'];
+            $rules["description.$locale"] = ContentRules::DESCRIPTION;
+            $rules["slugs.$locale"] = $isLive
+                ? ['required', ...ContentRules::SLUG, $slugUnique]
+                : ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9-]+$/', $slugUnique];
+
+            $attributes["title.$locale"] = (string) __('title');
+            $attributes["description.$locale"] = (string) __('description');
+            $attributes["slugs.$locale"] = (string) __('web address');
+        }
+
+        $messages = [
+            'publishedLocales.*.in' => (string) __('Choose a language that is enabled in your site settings.'),
+            'published_at.required' => $scheduleMessage,
+            'published_at.after' => (string) __('The scheduled date must be in the future.'),
+            'slugs.*.regex' => (string) __('Web addresses can only use lowercase letters, numbers and hyphens.'),
+        ];
+
+        return [$rules, $messages, $attributes];
     }
 }

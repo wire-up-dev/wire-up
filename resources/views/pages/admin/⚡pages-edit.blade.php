@@ -2,22 +2,19 @@
 
 declare(strict_types=1);
 use App\Actions\UpdatePageAction;
-use App\Enums\BlockType;
-use App\Enums\ContentStatus;
 use App\Models\Media;
 use App\Models\Page;
+use App\Services\ContentRules;
 use App\Services\SettingsService;
 use App\Traits\HasBlockBuilder;
 use App\Traits\HasContentEditor;
 use App\Traits\HasRevisionHistory;
 use Flux\Flux;
-use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -115,78 +112,9 @@ return new class extends Component
         $this->og_image = $this->normalizeMediaInput($this->og_image);
         $this->normalizeBlockAnchors();
 
-        /** @var array<string, array<int, mixed>> */
-        $rules = [
-            'status' => ['required', Rule::enum(ContentStatus::class)],
-            'published_at' => $this->status === ContentStatus::SCHEDULED
-                ? ['required', 'date', 'after:now']
-                : ['nullable', 'date'],
-            'publishedLocales' => ['array'],
-            'publishedLocales.*' => ['string', Rule::in(array_keys($this->activeLocales))],
-            'blocks' => ['array'],
-            'blocks.*.type' => ['required', 'string', Rule::in(BlockType::values())],
-            'blocks.*.content' => ['array'],
-            'og_image' => ['array'],
-            'og_image.*' => ['array'],
-            'og_image.*.*' => ['array'],
-            'og_image.*.*.id' => ['required', 'integer', 'exists:media,id'],
-            'og_image.*.*.metadata' => ['nullable', 'array'],
-            'og_image.*.*.metadata.caption' => ['nullable', 'string', 'max:500'],
-            'og_image.*.*.metadata.alt' => ['nullable', 'string', 'max:255'],
-            'noindex' => ['boolean'],
-            'members_only' => ['boolean'],
-            'layout' => ['array'],
-            'layout.hideHeader' => ['boolean'],
-            'layout.hideFooter' => ['boolean'],
-            'layout.backgroundFixed' => ['boolean'],
-            'layout.backgroundColor' => ['nullable', 'string', 'max:30'],
-            'layout.backgroundImage' => ['nullable', 'array'],
-            'layout.customCss' => ['nullable', 'string', 'max:50000'],
-            'layout.sidebar' => ['array'],
-            'layout.sidebar.menus' => ['array'],
-            'layout.sidebar.menus.*' => ['string'],
-            'categories' => ['array'],
-            'categories.*' => ['integer', Rule::exists('categories', 'id')],
-        ];
+        [$rules, $messages, $attributes] = $this->contentValidation($this->page, '', (string) __('Choose a date to schedule this page.'));
 
-        $localeAttributes = [];
-
-        foreach (array_keys($this->activeLocales) as $locale) {
-            $isLive = in_array($locale, $this->publishedLocales, true);
-
-            $slugUnique = Rule::unique('slugs', 'slug')->where('locale', $locale)
-                ->where('base_path', '')
-                ->where(function (Builder $query): void {
-                    $query->whereNot(function (Builder $q): void {
-                        $q->where('sluggable_id', $this->page->id)
-                            ->where('sluggable_type', 'page');
-                    });
-                });
-
-            $localeAttributes["title.$locale"] = __('title');
-            $localeAttributes["description.$locale"] = __('description');
-            $localeAttributes["slugs.$locale"] = __('web address');
-
-            $rules["title.$locale"] = $isLive ? ['required', 'string', 'min:3'] : ['nullable', 'string'];
-            $rules["description.$locale"] = ['nullable', 'string', 'max:160'];
-            $rules["slugs.$locale"] = $isLive
-                ? ['required', 'string', 'min:3', 'regex:/^[a-z0-9-]+$/', $slugUnique]
-                : ['nullable', 'string', 'regex:/^[a-z0-9-]+$/', $slugUnique];
-        }
-
-        $messages = [
-            'publishedLocales.*.in' => __('Choose a language that is enabled in your site settings.'),
-            'published_at.required' => __('Choose a date to schedule this page.'),
-            'published_at.after' => __('The scheduled date must be in the future.'),
-            'slugs.*.regex' => __('Web addresses can only use lowercase letters, numbers and hyphens.'),
-        ];
-
-        $attributes = [
-            ...$localeAttributes,
-            'publishedLocales.*' => __('language'),
-            'published_at' => __('scheduled date'),
-            'layout.customCss' => __('custom CSS'),
-        ];
+        $rules = [...$rules, ...ContentRules::mediaItems('og_image')];
 
         try {
             $validated = $this->validate($rules, $messages, $attributes);
@@ -613,14 +541,14 @@ return new class extends Component
                                 placeholder="{{ __('Choose status') }}"
                                 wire:model.live="status"
                             >
-                                @foreach (ContentStatus::cases() as $statusOption)
+                                @foreach (\App\Enums\ContentStatus::cases() as $statusOption)
                                     <flux:select.option value="{{ $statusOption->value }}">
                                         {{ $statusOption->label() }}
                                     </flux:select.option>
                                 @endforeach
                             </flux:select>
 
-                            <div x-cloak x-show="$wire.status === '{{ ContentStatus::SCHEDULED->value }}'">
+                            <div x-cloak x-show="$wire.status === '{{ \App\Enums\ContentStatus::SCHEDULED->value }}'">
                                 <flux:date-picker
                                     wire:model="published_at"
                                     label="{{ __('Publish on') }}"

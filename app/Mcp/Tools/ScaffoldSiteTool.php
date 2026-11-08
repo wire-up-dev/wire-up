@@ -8,6 +8,7 @@ use App\Actions\CreatePageAction;
 use App\Actions\UpdateSettingsAction;
 use App\Mcp\Support\Pages;
 use App\Models\Page;
+use App\Services\ContentRules;
 use App\Services\SettingsService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,8 +28,8 @@ final class ScaffoldSiteTool extends Tool
         $validated = $request->validate(
             [
                 'pages' => ['required', 'array', 'min:1', 'max:20'],
-                'pages.*.title' => ['required', 'string', 'min:3', 'max:255'],
-                'pages.*.description' => ['nullable', 'string', 'max:160'],
+                'pages.*.title' => ['required', ...ContentRules::TITLE],
+                'pages.*.description' => ContentRules::DESCRIPTION,
                 'pages.*.homepage' => ['boolean'],
                 'pages.*.nav' => ['sometimes', 'string', 'in:header,footer,both,none'],
             ],

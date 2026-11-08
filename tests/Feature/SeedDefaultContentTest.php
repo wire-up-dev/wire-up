@@ -34,6 +34,7 @@ it('seeds the default content under the configured default locale', function ():
 it('marks the configured default locale active when seeding locales', function (): void {
     config()->set('app.locale', 'ro');
 
+    collect(['translations', 'slugs', 'mediables'])->each(fn (string $table): int => DB::table($table)->delete());
     Schema::drop('locales');
     $migration = require database_path('migrations/2025_11_10_025724_create_locales_table.php');
     $migration->up();
@@ -44,6 +45,7 @@ it('marks the configured default locale active when seeding locales', function (
 it('falls back to english when the configured locale is not in the catalog', function (): void {
     config()->set('app.locale', 'xx');
 
+    collect(['translations', 'slugs', 'mediables'])->each(fn (string $table): int => DB::table($table)->delete());
     Schema::drop('locales');
     $migration = require database_path('migrations/2025_11_10_025724_create_locales_table.php');
     $migration->up();

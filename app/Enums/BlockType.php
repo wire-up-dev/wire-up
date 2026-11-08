@@ -156,17 +156,34 @@ enum BlockType: string
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function defaultItem(): ?array
+    {
+        return match ($this) {
+            self::ACCORDION => ['id' => (string) Str::uuid(), 'title' => [], 'body' => []],
+            self::TESTIMONIALS => ['id' => (string) Str::uuid(), 'quote' => [], 'author' => [], 'role' => [], 'avatar' => null, 'rating' => 0],
+            self::SPONSORS => ['id' => (string) Str::uuid(), 'logo' => null, 'name' => [], 'link' => '', 'tier' => ''],
+            self::FEATURE_CARDS => ['id' => (string) Str::uuid(), 'media' => 'image', 'image' => null, 'icon' => '', 'title' => [], 'body' => [], 'cta' => self::defaultCta()],
+            self::BUTTONS => ['id' => (string) Str::uuid(), 'text' => [], 'variant' => 'primary', 'link' => ['type' => 'url', 'value' => '', 'newTab' => false]],
+            self::STATS => ['id' => (string) Str::uuid(), 'value' => [], 'label' => []],
+            self::TEAM => ['id' => (string) Str::uuid(), 'photo' => null, 'name' => [], 'role' => [], 'bio' => [], 'socials' => ['email' => '', 'website' => '', 'linkedin' => '', 'x' => '', 'instagram' => '']],
+            self::PRICING => ['id' => (string) Str::uuid(), 'name' => [], 'price' => [], 'period' => [], 'description' => [], 'features' => [], 'featured' => false, 'badge' => [], 'cta' => self::defaultCta()],
+            default => null,
+        };
+    }
+
+    public function maxItems(): ?int
+    {
+        return $this === self::BUTTONS ? 3 : null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function defaultContent(): array
     {
-        $cta = [
-            'enabled' => false,
-            'text' => [],
-            'link' => ['type' => 'url', 'value' => '', 'newTab' => false],
-            'bg' => null,
-            'textColor' => null,
-        ];
+        $cta = self::defaultCta();
 
         return match ($this) {
             self::HERO => [
@@ -235,9 +252,7 @@ enum BlockType: string
                 'icon' => 'chevron',
                 'exclusive' => true,
                 'hasBackground' => false,
-                'items' => [
-                    ['id' => (string) Str::uuid(), 'title' => [], 'body' => []],
-                ],
+                'items' => [$this->defaultItem()],
             ],
             self::GALLERY => [
                 'heading' => [],
@@ -283,9 +298,7 @@ enum BlockType: string
                 'heading' => [],
                 'headingLevel' => '',
                 'intro' => [],
-                'items' => [
-                    ['id' => (string) Str::uuid(), 'quote' => [], 'author' => [], 'role' => [], 'avatar' => null, 'rating' => 0],
-                ],
+                'items' => [$this->defaultItem()],
             ],
             self::SPONSORS => [
                 'layout' => 'grid',
@@ -296,9 +309,7 @@ enum BlockType: string
                 'heading' => [],
                 'headingLevel' => '',
                 'intro' => [],
-                'items' => [
-                    ['id' => (string) Str::uuid(), 'logo' => null, 'name' => [], 'link' => '', 'tier' => ''],
-                ],
+                'items' => [$this->defaultItem()],
             ],
             self::FEATURE_CARDS => [
                 'layout' => 'grid',
@@ -320,9 +331,7 @@ enum BlockType: string
                     'text' => [],
                     'link' => ['type' => 'url', 'value' => '', 'newTab' => false],
                 ],
-                'items' => [
-                    ['id' => (string) Str::uuid(), 'media' => 'image', 'image' => null, 'icon' => '', 'title' => [], 'body' => [], 'cta' => $cta],
-                ],
+                'items' => [$this->defaultItem()],
             ],
             self::COLLECTION => [
                 'recordTypeId' => null,
@@ -368,9 +377,7 @@ enum BlockType: string
             self::BUTTONS => [
                 'align' => 'center',
                 'hasBackground' => false,
-                'items' => [
-                    ['id' => (string) Str::uuid(), 'text' => [], 'variant' => 'primary', 'link' => ['type' => 'url', 'value' => '', 'newTab' => false]],
-                ],
+                'items' => [$this->defaultItem()],
             ],
             self::AUDIO => [
                 'audio' => null,
@@ -412,9 +419,7 @@ enum BlockType: string
                 'heading' => [],
                 'headingLevel' => '',
                 'intro' => [],
-                'items' => [
-                    ['id' => (string) Str::uuid(), 'value' => [], 'label' => []],
-                ],
+                'items' => [$this->defaultItem()],
             ],
             self::TEAM => [
                 'columns' => 3,
@@ -423,9 +428,7 @@ enum BlockType: string
                 'heading' => [],
                 'headingLevel' => '',
                 'intro' => [],
-                'items' => [
-                    ['id' => (string) Str::uuid(), 'photo' => null, 'name' => [], 'role' => [], 'bio' => [], 'socials' => ['email' => '', 'website' => '', 'linkedin' => '', 'x' => '', 'instagram' => '']],
-                ],
+                'items' => [$this->defaultItem()],
             ],
             self::PRICING => [
                 'columns' => 3,
@@ -433,9 +436,7 @@ enum BlockType: string
                 'heading' => [],
                 'headingLevel' => '',
                 'intro' => [],
-                'items' => [
-                    ['id' => (string) Str::uuid(), 'name' => [], 'price' => [], 'period' => [], 'description' => [], 'features' => [], 'featured' => false, 'badge' => [], 'cta' => $cta],
-                ],
+                'items' => [$this->defaultItem()],
             ],
             self::CONTACT_FORM => [
                 'formName' => '',
@@ -513,5 +514,19 @@ enum BlockType: string
     public function frontendView(): string
     {
         return "components.site.blocks.{$this->value}";
+    }
+
+    /**
+     * @return array{enabled: bool, text: array<string, string>, link: array{type: string, value: string, newTab: bool}, bg: null, textColor: null}
+     */
+    private static function defaultCta(): array
+    {
+        return [
+            'enabled' => false,
+            'text' => [],
+            'link' => ['type' => 'url', 'value' => '', 'newTab' => false],
+            'bg' => null,
+            'textColor' => null,
+        ];
     }
 }

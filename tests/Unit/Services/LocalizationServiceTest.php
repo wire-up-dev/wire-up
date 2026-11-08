@@ -9,14 +9,14 @@ use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 it('returns no active locales in console before the locales table is migrated', function (): void {
     Cache::forget('site-locales');
 
-    Schema::disableForeignKeyConstraints();
+    collect(['translations', 'slugs', 'mediables'])->each(fn (string $table): int => DB::table($table)->delete());
     Schema::drop('locales');
-    Schema::enableForeignKeyConstraints();
 
     expect(resolve(LocalizationService::class)->getActiveLocales())->toBeEmpty();
 })->group('sqlite-only');

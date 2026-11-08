@@ -10,6 +10,7 @@ use App\Mcp\Support\Blocks;
 use App\Mcp\Support\Pages;
 use App\Mcp\Support\Records;
 use App\Models\Record;
+use App\Services\ContentRules;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
@@ -27,8 +28,8 @@ final class UpdateRecordTool extends Tool
         $validated = $request->validate(
             [
                 'record' => ['required', 'integer'],
-                'title' => ['nullable', 'string', 'min:3', 'max:255'],
-                'description' => ['nullable', 'string', 'max:160'],
+                'title' => ['nullable', ...ContentRules::TITLE],
+                'description' => ContentRules::DESCRIPTION,
                 'data' => ['array'],
                 'media' => ['array'],
                 'media.*' => ['array'],

@@ -2,19 +2,17 @@
 
 declare(strict_types=1);
 use App\Actions\UpdateRecordAction;
-use App\Enums\BlockType;
-use App\Enums\ContentStatus;
 use App\Enums\FieldType;
 use App\Models\Media;
 use App\Models\Page;
 use App\Models\Record;
 use App\Models\RecordType;
+use App\Services\ContentRules;
 use App\Services\SettingsService;
 use App\Traits\HasBlockBuilder;
 use App\Traits\HasContentEditor;
 use App\Traits\HasRevisionHistory;
 use Flux\Flux;
-use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -338,81 +336,23 @@ return new class extends Component
      */
     private function validationRules(): array
     {
+        [$rules, $messages, $attributes] = $this->contentValidation($this->record, $this->recordType->slug_prefix, (string) __('Choose a date to schedule this record.'));
+
         $rules = [
-            'status' => ['required', Rule::enum(ContentStatus::class)],
-            'published_at' => $this->status === ContentStatus::SCHEDULED
-                ? ['required', 'date', 'after:now']
-                : ['nullable', 'date'],
-            'publishedLocales' => ['array'],
-            'publishedLocales.*' => ['string', Rule::in(array_keys($this->activeLocales))],
-            'blocks' => ['array'],
-            'blocks.*.type' => ['required', 'string', Rule::in(BlockType::values())],
-            'blocks.*.content' => ['array'],
-            'categories' => ['array'],
-            'categories.*' => ['integer', Rule::exists('categories', 'id')],
-            'noindex' => ['boolean'],
-            'members_only' => ['boolean'],
-            'stock' => ['nullable', 'integer', 'min:0', 'max:1000000'],
-            'layout' => ['array'],
-            'layout.hideHeader' => ['boolean'],
-            'layout.hideFooter' => ['boolean'],
-            'layout.backgroundFixed' => ['boolean'],
-            'layout.backgroundColor' => ['nullable', 'string', 'max:30'],
-            'layout.backgroundImage' => ['nullable', 'array'],
-            'layout.customCss' => ['nullable', 'string', 'max:50000'],
-            'layout.sidebar' => ['array'],
-            'layout.sidebar.menus' => ['array'],
-            'layout.sidebar.menus.*' => ['string'],
+            ...$rules,
+            ...ContentRules::mediaItems('media.og_image'),
             'media' => ['array'],
-            'media.og_image' => ['array'],
-            'media.og_image.*' => ['array'],
-            'media.og_image.*.*' => ['array'],
-            'media.og_image.*.*.id' => ['required', 'integer', 'exists:media,id'],
-            'media.og_image.*.*.metadata' => ['nullable', 'array'],
-            'media.og_image.*.*.metadata.caption' => ['nullable', 'string', 'max:500'],
-            'media.og_image.*.*.metadata.alt' => ['nullable', 'string', 'max:255'],
+            'stock' => ['nullable', 'integer', 'min:0', 'max:1000000'],
         ];
-
-        $attributes = [
-            'publishedLocales.*' => (string) __('language'),
-            'published_at' => (string) __('scheduled date'),
-            'layout.customCss' => (string) __('custom CSS'),
-        ];
-
-        foreach (array_keys($this->activeLocales) as $locale) {
-            $isLive = in_array($locale, $this->publishedLocales, true);
-
-            $slugUnique = Rule::unique('slugs', 'slug')->where('locale', $locale)
-                ->where('base_path', $this->recordType->slug_prefix)
-                ->where(function (Builder $query): void {
-                    $query->whereNot(function (Builder $q): void {
-                        $q->where('sluggable_id', $this->record->id)
-                            ->where('sluggable_type', 'record');
-                    });
-                });
-
-            $rules["title.$locale"] = $isLive ? ['required', 'string', 'min:3'] : ['nullable', 'string'];
-            $rules["description.$locale"] = ['nullable', 'string', 'max:160'];
-            $rules["slugs.$locale"] = $isLive
-                ? ['required', 'string', 'min:3', 'regex:/^[a-z0-9-]+$/', $slugUnique]
-                : ['nullable', 'string', 'regex:/^[a-z0-9-]+$/', $slugUnique];
-
-            $attributes["title.$locale"] = (string) __('title');
-            $attributes["slugs.$locale"] = (string) __('web address');
-            $attributes["description.$locale"] = (string) __('description');
-        }
 
         foreach ($this->recordType->fields as $field) {
             $this->appendFieldRules($field, $rules, $attributes);
         }
 
         $messages = [
-            'publishedLocales.*.in' => __('Choose a language that is enabled in your site settings.'),
-            'published_at.required' => __('Choose a date to schedule this record.'),
-            'published_at.after' => __('The scheduled date must be in the future.'),
-            'media.*.*.required' => __('Add at least one item.'),
-            'media.*.*.min' => __('Add at least one item.'),
-            'slugs.*.regex' => __('Web addresses can only use lowercase letters, numbers and hyphens.'),
+            ...$messages,
+            'media.*.*.required' => (string) __('Add at least one item.'),
+            'media.*.*.min' => (string) __('Add at least one item.'),
         ];
 
         return [$rules, $messages, $attributes];
@@ -938,14 +878,17 @@ return new class extends Component
                                     placeholder="{{ __('Choose status') }}"
                                     wire:model.live="status"
                                 >
-                                    @foreach (ContentStatus::cases() as $statusOption)
+                                    @foreach (\App\Enums\ContentStatus::cases() as $statusOption)
                                         <flux:select.option value="{{ $statusOption->value }}">
                                             {{ $statusOption->label() }}
                                         </flux:select.option>
                                     @endforeach
                                 </flux:select>
 
-                                <div x-cloak x-show="$wire.status === '{{ ContentStatus::SCHEDULED->value }}'">
+                                <div
+                                    x-cloak
+                                    x-show="$wire.status === '{{ \App\Enums\ContentStatus::SCHEDULED->value }}'"
+                                >
                                     <flux:date-picker
                                         wire:model="published_at"
                                         label="{{ __('Publish on') }}"

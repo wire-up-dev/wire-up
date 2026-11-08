@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\BlockType;
 use App\Enums\ContentStatus;
 use App\Models\Page;
 use Livewire\Features\SupportTesting\Testable;
@@ -32,53 +33,45 @@ it('returns early when adding an item to a missing block', function (string $met
 
     expect($component->get('blocks'))->toBe([]);
 })->with([
-    'accordion' => ['addAccordionItem'],
-    'testimonial' => ['addTestimonialItem'],
-    'sponsor' => ['addSponsorItem'],
-    'feature' => ['addFeatureItem'],
-    'stat' => ['addStatItem'],
-    'team' => ['addTeamItem'],
-    'pricing' => ['addPricingItem'],
+    'block item' => ['addBlockItem'],
     'contact field' => ['addContactField'],
 ]);
 
-it('returns early when removing an item from a missing block', function (string $method): void {
-    $component = blockEditor()->call($method, 'missing-block', 0);
+it('returns early when removing an item from a missing block', function (): void {
+    $component = blockEditor()->call('removeBlockItem', 'missing-block', 0);
 
     expect($component->get('blocks'))->toBe([]);
-})->with([
-    'accordion' => ['removeAccordionItem'],
-    'sponsor' => ['removeSponsorItem'],
-    'feature' => ['removeFeatureItem'],
-    'testimonial' => ['removeTestimonialItem'],
-    'button' => ['removeButtonItem'],
-    'stat' => ['removeStatItem'],
-    'team' => ['removeTeamItem'],
-    'pricing' => ['removePricingItem'],
-]);
+});
 
-it('adds and removes items for each block type', function (string $type, string $addMethod, string $removeMethod): void {
+it('adds nothing to a block type that has no items', function (): void {
+    $component = blockEditor()->set('blocks', blockWith('hero', []))->call('addBlockItem', 'b1');
+
+    expect($component->get('blocks.b1.content.items'))->toBe([]);
+});
+
+it('adds and removes items for each block type', function (string $type): void {
     $component = blockEditor()->set('blocks', blockWith($type));
 
-    $component->call($addMethod, 'b1');
-    expect($component->get('blocks.b1.content.items'))->toHaveCount(1);
+    $component->call('addBlockItem', 'b1');
+    expect($component->get('blocks.b1.content.items'))->toHaveCount(1)
+        ->and(array_keys($component->get('blocks.b1.content.items.0')))->toBe(array_keys(BlockType::from($type)->defaultItem()));
 
-    $component->call($addMethod, 'b1');
+    $component->call('addBlockItem', 'b1');
     expect($component->get('blocks.b1.content.items'))->toHaveCount(2);
 
-    $component->call($removeMethod, 'b1', 0);
+    $component->call('removeBlockItem', 'b1', 0);
     expect($component->get('blocks.b1.content.items'))->toHaveCount(1);
 
-    $component->call($removeMethod, 'b1', 5);
+    $component->call('removeBlockItem', 'b1', 5);
     expect($component->get('blocks.b1.content.items'))->toHaveCount(1);
 })->with([
-    'accordion' => ['accordion', 'addAccordionItem', 'removeAccordionItem'],
-    'testimonials' => ['testimonials', 'addTestimonialItem', 'removeTestimonialItem'],
-    'sponsors' => ['sponsors', 'addSponsorItem', 'removeSponsorItem'],
-    'feature-cards' => ['feature-cards', 'addFeatureItem', 'removeFeatureItem'],
-    'stats' => ['stats', 'addStatItem', 'removeStatItem'],
-    'team' => ['team', 'addTeamItem', 'removeTeamItem'],
-    'pricing' => ['pricing', 'addPricingItem', 'removePricingItem'],
+    'accordion' => ['accordion'],
+    'testimonials' => ['testimonials'],
+    'sponsors' => ['sponsors'],
+    'feature-cards' => ['feature-cards'],
+    'stats' => ['stats'],
+    'team' => ['team'],
+    'pricing' => ['pricing'],
 ]);
 
 it('caps button items at three', function (): void {
@@ -89,20 +82,20 @@ it('caps button items at three', function (): void {
 
     $component = blockEditor()->set('blocks', blockWith('buttons', $existing));
 
-    $component->call('addButtonItem', 'b1');
+    $component->call('addBlockItem', 'b1');
     expect($component->get('blocks.b1.content.items'))->toHaveCount(3);
 
-    $component->call('addButtonItem', 'b1');
+    $component->call('addBlockItem', 'b1');
     expect($component->get('blocks.b1.content.items'))->toHaveCount(3);
 
-    $component->call('addButtonItem', 'missing');
+    $component->call('addBlockItem', 'missing');
     expect($component->get('blocks.b1.content.items'))->toHaveCount(3);
 
-    $component->call('removeButtonItem', 'b1', 0);
+    $component->call('removeBlockItem', 'b1', 0);
     expect($component->get('blocks.b1.content.items'))->toHaveCount(2);
 });
 
-it('reorders items and ignores blocks without a matching item', function (string $type, string $reorderMethod): void {
+it('reorders items and ignores blocks without a matching item', function (string $type): void {
     $items = [
         ['id' => 'i1', 'title' => [], 'body' => []],
         ['id' => 'i2', 'title' => [], 'body' => []],
@@ -115,20 +108,20 @@ it('reorders items and ignores blocks without a matching item', function (string
 
     $component = blockEditor()->set('blocks', $blocks);
 
-    $component->call($reorderMethod, 'i2', 0);
+    $component->call('reorderBlockItems', 'i2', 0);
     expect($component->get('blocks.b1.content.items.0.id'))->toBe('i2');
 
-    $component->call($reorderMethod, 'unknown-item', 0);
+    $component->call('reorderBlockItems', 'unknown-item', 0);
     expect($component->get('blocks.b1.content.items.0.id'))->toBe('i2');
 })->with([
-    'accordion' => ['accordion', 'reorderAccordionItems'],
-    'feature-cards' => ['feature-cards', 'reorderFeatureItems'],
-    'sponsors' => ['sponsors', 'reorderSponsorItems'],
-    'testimonials' => ['testimonials', 'reorderTestimonialItems'],
-    'buttons' => ['buttons', 'reorderButtonItems'],
-    'stats' => ['stats', 'reorderStatItems'],
-    'team' => ['team', 'reorderTeamItems'],
-    'pricing' => ['pricing', 'reorderPricingItems'],
+    'accordion' => ['accordion'],
+    'feature-cards' => ['feature-cards'],
+    'sponsors' => ['sponsors'],
+    'testimonials' => ['testimonials'],
+    'buttons' => ['buttons'],
+    'stats' => ['stats'],
+    'team' => ['team'],
+    'pricing' => ['pricing'],
 ]);
 
 it('syncs media for a block item', function (): void {

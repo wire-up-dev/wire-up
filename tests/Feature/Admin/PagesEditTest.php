@@ -142,6 +142,18 @@ it('rejects a slug containing a slash or invalid characters', function (): void 
         ->assertHasErrors(['slugs.en' => 'regex']);
 });
 
+it('rejects a title or web address longer than the database column', function (): void {
+    $page = Page::factory()->create(['status' => ContentStatus::DRAFT]);
+
+    $this->actingAsAdmin();
+
+    Livewire::test('pages::admin.pages-edit', ['page' => $page])
+        ->set('title.en', str_repeat('a', 256))
+        ->set('slugs.en', str_repeat('a', 256))
+        ->call('update')
+        ->assertHasErrors(['title.en' => 'max', 'slugs.en' => 'max']);
+});
+
 it('cycles to the next active locale on change-locale', function (): void {
     Locale::query()->where('code', 'fr')->update(['active' => true]);
     cache()->forget('site-locales');

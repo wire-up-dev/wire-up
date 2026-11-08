@@ -75,54 +75,6 @@ trait HasBlockBuilder
         }
     }
 
-    public function addAccordionItem(string $id): void
-    {
-        if (! isset($this->blocks[$id])) {
-            return;
-        }
-
-        $itemId = (string) Str::uuid();
-        $this->blocks[$id]['content']['items'][] = ['id' => $itemId, 'title' => [], 'body' => []];
-        $this->dispatch('open-block-item', id: $itemId);
-    }
-
-    public function removeAccordionItem(string $id, int $index): void
-    {
-        if (! isset($this->blocks[$id]['content']['items'][$index])) {
-            return;
-        }
-
-        unset($this->blocks[$id]['content']['items'][$index]);
-
-        $this->blocks[$id]['content']['items'] = array_values($this->blocks[$id]['content']['items']);
-    }
-
-    #[Renderless]
-    public function reorderAccordionItems(string $itemId, int $position): void
-    {
-        foreach ($this->blocks as $blockId => $block) {
-            $items = $block['content']['items'] ?? null;
-
-            if (! is_array($items)) {
-                continue;
-            }
-
-            $from = collect($items)->search(fn (array $item): bool => ($item['id'] ?? null) === $itemId);
-
-            if ($from === false) {
-                continue;
-            }
-
-            $moved = $items[$from];
-            array_splice($items, $from, 1);
-            array_splice($items, $position, 0, [$moved]);
-
-            $this->blocks[$blockId]['content']['items'] = array_values($items);
-
-            return;
-        }
-    }
-
     #[On('block-item-media-updated')]
     public function syncBlockItemMedia(string $blockId, string $itemId, string $field, mixed $value): void
     {
@@ -160,306 +112,6 @@ trait HasBlockBuilder
         }
 
         $this->blocks[$blockId]['content']['recordIds'] = $ids;
-    }
-
-    public function addTestimonialItem(string $id): void
-    {
-        if (! isset($this->blocks[$id])) {
-            return;
-        }
-
-        $itemId = (string) Str::uuid();
-        $this->blocks[$id]['content']['items'][] = ['id' => $itemId, 'quote' => [], 'author' => [], 'role' => [], 'avatar' => null, 'rating' => 0];
-        $this->dispatch('open-block-item', id: $itemId);
-    }
-
-    public function addSponsorItem(string $id): void
-    {
-        if (! isset($this->blocks[$id])) {
-            return;
-        }
-
-        $itemId = (string) Str::uuid();
-        $this->blocks[$id]['content']['items'][] = ['id' => $itemId, 'logo' => null, 'name' => [], 'link' => '', 'tier' => ''];
-        $this->dispatch('open-block-item', id: $itemId);
-    }
-
-    public function removeSponsorItem(string $id, int $index): void
-    {
-        if (! isset($this->blocks[$id]['content']['items'][$index])) {
-            return;
-        }
-
-        unset($this->blocks[$id]['content']['items'][$index]);
-
-        $this->blocks[$id]['content']['items'] = array_values($this->blocks[$id]['content']['items']);
-    }
-
-    public function addFeatureItem(string $id): void
-    {
-        if (! isset($this->blocks[$id])) {
-            return;
-        }
-
-        $itemId = (string) Str::uuid();
-        $this->blocks[$id]['content']['items'][] = [
-            'id' => $itemId,
-            'media' => 'image',
-            'image' => null,
-            'icon' => '',
-            'title' => [],
-            'body' => [],
-            'cta' => [
-                'enabled' => false,
-                'text' => [],
-                'link' => ['type' => 'url', 'value' => '', 'newTab' => false],
-                'bg' => null,
-                'textColor' => null,
-            ],
-        ];
-        $this->dispatch('open-block-item', id: $itemId);
-    }
-
-    public function removeFeatureItem(string $id, int $index): void
-    {
-        if (! isset($this->blocks[$id]['content']['items'][$index])) {
-            return;
-        }
-
-        unset($this->blocks[$id]['content']['items'][$index]);
-
-        $this->blocks[$id]['content']['items'] = array_values($this->blocks[$id]['content']['items']);
-    }
-
-    #[Renderless]
-    public function reorderFeatureItems(string $itemId, int $position): void
-    {
-        foreach ($this->blocks as $blockId => $block) {
-            $items = $block['content']['items'] ?? null;
-
-            if (! is_array($items)) {
-                continue;
-            }
-
-            $from = collect($items)->search(fn (array $item): bool => ($item['id'] ?? null) === $itemId);
-
-            if ($from === false) {
-                continue;
-            }
-
-            $moved = $items[$from];
-            array_splice($items, $from, 1);
-            array_splice($items, $position, 0, [$moved]);
-
-            $this->blocks[$blockId]['content']['items'] = array_values($items);
-
-            return;
-        }
-    }
-
-    #[Renderless]
-    public function reorderSponsorItems(string $itemId, int $position): void
-    {
-        foreach ($this->blocks as $blockId => $block) {
-            $items = $block['content']['items'] ?? null;
-
-            if (! is_array($items)) {
-                continue;
-            }
-
-            $from = collect($items)->search(fn (array $item): bool => ($item['id'] ?? null) === $itemId);
-
-            if ($from === false) {
-                continue;
-            }
-
-            $moved = $items[$from];
-            array_splice($items, $from, 1);
-            array_splice($items, $position, 0, [$moved]);
-
-            $this->blocks[$blockId]['content']['items'] = array_values($items);
-
-            return;
-        }
-    }
-
-    public function removeTestimonialItem(string $id, int $index): void
-    {
-        if (! isset($this->blocks[$id]['content']['items'][$index])) {
-            return;
-        }
-
-        unset($this->blocks[$id]['content']['items'][$index]);
-
-        $this->blocks[$id]['content']['items'] = array_values($this->blocks[$id]['content']['items']);
-    }
-
-    #[Renderless]
-    public function reorderTestimonialItems(string $itemId, int $position): void
-    {
-        foreach ($this->blocks as $blockId => $block) {
-            $items = $block['content']['items'] ?? null;
-
-            if (! is_array($items)) {
-                continue;
-            }
-
-            $from = collect($items)->search(fn (array $item): bool => ($item['id'] ?? null) === $itemId);
-
-            if ($from === false) {
-                continue;
-            }
-
-            $moved = $items[$from];
-            array_splice($items, $from, 1);
-            array_splice($items, $position, 0, [$moved]);
-
-            $this->blocks[$blockId]['content']['items'] = array_values($items);
-
-            return;
-        }
-    }
-
-    public function addButtonItem(string $id): void
-    {
-        if (! isset($this->blocks[$id]) || count($this->blocks[$id]['content']['items'] ?? []) >= 3) {
-            return;
-        }
-
-        $itemId = (string) Str::uuid();
-        $this->blocks[$id]['content']['items'][] = [
-            'id' => $itemId,
-            'text' => [],
-            'variant' => 'primary',
-            'link' => ['type' => 'url', 'value' => '', 'newTab' => false],
-        ];
-        $this->dispatch('open-block-item', id: $itemId);
-    }
-
-    public function removeButtonItem(string $id, int $index): void
-    {
-        if (! isset($this->blocks[$id]['content']['items'][$index])) {
-            return;
-        }
-
-        unset($this->blocks[$id]['content']['items'][$index]);
-
-        $this->blocks[$id]['content']['items'] = array_values($this->blocks[$id]['content']['items']);
-    }
-
-    #[Renderless]
-    public function reorderButtonItems(string $itemId, int $position): void
-    {
-        foreach ($this->blocks as $blockId => $block) {
-            $items = $block['content']['items'] ?? null;
-
-            if (! is_array($items)) {
-                continue;
-            }
-
-            $from = collect($items)->search(fn (array $item): bool => ($item['id'] ?? null) === $itemId);
-
-            if ($from === false) {
-                continue;
-            }
-
-            $moved = $items[$from];
-            array_splice($items, $from, 1);
-            array_splice($items, $position, 0, [$moved]);
-
-            $this->blocks[$blockId]['content']['items'] = array_values($items);
-
-            return;
-        }
-    }
-
-    public function addStatItem(string $id): void
-    {
-        if (! isset($this->blocks[$id])) {
-            return;
-        }
-
-        $itemId = (string) Str::uuid();
-        $this->blocks[$id]['content']['items'][] = ['id' => $itemId, 'value' => [], 'label' => []];
-        $this->dispatch('open-block-item', id: $itemId);
-    }
-
-    public function removeStatItem(string $id, int $index): void
-    {
-        $this->removeBlockItem($id, $index);
-    }
-
-    #[Renderless]
-    public function reorderStatItems(string $itemId, int $position): void
-    {
-        $this->reorderBlockItems($itemId, $position);
-    }
-
-    public function addTeamItem(string $id): void
-    {
-        if (! isset($this->blocks[$id])) {
-            return;
-        }
-
-        $itemId = (string) Str::uuid();
-        $this->blocks[$id]['content']['items'][] = [
-            'id' => $itemId,
-            'photo' => null,
-            'name' => [],
-            'role' => [],
-            'bio' => [],
-            'socials' => ['email' => '', 'website' => '', 'linkedin' => '', 'x' => '', 'instagram' => ''],
-        ];
-        $this->dispatch('open-block-item', id: $itemId);
-    }
-
-    public function removeTeamItem(string $id, int $index): void
-    {
-        $this->removeBlockItem($id, $index);
-    }
-
-    #[Renderless]
-    public function reorderTeamItems(string $itemId, int $position): void
-    {
-        $this->reorderBlockItems($itemId, $position);
-    }
-
-    public function addPricingItem(string $id): void
-    {
-        if (! isset($this->blocks[$id])) {
-            return;
-        }
-
-        $itemId = (string) Str::uuid();
-        $this->blocks[$id]['content']['items'][] = [
-            'id' => $itemId,
-            'name' => [],
-            'price' => [],
-            'period' => [],
-            'description' => [],
-            'features' => [],
-            'featured' => false,
-            'badge' => [],
-            'cta' => [
-                'enabled' => false,
-                'text' => [],
-                'link' => ['type' => 'url', 'value' => '', 'newTab' => false],
-                'bg' => null,
-                'textColor' => null,
-            ],
-        ];
-        $this->dispatch('open-block-item', id: $itemId);
-    }
-
-    public function removePricingItem(string $id, int $index): void
-    {
-        $this->removeBlockItem($id, $index);
-    }
-
-    #[Renderless]
-    public function reorderPricingItems(string $itemId, int $position): void
-    {
-        $this->reorderBlockItems($itemId, $position);
     }
 
     public function addContactBuiltin(string $id, string $key): void
@@ -621,6 +273,61 @@ trait HasBlockBuilder
         Flux::modal('remove-block')->close();
     }
 
+    public function addBlockItem(string $id): void
+    {
+        $item = BlockType::tryFrom($this->blocks[$id]['type'] ?? '')?->defaultItem();
+
+        if ($item === null) {
+            return;
+        }
+
+        $maxItems = BlockType::from($this->blocks[$id]['type'])->maxItems();
+
+        if ($maxItems !== null && count($this->blocks[$id]['content']['items'] ?? []) >= $maxItems) {
+            return;
+        }
+
+        $this->blocks[$id]['content']['items'][] = $item;
+        $this->dispatch('open-block-item', id: $item['id']);
+    }
+
+    public function removeBlockItem(string $id, int $index): void
+    {
+        if (! isset($this->blocks[$id]['content']['items'][$index])) {
+            return;
+        }
+
+        unset($this->blocks[$id]['content']['items'][$index]);
+
+        $this->blocks[$id]['content']['items'] = array_values($this->blocks[$id]['content']['items']);
+    }
+
+    #[Renderless]
+    public function reorderBlockItems(string $itemId, int $position): void
+    {
+        foreach ($this->blocks as $blockId => $block) {
+            $items = $block['content']['items'] ?? null;
+
+            if (! is_array($items)) {
+                continue;
+            }
+
+            $from = collect($items)->search(fn (array $item): bool => ($item['id'] ?? null) === $itemId);
+
+            if ($from === false) {
+                continue;
+            }
+
+            $moved = $items[$from];
+            array_splice($items, $from, 1);
+            array_splice($items, $position, 0, [$moved]);
+
+            $this->blocks[$blockId]['content']['items'] = array_values($items);
+
+            return;
+        }
+    }
+
     /**
      * @param  array<int|string, array{id: string, type: string, position: int, content: array<string, mixed>}>  $blocks
      * @return array<int|string, array{id: string, type: string, position: int, content: array<string, mixed>}>
@@ -676,42 +383,6 @@ trait HasBlockBuilder
             }
 
             $this->blocks[$id]['content']['anchor'] = $anchor;
-        }
-    }
-
-    protected function removeBlockItem(string $id, int $index): void
-    {
-        if (! isset($this->blocks[$id]['content']['items'][$index])) {
-            return;
-        }
-
-        unset($this->blocks[$id]['content']['items'][$index]);
-
-        $this->blocks[$id]['content']['items'] = array_values($this->blocks[$id]['content']['items']);
-    }
-
-    protected function reorderBlockItems(string $itemId, int $position): void
-    {
-        foreach ($this->blocks as $blockId => $block) {
-            $items = $block['content']['items'] ?? null;
-
-            if (! is_array($items)) {
-                continue;
-            }
-
-            $from = collect($items)->search(fn (array $item): bool => ($item['id'] ?? null) === $itemId);
-
-            if ($from === false) {
-                continue;
-            }
-
-            $moved = $items[$from];
-            array_splice($items, $from, 1);
-            array_splice($items, $position, 0, [$moved]);
-
-            $this->blocks[$blockId]['content']['items'] = array_values($items);
-
-            return;
         }
     }
 

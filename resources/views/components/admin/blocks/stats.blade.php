@@ -23,7 +23,7 @@
     <div class="flex flex-col gap-2">
         <flux:label>{{ __('Stats') }}</flux:label>
 
-        <div wire:sort="reorderStatItems" wire:sort:group="stats-{{ $block['id'] }}" class="flex flex-col gap-3">
+        <div wire:sort="reorderBlockItems" wire:sort:group="stats-{{ $block['id'] }}" class="flex flex-col gap-3">
             @foreach ($items as $i => $item)
                 @php($statTitle = \Illuminate\Support\Str::of((string) data_get($item, "label.{$locale}"))->squish()->limit(50)->value())
                 <flux:card
@@ -66,7 +66,7 @@
                                 variant="subtle"
                                 icon="trash"
                                 square
-                                wire:click="removeStatItem('{{ $block['id'] }}', {{ $i }})"
+                                wire:click="removeBlockItem('{{ $block['id'] }}', {{ $i }})"
                                 :tooltip="__('Remove stat')"
                             />
                         </div>
@@ -94,7 +94,7 @@
             <flux:button
                 size="sm"
                 icon="plus"
-                wire:click="addStatItem('{{ $block['id'] }}')"
+                wire:click="addBlockItem('{{ $block['id'] }}')"
             >{{ __('Add stat') }}</flux:button>
         </div>
     </div>

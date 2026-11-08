@@ -9,6 +9,7 @@ use App\Mcp\Support\Pages;
 use App\Models\Media;
 use App\Models\Page;
 use App\Models\Slug;
+use App\Services\ContentRules;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\JsonSchema\Types\Type;
@@ -27,21 +28,13 @@ final class UpdatePageTool extends Tool
         $validated = $request->validate(
             [
                 'page' => ['required', 'integer'],
-                'title' => ['nullable', 'string', 'min:3', 'max:255'],
-                'description' => ['nullable', 'string', 'max:160'],
-                'slug' => ['nullable', 'string', 'min:3', 'max:255', 'regex:/^[a-z0-9-]+$/'],
+                'title' => ['nullable', ...ContentRules::TITLE],
+                'description' => ContentRules::DESCRIPTION,
+                'slug' => ['nullable', ...ContentRules::SLUG],
                 'noindex' => ['boolean'],
                 'og_image' => ['nullable', 'integer', 'exists:media,id'],
-                'layout' => ['sometimes', 'array'],
-                'layout.hideHeader' => ['boolean'],
-                'layout.hideFooter' => ['boolean'],
-                'layout.backgroundFixed' => ['boolean'],
-                'layout.backgroundColor' => ['nullable', 'string', 'max:30'],
-                'layout.backgroundImage' => ['nullable', 'integer', 'exists:media,id'],
-                'layout.customCss' => ['nullable', 'string', 'max:50000'],
-                'layout.sidebar' => ['sometimes', 'array'],
+                ...ContentRules::layout(['nullable', 'integer', 'exists:media,id']),
                 'layout.sidebar.menus' => ['array', 'max:3'],
-                'layout.sidebar.menus.*' => ['string', 'max:255'],
             ],
             [
                 'page.required' => 'Pass "page": the page id. Use list-pages to find it.',

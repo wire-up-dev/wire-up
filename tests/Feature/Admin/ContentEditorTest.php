@@ -468,15 +468,15 @@ it('adds, removes and reorders stats, team and pricing items', function (): void
             ]]],
             'pr' => ['id' => 'pr', 'type' => 'pricing', 'position' => 2, 'content' => ['columns' => 3, 'items' => []]],
         ])
-        ->call('addStatItem', 'st')
+        ->call('addBlockItem', 'st')
         ->assertSet('blocks.st.content.items', fn (array $items): bool => count($items) === 2)
-        ->call('removeStatItem', 'st', 0)
+        ->call('removeBlockItem', 'st', 0)
         ->assertSet('blocks.st.content.items', fn (array $items): bool => count($items) === 1 && array_keys($items) === [0])
-        ->call('reorderTeamItems', 'y', 0)
+        ->call('reorderBlockItems', 'y', 0)
         ->assertSet('blocks.tm.content.items', fn (array $items): bool => array_column($items, 'id') === ['y', 'x'])
-        ->call('addPricingItem', 'pr')
+        ->call('addBlockItem', 'pr')
         ->assertSet('blocks.pr.content.items', fn (array $items): bool => count($items) === 1 && $items[0]['featured'] === false)
-        ->call('removePricingItem', 'pr', 0)
+        ->call('removeBlockItem', 'pr', 0)
         ->assertSet('blocks.pr.content.items', fn (array $items): bool => $items === []);
 });
 
@@ -498,13 +498,13 @@ it('adds and removes buttons, capping at three', function (): void {
         ->set('blocks', [
             'new-btn' => ['id' => 'new-btn', 'type' => 'buttons', 'position' => 0, 'content' => BlockType::BUTTONS->defaultContent()],
         ])
-        ->call('addButtonItem', 'new-btn')
+        ->call('addBlockItem', 'new-btn')
         ->assertSet('blocks.new-btn.content.items', fn (array $items): bool => count($items) === 2)
-        ->call('addButtonItem', 'new-btn')
+        ->call('addBlockItem', 'new-btn')
         ->assertSet('blocks.new-btn.content.items', fn (array $items): bool => count($items) === 3)
-        ->call('addButtonItem', 'new-btn')
+        ->call('addBlockItem', 'new-btn')
         ->assertSet('blocks.new-btn.content.items', fn (array $items): bool => count($items) === 3)
-        ->call('removeButtonItem', 'new-btn', 1)
+        ->call('removeBlockItem', 'new-btn', 1)
         ->assertSet('blocks.new-btn.content.items', fn (array $items): bool => count($items) === 2 && array_keys($items) === [0, 1]);
 });
 
@@ -516,7 +516,7 @@ it('reorders buttons by id', function (): void {
                 ['id' => 'b', 'text' => ['en' => 'B'], 'variant' => 'primary', 'link' => ['type' => 'url', 'value' => '', 'newTab' => false]],
             ]]],
         ])
-        ->call('reorderButtonItems', 'b', 0)
+        ->call('reorderBlockItems', 'b', 0)
         ->assertSet('blocks.new-btn.content.items', fn (array $items): bool => array_column($items, 'id') === ['b', 'a']);
 });
 
@@ -525,11 +525,11 @@ it('adds and removes accordion items', function (): void {
         ->set('blocks', [
             'new-acc' => ['id' => 'new-acc', 'type' => 'accordion', 'position' => 0, 'content' => ['items' => [['title' => [], 'body' => []]]]],
         ])
-        ->call('addAccordionItem', 'new-acc')
+        ->call('addBlockItem', 'new-acc')
         ->assertSet('blocks.new-acc.content.items', fn (array $items): bool => count($items) === 2)
-        ->call('addAccordionItem', 'new-acc')
+        ->call('addBlockItem', 'new-acc')
         ->assertSet('blocks.new-acc.content.items', fn (array $items): bool => count($items) === 3)
-        ->call('removeAccordionItem', 'new-acc', 1)
+        ->call('removeBlockItem', 'new-acc', 1)
         ->assertSet('blocks.new-acc.content.items', fn (array $items): bool => count($items) === 2 && array_keys($items) === [0, 1]);
 });
 
@@ -542,9 +542,9 @@ it('reorders accordion items by id', function (): void {
                 ['id' => 'c', 'title' => ['en' => 'C'], 'body' => []],
             ]]],
         ])
-        ->call('reorderAccordionItems', 'c', 0)
+        ->call('reorderBlockItems', 'c', 0)
         ->assertSet('blocks.new-acc.content.items', fn (array $items): bool => array_column($items, 'id') === ['c', 'a', 'b'])
-        ->call('reorderAccordionItems', 'c', 2)
+        ->call('reorderBlockItems', 'c', 2)
         ->assertSet('blocks.new-acc.content.items', fn (array $items): bool => array_column($items, 'id') === ['a', 'b', 'c']);
 });
 
@@ -619,11 +619,11 @@ it('adds and removes testimonial items', function (): void {
         ->set('blocks', [
             'new-t' => ['id' => 'new-t', 'type' => 'testimonials', 'position' => 0, 'content' => ['items' => [['quote' => [], 'author' => []]]]],
         ])
-        ->call('addTestimonialItem', 'new-t')
+        ->call('addBlockItem', 'new-t')
         ->assertSet('blocks.new-t.content.items', fn (array $items): bool => count($items) === 2)
-        ->call('addTestimonialItem', 'new-t')
+        ->call('addBlockItem', 'new-t')
         ->assertSet('blocks.new-t.content.items', fn (array $items): bool => count($items) === 3)
-        ->call('removeTestimonialItem', 'new-t', 1)
+        ->call('removeBlockItem', 'new-t', 1)
         ->assertSet('blocks.new-t.content.items', fn (array $items): bool => count($items) === 2 && array_keys($items) === [0, 1]);
 });
 
@@ -636,9 +636,9 @@ it('reorders testimonial items by id', function (): void {
                 ['id' => 'c', 'author' => ['en' => 'C'], 'quote' => []],
             ]]],
         ])
-        ->call('reorderTestimonialItems', 'c', 0)
+        ->call('reorderBlockItems', 'c', 0)
         ->assertSet('blocks.new-t.content.items', fn (array $items): bool => array_column($items, 'id') === ['c', 'a', 'b'])
-        ->call('reorderTestimonialItems', 'c', 2)
+        ->call('reorderBlockItems', 'c', 2)
         ->assertSet('blocks.new-t.content.items', fn (array $items): bool => array_column($items, 'id') === ['a', 'b', 'c']);
 });
 
@@ -647,7 +647,7 @@ it('seeds the new testimonial item with the full field shape', function (): void
         ->set('blocks', [
             'new-t' => ['id' => 'new-t', 'type' => 'testimonials', 'position' => 0, 'content' => ['items' => []]],
         ])
-        ->call('addTestimonialItem', 'new-t')
+        ->call('addBlockItem', 'new-t')
         ->assertSet('blocks.new-t.content.items', function (array $items): bool {
             $item = $items[0];
 
@@ -733,11 +733,11 @@ it('adds and removes sponsor items', function (): void {
         ->set('blocks', [
             'new-s' => ['id' => 'new-s', 'type' => 'sponsors', 'position' => 0, 'content' => ['items' => [['logo' => null, 'name' => []]]]],
         ])
-        ->call('addSponsorItem', 'new-s')
+        ->call('addBlockItem', 'new-s')
         ->assertSet('blocks.new-s.content.items', fn (array $items): bool => count($items) === 2)
-        ->call('addSponsorItem', 'new-s')
+        ->call('addBlockItem', 'new-s')
         ->assertSet('blocks.new-s.content.items', fn (array $items): bool => count($items) === 3)
-        ->call('removeSponsorItem', 'new-s', 1)
+        ->call('removeBlockItem', 'new-s', 1)
         ->assertSet('blocks.new-s.content.items', fn (array $items): bool => count($items) === 2 && array_keys($items) === [0, 1]);
 });
 
@@ -750,9 +750,9 @@ it('reorders sponsor items by id', function (): void {
                 ['id' => 'c', 'name' => ['en' => 'C'], 'logo' => null],
             ]]],
         ])
-        ->call('reorderSponsorItems', 'c', 0)
+        ->call('reorderBlockItems', 'c', 0)
         ->assertSet('blocks.new-s.content.items', fn (array $items): bool => array_column($items, 'id') === ['c', 'a', 'b'])
-        ->call('reorderSponsorItems', 'c', 2)
+        ->call('reorderBlockItems', 'c', 2)
         ->assertSet('blocks.new-s.content.items', fn (array $items): bool => array_column($items, 'id') === ['a', 'b', 'c']);
 });
 
@@ -761,7 +761,7 @@ it('seeds the new sponsor item with the full field shape', function (): void {
         ->set('blocks', [
             'new-s' => ['id' => 'new-s', 'type' => 'sponsors', 'position' => 0, 'content' => ['items' => []]],
         ])
-        ->call('addSponsorItem', 'new-s')
+        ->call('addBlockItem', 'new-s')
         ->assertSet('blocks.new-s.content.items', function (array $items): bool {
             $item = $items[0];
 
@@ -880,11 +880,11 @@ it('adds and removes feature card items', function (): void {
         ->set('blocks', [
             'new-f' => ['id' => 'new-f', 'type' => 'feature-cards', 'position' => 0, 'content' => ['items' => [['image' => null, 'title' => []]]]],
         ])
-        ->call('addFeatureItem', 'new-f')
+        ->call('addBlockItem', 'new-f')
         ->assertSet('blocks.new-f.content.items', fn (array $items): bool => count($items) === 2)
-        ->call('addFeatureItem', 'new-f')
+        ->call('addBlockItem', 'new-f')
         ->assertSet('blocks.new-f.content.items', fn (array $items): bool => count($items) === 3)
-        ->call('removeFeatureItem', 'new-f', 1)
+        ->call('removeBlockItem', 'new-f', 1)
         ->assertSet('blocks.new-f.content.items', fn (array $items): bool => count($items) === 2 && array_keys($items) === [0, 1]);
 });
 
@@ -897,9 +897,9 @@ it('reorders feature card items by id', function (): void {
                 ['id' => 'c', 'title' => ['en' => 'C'], 'image' => null],
             ]]],
         ])
-        ->call('reorderFeatureItems', 'c', 0)
+        ->call('reorderBlockItems', 'c', 0)
         ->assertSet('blocks.new-f.content.items', fn (array $items): bool => array_column($items, 'id') === ['c', 'a', 'b'])
-        ->call('reorderFeatureItems', 'c', 2)
+        ->call('reorderBlockItems', 'c', 2)
         ->assertSet('blocks.new-f.content.items', fn (array $items): bool => array_column($items, 'id') === ['a', 'b', 'c']);
 });
 
@@ -908,7 +908,7 @@ it('seeds the new feature card item with the full field shape', function (): voi
         ->set('blocks', [
             'new-f' => ['id' => 'new-f', 'type' => 'feature-cards', 'position' => 0, 'content' => ['items' => []]],
         ])
-        ->call('addFeatureItem', 'new-f')
+        ->call('addBlockItem', 'new-f')
         ->assertSet('blocks.new-f.content.items', function (array $items): bool {
             $item = $items[0];
 
