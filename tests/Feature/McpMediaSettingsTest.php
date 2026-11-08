@@ -15,6 +15,7 @@ use App\Models\Media;
 use App\Models\Page;
 use App\Models\Settings;
 use App\Services\SettingsService;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
@@ -72,7 +73,7 @@ it('imports an image from a url into the media library', function (): void {
 });
 
 it('returns the existing media item when the same file is imported twice', function (): void {
-    Http::fake(['cdn.example.com/*' => Http::response(onePixelPng())]);
+    Http::fake(['cdn.example.com/*' => fn (): PromiseInterface => Http::response(onePixelPng())]);
 
     WireUpServer::tool(ImportMediaFromUrlTool::class, ['url' => 'https://cdn.example.com/a.png'])->assertOk();
     WireUpServer::tool(ImportMediaFromUrlTool::class, ['url' => 'https://cdn.example.com/b.png'])->assertOk();

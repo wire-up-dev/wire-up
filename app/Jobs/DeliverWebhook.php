@@ -42,7 +42,7 @@ final class DeliverWebhook implements ShouldQueue
         $delivery->increment('attempts');
 
         try {
-            $guard->assertPublic($delivery->webhook->url);
+            $options = $guard->pinnedOptions($delivery->webhook->url);
         } catch (InvalidArgumentException $exception) {
             $this->record($delivery, null, __('The address points to a private network, so it was not called.'));
             $this->fail($exception);
@@ -62,7 +62,7 @@ final class DeliverWebhook implements ShouldQueue
                     'X-Wire-Up-Timestamp' => $timestamp,
                     'X-Wire-Up-Signature' => 'sha256='.hash_hmac('sha256', $timestamp.'.'.$body, $delivery->webhook->secret),
                 ])
-                ->withOptions(['allow_redirects' => false])
+                ->withOptions($options)
                 ->timeout(10)
                 ->post($delivery->webhook->url);
         } catch (Throwable $exception) {

@@ -8,8 +8,17 @@ use App\Models\Settings;
 
 final class IntegrationSettings
 {
+    public static function configIsBeingCached(): bool
+    {
+        return app()->runningConsoleCommand('config:cache', 'optimize');
+    }
+
     public function apply(): void
     {
+        if (self::configIsBeingCached()) {
+            return;
+        }
+
         config()->set($this->environmentValues());
 
         $saved = Settings::uncached(IntegrationRegistry::settingKeys());

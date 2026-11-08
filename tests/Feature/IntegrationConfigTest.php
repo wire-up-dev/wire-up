@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Integrations\IntegrationSettings;
 use App\Models\Settings;
+use App\Providers\AppServiceProvider;
 use Laravel\Nightwatch\NightwatchServiceProvider;
 use Sentry\Laravel\ServiceProvider as SentryServiceProvider;
 
@@ -233,3 +234,20 @@ it('applies saved changes on top of a cached configuration', function (): void {
         ->and(config('nightwatch.token'))->toBe('new-token')
         ->and(config('nightwatch.enabled'))->toBeTrue();
 });
+
+it('keeps saved settings and keys out of the config cache', function (string $command): void {
+    $argv = $GLOBALS['argv'];
+    $_SERVER['argv'] = ['artisan', $command];
+    Settings::set(['pexels_api_key' => 'db-pexels-key', 'site_name' => 'Cached Site']);
+    config()->set(['site' => [], 'services.pexels.key' => 'env-pexels-key']);
+
+    try {
+        new IntegrationSettings()->apply();
+        app()->getProvider(AppServiceProvider::class)->boot();
+    } finally {
+        $_SERVER['argv'] = $argv;
+    }
+
+    expect(config('services.pexels.key'))->toBe('env-pexels-key')
+        ->and(config('site'))->toBe([]);
+})->with(['config:cache', 'optimize']);

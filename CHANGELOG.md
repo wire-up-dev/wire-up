@@ -4,6 +4,8 @@ Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater sh
 
 ## Unreleased
 
+- Saved integration keys and site settings no longer end up in Laravel's cached configuration file. They are read from the database on each request as before.
+- Importing media from a URL, reading a webpage, webhooks and Slack messages now only connect to the public address Wire Up checked, so a hostname can't be switched to an internal address between the check and the request. Redirects are checked hop by hop, addresses that don't resolve are refused, and downloads stop as soon as they pass the size limit instead of after loading the whole file.
 - Sites on PostgreSQL: deleting media, importing a site, pages that don't exist, the Users screen and searches in the admin now work. Before, each of these failed with an error, and searches only matched the exact capitalisation. Wire Up is now tested on MySQL and PostgreSQL as well as SQLite.
 - Sites on MySQL: searching records now ignores capitalisation in their fields, contact form answers in the inbox and in notification emails keep the order of the form, and page summaries for search engines start with the block's heading again.
 - The dashboard warns when the scheduler hasn't run for ten minutes, when e-mails and webhooks have waited more than fifteen minutes for a queue worker, and when background tasks failed in the last week.

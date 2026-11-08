@@ -10,16 +10,14 @@ use DOMElement;
 use DOMNode;
 use DOMNodeList;
 use DOMXPath;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\UriInterface;
 use Throwable;
 
 final readonly class ReadWebpageAction
 {
     private const int MAX_CRAWL = 20;
+
+    private const int MAX_PAGE_BYTES = 5 * 1024 * 1024;
 
     private const int CONTENT_LIMIT = 6000;
 
@@ -75,16 +73,7 @@ final readonly class ReadWebpageAction
     private function fetch(string $url): ?string
     {
         try {
-            $this->urlGuard->assertPublic($url);
-
-            $response = Http::withOptions([
-                'allow_redirects' => [
-                    'max' => 3,
-                    'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $uri): void {
-                        $this->urlGuard->assertPublic((string) $uri);
-                    },
-                ],
-            ])->timeout(20)->get($url);
+            $response = $this->urlGuard->get($url, 20, self::MAX_PAGE_BYTES);
 
             if ($response->failed() || ! Str::contains((string) $response->header('Content-Type'), 'html', true)) {
                 return null;

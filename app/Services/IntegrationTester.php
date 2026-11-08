@@ -19,12 +19,12 @@ use function Illuminate\Support\php_binary;
 
 final readonly class IntegrationTester
 {
-    public function __construct(private SettingsService $settings, private NewsletterService $newsletter, private HubInterface $sentry, private OffsiteBackupService $offsite) {}
+    public function __construct(private SettingsService $settings, private NewsletterService $newsletter, private HubInterface $sentry, private OffsiteBackupService $offsite, private PublicUrlGuard $urlGuard) {}
 
     public function slack(string $webhookUrl): IntegrationTestResult
     {
         try {
-            $response = Http::timeout(10)->post($webhookUrl, [
+            $response = Http::withOptions($this->urlGuard->pinnedOptions($webhookUrl))->timeout(10)->post($webhookUrl, [
                 'text' => __('Test message from :site. Your Slack notifications are working.', ['site' => $this->settings->brandName()]),
             ]);
         } catch (Throwable $exception) {

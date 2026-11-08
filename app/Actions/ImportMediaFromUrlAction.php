@@ -8,13 +8,9 @@ use App\Enums\MediaType;
 use App\Models\Media;
 use App\Services\PublicUrlGuard;
 use finfo;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\UriInterface;
 
 final readonly class ImportMediaFromUrlAction
 {
@@ -35,20 +31,9 @@ final readonly class ImportMediaFromUrlAction
 
     public function handle(string $url, string $alt = ''): Media
     {
-        $this->urlGuard->assertPublic($url);
-
-        $contents = Http::withOptions([
-            'allow_redirects' => [
-                'max' => 3,
-                'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $uri): void {
-                    $this->urlGuard->assertPublic((string) $uri);
-                },
-            ],
-        ])->timeout(20)->get($url)->throw()->body();
+        $contents = $this->urlGuard->get($url, 20, self::MAX_BYTES)->throw()->body();
 
         throw_if($contents === '', InvalidArgumentException::class, 'The URL returned an empty response.');
-
-        throw_if(mb_strlen($contents, '8bit') > self::MAX_BYTES, InvalidArgumentException::class, 'The file is larger than the 20 MB import limit.');
 
         $mime = (string) new finfo(FILEINFO_MIME_TYPE)->buffer($contents);
         $allowed = self::ALLOWED_MIMES[$mime] ?? null;

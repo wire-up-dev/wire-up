@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use App\Models\User;
+use App\Services\PublicUrlGuard;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
@@ -16,6 +17,8 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         Process::preventStrayProcesses();
+
+        PublicUrlGuard::resolveHostsUsing(fn (string $host): array => $host === 'localhost' ? ['127.0.0.1'] : ['93.184.215.14']);
     }
 
     protected function refreshApplication(): void

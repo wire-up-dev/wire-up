@@ -15,7 +15,7 @@ it('posts the notification payload to the routed webhook url', function (): void
     $submission = Submission::factory()->create(['form_name' => 'Contact', 'name' => 'Ada']);
     $notifiable = (new AnonymousNotifiable)->route(SlackWebhookChannel::class, 'https://hooks.slack.com/services/T0/B0/xyz');
 
-    new SlackWebhookChannel()->send($notifiable, new SubmissionReceived($submission));
+    resolve(SlackWebhookChannel::class)->send($notifiable, new SubmissionReceived($submission));
 
     Http::assertSent(fn ($request): bool => (string) $request->url() === 'https://hooks.slack.com/services/T0/B0/xyz'
         && $request['text'] === 'New submission from Contact'
@@ -25,7 +25,7 @@ it('posts the notification payload to the routed webhook url', function (): void
 it('does nothing for notifiables without a webhook route', function (object $notifiable): void {
     Http::fake();
 
-    new SlackWebhookChannel()->send($notifiable, new SubmissionReceived(Submission::factory()->make()));
+    resolve(SlackWebhookChannel::class)->send($notifiable, new SubmissionReceived(Submission::factory()->make()));
 
     Http::assertNothingSent();
 })->with([
@@ -39,5 +39,17 @@ it('propagates webhook failures', function (): void {
 
     $notifiable = (new AnonymousNotifiable)->route(SlackWebhookChannel::class, 'https://hooks.slack.com/services/T0/B0/xyz');
 
-    new SlackWebhookChannel()->send($notifiable, new SubmissionReceived(Submission::factory()->create()));
+    resolve(SlackWebhookChannel::class)->send($notifiable, new SubmissionReceived(Submission::factory()->create()));
 })->throws(RequestException::class);
+
+it('refuses a webhook url that points at a private address', function (): void {
+    Http::fake();
+
+    $notifiable = (new AnonymousNotifiable)->route(SlackWebhookChannel::class, 'http://10.0.0.5/hook');
+
+    try {
+        resolve(SlackWebhookChannel::class)->send($notifiable, new SubmissionReceived(Submission::factory()->create()));
+    } finally {
+        Http::assertNothingSent();
+    }
+})->throws(InvalidArgumentException::class);

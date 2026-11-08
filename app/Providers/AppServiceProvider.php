@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Integrations\IntegrationSettings;
 use App\Listeners\RecordSchedulerHeartbeat;
 use App\Models\Role;
 use App\Models\Settings;
@@ -87,6 +88,10 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configureSettings(): void
     {
+        if (IntegrationSettings::configIsBeingCached()) {
+            return;
+        }
+
         config()->set('site', Settings::cached());
         config()->set('cashier.currency', Str::lower(SettingsService::current()->currency()));
     }
