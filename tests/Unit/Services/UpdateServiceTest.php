@@ -153,10 +153,12 @@ it('holds back a release until its prebuilt frontend assets are published', func
     Process::fake([
         '*ls-remote*' => Process::result(output: "aaa\trefs/tags/v1.0.0"),
         '*get-url*' => Process::result(output: ReleaseArchive::REMOTE),
+        '*ssh-keygen*' => Process::result(),
     ]);
     Http::fake([
         ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response('Not Found', 404),
         ReleaseArchive::url('v0.9.0', 'build.tar.gz.sha256') => Http::response(str_repeat('a', 64)),
+        ReleaseArchive::url('v0.9.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
     ]);
 
     $service = new UpdateService();

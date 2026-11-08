@@ -8,6 +8,7 @@ use App\Enums\RevisionSource;
 use App\Models\Activity;
 use App\Services\BackupService;
 use App\Services\DatabaseDumper;
+use App\Services\ReleaseSignature;
 use App\Services\SiteBundle;
 use App\Services\UpdateService;
 use Illuminate\Process\PendingProcess;
@@ -194,10 +195,11 @@ it('rolls back to the previous version when a migration fails', function (): voi
     Process::assertRanInOrder([
         ['git', 'rev-parse', 'HEAD'],
         ['git', 'remote', 'get-url', 'origin'],
+        ['git', 'fetch', '--tags', '--force', 'origin'],
+        resolve(ReleaseSignature::class)->verifyTagCommand('v1.0.0'),
         ['npm', '--version'],
         [PHP_BINARY, 'artisan', 'down'],
         [PHP_BINARY, 'artisan', 'wireup:backup', '--name='.preUpdateBackup('v1.0.0')],
-        ['git', 'fetch', '--tags', '--force', 'origin'],
         ['git', '-c', 'advice.detachedHead=false', 'checkout', '--force', 'v1.0.0'],
         ['composer', 'install', '--no-dev', '--no-interaction', '--prefer-dist'],
         [PHP_BINARY, 'artisan', 'migrate', '--force'],
@@ -262,6 +264,7 @@ it('puts the previous frontend assets back when the update fails after replacing
     ]);
     Http::fake([
         ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response(hash('sha256', $archive)),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
         ReleaseArchive::url('v1.0.0') => Http::response($archive),
     ]);
 
@@ -306,6 +309,7 @@ it('installs the prebuilt frontend assets instead of building them on the server
     ]);
     Http::fake([
         ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response(hash('sha256', $archive)),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
         ReleaseArchive::url('v1.0.0') => Http::response($archive),
     ]);
 
@@ -328,6 +332,7 @@ it('stops before maintenance mode when the prebuilt assets fail verification', f
     ]);
     Http::fake([
         ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response(str_repeat('a', 64)),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
         ReleaseArchive::url('v1.0.0') => Http::response('tampered'),
     ]);
 
@@ -344,6 +349,28 @@ it('stops before maintenance mode when the prebuilt assets fail verification', f
 
     expect($state['status'])->toBe('failed')
         ->and($state['step'])->toBe('Download frontend assets')
+        ->and($state['site_down'])->toBeFalse();
+});
+
+it('refuses a release whose tag is not signed by a trusted key', function (): void {
+    Process::fake([
+        '*verify-tag*' => Process::result(errorOutput: 'error: no signature found', exitCode: 1),
+        '*' => Process::result(),
+    ]);
+
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])
+        ->expectsOutputToContain('no signature found')
+        ->assertExitCode(1);
+
+    Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'down']);
+    Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === ['git', '-c', 'advice.detachedHead=false', 'checkout', '--force', 'v1.0.0']);
+
+    $state = resolve(UpdateService::class)->state();
+
+    expect($state['status'])->toBe('failed')
+        ->and($state['step'])->toBe('Verify the v1.0.0 signature')
         ->and($state['site_down'])->toBeFalse();
 });
 

@@ -10,6 +10,8 @@ return [
 
     'build_path' => public_path('build'),
 
+    'release_signers' => base_path('config/allowed_signers'),
+
     'backup_path' => storage_path('app/backups'),
 
     'transfer_path' => storage_path('app/transfers'),

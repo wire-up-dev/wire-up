@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Process;
 use PharData;
 use RuntimeException;
 
-final class ReleaseAssets
+final readonly class ReleaseAssets
 {
     public const string ARCHIVE = 'build.tar.gz';
+
+    public function __construct(private ReleaseSignature $signature = new ReleaseSignature()) {}
 
     public function url(string $tag, string $file = self::ARCHIVE): ?string
     {
@@ -112,15 +114,18 @@ final class ReleaseAssets
 
     private function checksum(string $tag): ?string
     {
-        $url = $this->url($tag, self::ARCHIVE.'.sha256');
-
-        if ($url === null) {
+        if (preg_match('/^[a-f0-9]{64}\b/', mb_trim($this->fetch($tag, self::ARCHIVE.'.sha256')), $match) !== 1) {
             return null;
         }
 
-        $body = rescue(fn (): string => Http::timeout(15)->get($url)->throw()->body(), '', report: false);
+        return $this->signature->verifies("{$tag}\n{$match[0]}\n", $this->fetch($tag, self::ARCHIVE.'.sha256.sig')) ? $match[0] : null;
+    }
 
-        return preg_match('/^[a-f0-9]{64}\b/', mb_trim($body), $match) === 1 ? $match[0] : null;
+    private function fetch(string $tag, string $file): string
+    {
+        $url = $this->url($tag, $file);
+
+        return $url === null ? '' : rescue(fn (): string => Http::timeout(15)->get($url)->throw()->body(), '', report: false);
     }
 
     private function repository(): ?string

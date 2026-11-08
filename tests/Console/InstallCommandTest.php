@@ -61,6 +61,7 @@ it('installs the prebuilt frontend assets when the checkout is a release', funct
     ]);
     Http::fake([
         ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response(hash('sha256', $archive)),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
         ReleaseArchive::url('v1.0.0') => Http::response($archive),
     ]);
     User::factory()->create();

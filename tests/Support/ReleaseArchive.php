@@ -13,6 +13,8 @@ final class ReleaseArchive
 {
     public const string REMOTE = 'git@github.com:wire-up-dev/wire-up.git';
 
+    public const string SIGNATURE = "-----BEGIN SSH SIGNATURE-----\nZmFrZQ==\n-----END SSH SIGNATURE-----\n";
+
     public static function url(string $tag, string $file = 'build.tar.gz'): string
     {
         return "https://github.com/wire-up-dev/wire-up/releases/download/{$tag}/{$file}";

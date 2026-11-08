@@ -9,6 +9,7 @@ use App\Services\ActivityLog;
 use App\Services\BackupService;
 use App\Services\DatabaseDumper;
 use App\Services\ReleaseAssets;
+use App\Services\ReleaseSignature;
 use App\Services\UpdateService;
 use App\Traits\RunsSteps;
 use Closure;
@@ -26,7 +27,7 @@ final class UpdateCommand extends Command
 
     public const int MINIMUM_FREE_BYTES = 500 * 1024 * 1024;
 
-    public function handle(UpdateService $updates, ReleaseAssets $assets, DatabaseDumper $dumper, BackupService $backups): int
+    public function handle(UpdateService $updates, ReleaseAssets $assets, ReleaseSignature $signature, DatabaseDumper $dumper, BackupService $backups): int
     {
         $lock = $updates->updateLock();
 
@@ -37,13 +38,13 @@ final class UpdateCommand extends Command
         }
 
         try {
-            return $this->update($updates, $assets, $dumper, $backups);
+            return $this->update($updates, $assets, $signature, $dumper, $backups);
         } finally {
             $lock->release();
         }
     }
 
-    private function update(UpdateService $updates, ReleaseAssets $assets, DatabaseDumper $dumper, BackupService $backups): int
+    private function update(UpdateService $updates, ReleaseAssets $assets, ReleaseSignature $signature, DatabaseDumper $dumper, BackupService $backups): int
     {
         $tag = $this->targetTag($updates);
 
@@ -77,6 +78,8 @@ final class UpdateCommand extends Command
 
         $preparation = [
             'Check free disk space' => fn () => $this->ensureDiskSpace($backups),
+            'Fetch releases' => ['git', 'fetch', '--tags', '--force', 'origin'],
+            "Verify the {$tag} signature" => $signature->verifyTagCommand($tag),
             ...($prebuilt
                 ? ['Download frontend assets' => fn (): string => $assets->download($tag)]
                 : ['Check Node.js' => ['npm', '--version']]),
@@ -96,7 +99,6 @@ final class UpdateCommand extends Command
         $steps = [
             'Enable maintenance mode' => [PHP_BINARY, 'artisan', 'down'],
             'Back up database' => [PHP_BINARY, 'artisan', 'wireup:backup', '--name='.$backup],
-            'Fetch releases' => ['git', 'fetch', '--tags', '--force', 'origin'],
             "Check out {$tag}" => ['git', '-c', 'advice.detachedHead=false', 'checkout', '--force', $tag],
             'Install PHP dependencies' => ['composer', 'install', '--no-dev', '--no-interaction', '--prefer-dist'],
             'Run database migrations' => [PHP_BINARY, 'artisan', 'migrate', '--force'],

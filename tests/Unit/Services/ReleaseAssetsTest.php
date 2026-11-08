@@ -47,8 +47,11 @@ it('looks for nothing to download when the remote is not on GitHub', function (s
 ]);
 
 it('knows whether a release has prebuilt assets from its published checksum', function (Closure $response, bool $published): void {
-    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE)]);
-    Http::fake([ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => $response()]);
+    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE), '*ssh-keygen*' => Process::result()]);
+    Http::fake([
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => $response(),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
+    ]);
 
     expect(new ReleaseAssets()->published('v1.0.0'))->toBe($published);
 })->with([
@@ -59,10 +62,12 @@ it('knows whether a release has prebuilt assets from its published checksum', fu
 ]);
 
 it('treats a release as still building only while the installed release has prebuilt assets', function (bool $tagPublished, bool $currentPublished, bool $stillBuilding): void {
-    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE)]);
+    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE), '*ssh-keygen*' => Process::result()]);
     Http::fake([
         ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => $tagPublished ? Http::response(str_repeat('a', 64)) : Http::response('Not Found', 404),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
         ReleaseArchive::url('v0.9.0', 'build.tar.gz.sha256') => $currentPublished ? Http::response(str_repeat('b', 64)) : Http::response('Not Found', 404),
+        ReleaseArchive::url('v0.9.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
     ]);
 
     expect(new ReleaseAssets()->stillBuilding('v1.0.0', 'v0.9.0'))->toBe($stillBuilding);
@@ -74,9 +79,10 @@ it('treats a release as still building only while the installed release has preb
 
 it('downloads the prebuilt assets once they match their checksum', function (): void {
     $archive = ReleaseArchive::make();
-    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE)]);
+    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE), '*ssh-keygen*' => Process::result()]);
     Http::fake([
         ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response(hash('sha256', $archive)),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
         ReleaseArchive::url('v1.0.0') => Http::response($archive),
     ]);
 
@@ -87,9 +93,10 @@ it('downloads the prebuilt assets once they match their checksum', function (): 
 });
 
 it('refuses prebuilt assets that do not match their checksum', function (): void {
-    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE)]);
+    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE), '*ssh-keygen*' => Process::result()]);
     Http::fake([
         ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response(str_repeat('a', 64)),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
         ReleaseArchive::url('v1.0.0') => Http::response('tampered'),
     ]);
 
@@ -99,7 +106,7 @@ it('refuses prebuilt assets that do not match their checksum', function (): void
 });
 
 it('refuses to download assets that were never published', function (): void {
-    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE)]);
+    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE), '*ssh-keygen*' => Process::result()]);
     Http::fake([ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response('Not Found', 404)]);
 
     expect(fn (): string => new ReleaseAssets()->download('v1.0.0'))
@@ -177,4 +184,34 @@ it('drops the kept copy once the update has finished', function (): void {
 
     expect(File::exists($build.'-rollback'))->toBeFalse()
         ->and(File::exists($build.'/manifest.json'))->toBeTrue();
+});
+
+it('only counts assets as published when the tag and checksum are signed', function (bool $signed, bool $published): void {
+    Process::fake([
+        '*get-url*' => Process::result(output: ReleaseArchive::REMOTE),
+        '*ssh-keygen*' => Process::result(exitCode: $signed ? 0 : 255),
+    ]);
+    Http::fake([
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response(str_repeat('a', 64)."  build.tar.gz\n"),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
+    ]);
+
+    expect(new ReleaseAssets()->published('v1.0.0'))->toBe($published);
+
+    Process::assertRan(fn ($process): bool => $process->input === "v1.0.0\n".str_repeat('a', 64)."\n");
+})->with([
+    'signed' => [true, true],
+    'not signed by a trusted key' => [false, false],
+]);
+
+it('does not count unsigned assets as published', function (): void {
+    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE)]);
+    Http::fake([
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response(str_repeat('a', 64)),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response('Not Found', 404),
+    ]);
+
+    expect(new ReleaseAssets()->published('v1.0.0'))->toBeFalse();
+
+    Process::assertDidntRun(fn ($process): bool => str_contains(implode(' ', (array) $process->command), 'ssh-keygen'));
 });
