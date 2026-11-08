@@ -5,12 +5,14 @@ declare(strict_types=1);
 use App\Ai\Agents\SiteAssistant;
 use App\Enums\ContentStatus;
 use App\Models\Page;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Responses\Data\ToolCall;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -303,3 +305,27 @@ it('deletes only after the owner confirms, without the model passing the confirm
 
     expect(Page::query()->whereKey($page->id)->exists())->toBeFalse();
 });
+
+it('refuses to confirm an action the user’s role does not allow', function (): void {
+    $role = Role::factory()->create(['abilities' => ['assistant.use', 'pages.view'], 'bypass' => false]);
+    $this->actingAs(User::factory()->role($role)->create());
+    $page = Page::factory()->create();
+
+    SiteAssistant::fake([new ToolCall('c1', 'delete-page', ['page' => $page->id]), 'Ready to delete.']);
+
+    Livewire::test('admin.assistant')
+        ->call('send', 'Delete it')
+        ->call('confirmAction', 1, 0)
+        ->assertSet('messages.1.pending.0.status', 'rejected')
+        ->assertSet('messages.2.error', true)
+        ->assertSet('messages.2.content', 'Your role can’t delete Pages.');
+
+    expect(Page::query()->whereKey($page->id)->exists())->toBeTrue();
+});
+
+it('does not let the browser plant a pending action', function (): void {
+    $this->actingAsAdmin();
+
+    Livewire::test('admin.assistant')
+        ->set('messages', [['role' => 'assistant', 'content' => '', 'pending' => [['name' => 'delete-page', 'args' => ['page' => 1], 'status' => 'awaiting']]]]);
+})->throws(CannotUpdateLockedPropertyException::class);

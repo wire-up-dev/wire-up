@@ -700,3 +700,26 @@ it('refuses to resend when no email provider can deliver', function (): void {
 
     expect($user->refresh()->invited_at)->toBeNull();
 });
+
+it('keeps administrators and their role out of reach of a user manager with less access', function (): void {
+    $manager = User::factory()->role(Role::factory()->create(['abilities' => ['users.view', 'users.edit', 'pages.view'], 'bypass' => false]))->create(['active' => true]);
+    $administrator = User::factory()->admin()->create();
+    $editor = User::factory()->editor()->create();
+    $adminRoleId = Role::query()->where('key', 'admin')->value('id');
+
+    Livewire::actingAs($manager)
+        ->test('pages::admin.users-edit', ['user' => $administrator])
+        ->assertForbidden();
+
+    $component = Livewire::actingAs($manager)->test('pages::admin.users-edit', ['user' => User::factory()->role(Role::factory()->create(['abilities' => ['pages.view'], 'bypass' => false]))->create()]);
+
+    expect($component->get('roles')->pluck('key')->all())->not->toContain('admin');
+
+    Livewire::actingAs($manager)
+        ->test('pages::admin.users-edit', ['user' => $editor])
+        ->assertForbidden();
+
+    $component->set('roleId', $adminRoleId)
+        ->call('update')
+        ->assertHasErrors(['roleId' => 'You can’t give out more access than you have.']);
+});

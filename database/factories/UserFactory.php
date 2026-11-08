@@ -42,7 +42,7 @@ final class UserFactory extends Factory
                 'birthday' => fake()->date(),
             ],
             'role_id' => Role::factory(),
-            'active' => fake()->boolean(),
+            'active' => true,
             'locale' => fake()->languageCode(),
             'last_seen_at' => fake()->optional(0.7)->dateTimeBetween('-1 year', 'now'),
             'invited_at' => null,

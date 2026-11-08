@@ -136,7 +136,7 @@ return new class extends Component
 
         $guard = resolve(UserGuard::class);
         $refusal = match (true) {
-            ! $guard->canManage(auth()->user(), $user) => __('Only an owner can change an owner’s account.'),
+            ! $guard->canManage(auth()->user(), $user) => __('You can’t change an account with more access than yours.'),
             $user->active => $guard->loginLockReason(auth()->user(), $user),
             default => null,
         };

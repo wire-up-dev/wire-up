@@ -6,6 +6,7 @@ namespace App\Ai\Agents;
 
 use App\Ai\Contracts\HiddenFromAssistant;
 use App\Ai\Contracts\RequiresConfirmation;
+use App\Ai\Tools\AssistantTool;
 use App\Ai\Tools\ConfirmationTool;
 use App\Ai\Tools\DraftOnlyTool;
 use App\Ai\Tools\McpResourceTool;
@@ -122,7 +123,7 @@ final class SiteAssistant implements Agent, Conversational, HasSkills, HasTools
             ->map(fn (string $class): object => match (true) {
                 is_a($class, RequiresConfirmation::class, true) => new ConfirmationTool(resolve($class)),
                 in_array($class, [CreatePageTool::class, CreateRecordTool::class], true) => new DraftOnlyTool(resolve($class)),
-                default => resolve($class),
+                default => new AssistantTool(resolve($class)),
             });
 
         $resources = self::visible(WireUpServer::resourceClasses())

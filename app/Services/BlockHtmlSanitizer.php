@@ -19,24 +19,15 @@ final class BlockHtmlSanitizer
     ];
 
     /**
+     * @var list<string>
+     */
+    private const array ANIMATION_ELEMENTS = ['animate', 'set', 'animatemotion', 'animatetransform'];
+
+    /**
      * @var array<string, list<string>>
      */
     private const array VERBATIM_FIELDS = [
         'code' => ['code'],
-    ];
-
-    /**
-     * @var list<string>
-     */
-    private const array URL_ATTRIBUTES = ['href', 'src', 'action', 'formaction', 'poster', 'background'];
-
-    /**
-     * @var list<string>
-     */
-    private const array DANGEROUS_MARKERS = [
-        '<script', '<style', '<iframe', '<object', '<embed', '<form',
-        '<link', '<meta', '<base', '<applet', '<frame', '<noscript',
-        'javascript:', 'vbscript:', 'data:text/html',
     ];
 
     /**
@@ -76,7 +67,7 @@ final class BlockHtmlSanitizer
             return '';
         }
 
-        if (! self::mayCarryDangerousMarkup($value)) {
+        if (! str_contains($value, '<')) {
             return $value;
         }
 
@@ -94,67 +85,76 @@ final class BlockHtmlSanitizer
 
     private static function isDangerousUrl(string $value): bool
     {
-        if (preg_match('/^\s*(?:javascript|vbscript|data)\s*:/i', $value) !== 1) {
+        $normalized = mb_strtolower((string) preg_replace(['/^[\x00-\x20]+/', '/[\t\n\r]/'], '', $value));
+
+        if (preg_match('/^(?:javascript|vbscript|data):/', $normalized) !== 1) {
             return false;
         }
 
-        return ! str_starts_with(mb_strtolower(mb_trim($value)), 'data:image/');
-    }
-
-    private static function mayCarryDangerousMarkup(string $value): bool
-    {
-        $lowered = mb_strtolower($value);
-
-        foreach (self::DANGEROUS_MARKERS as $marker) {
-            if (str_contains($lowered, $marker)) {
-                return true;
-            }
-        }
-
-        return preg_match('/\son[a-z]+\s*=/i', $value) === 1;
+        return ! str_starts_with($normalized, 'data:image/');
     }
 
     private static function withoutDangerousMarkup(string $value): string
     {
-        $document = HTMLDocument::createFromString('<div>'.$value.'</div>', LIBXML_NOERROR);
+        $document = HTMLDocument::createFromString('<!doctype html><html><head></head><body>'.$value, LIBXML_NOERROR);
 
-        $root = $document->getElementsByTagName('div')->item(0);
+        $body = $document->body;
 
-        throw_unless($root instanceof Element, RuntimeException::class, 'The sanitizer wrapper element went missing.');
+        throw_unless($body instanceof Element, RuntimeException::class, 'The sanitizer body element went missing.');
 
-        foreach (self::FORBIDDEN_ELEMENTS as $tag) {
-            foreach (iterator_to_array($root->getElementsByTagName($tag)) as $element) {
-                $element->remove();
+        $removed = false;
+
+        foreach (iterator_to_array($document->getElementsByTagName('*')) as $element) {
+            if (! $element->isConnected) {
+                continue;
             }
+
+            if (self::isForbidden($element)) {
+                $element->remove();
+                $removed = true;
+
+                continue;
+            }
+
+            $removed = self::stripDangerousAttributes($element) || $removed;
         }
 
-        foreach (iterator_to_array($root->getElementsByTagName('*')) as $element) {
-            self::stripDangerousAttributes($element);
+        if (! $removed) {
+            return $value;
         }
 
         $html = '';
 
-        foreach ($root->childNodes as $child) {
+        foreach ($body->childNodes as $child) {
             $html .= $document->saveHtml($child);
         }
 
         return $html;
     }
 
-    private static function stripDangerousAttributes(Element $element): void
+    private static function isForbidden(Element $element): bool
     {
+        $name = mb_strtolower($element->localName);
+
+        if (in_array($name, self::FORBIDDEN_ELEMENTS, true)) {
+            return true;
+        }
+
+        return in_array($name, self::ANIMATION_ELEMENTS, true)
+            && str_ends_with(mb_strtolower(mb_trim((string) $element->getAttribute('attributeName'))), 'href');
+    }
+
+    private static function stripDangerousAttributes(Element $element): bool
+    {
+        $removed = false;
+
         foreach (iterator_to_array($element->attributes) as $attribute) {
-            $name = mb_strtolower($attribute->nodeName);
-
-            if (str_starts_with($name, 'on')) {
-                $element->removeAttribute($attribute->nodeName);
-
-                continue;
-            }
-
-            if (in_array($name, self::URL_ATTRIBUTES, true) && self::isDangerousUrl($attribute->nodeValue ?? '')) {
-                $element->removeAttribute($attribute->nodeName);
+            if (str_starts_with(mb_strtolower($attribute->localName), 'on') || self::isDangerousUrl($attribute->value)) {
+                $element->removeAttributeNode($attribute);
+                $removed = true;
             }
         }
+
+        return $removed;
     }
 }

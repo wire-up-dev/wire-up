@@ -15,6 +15,7 @@ it('leaves content that carries no dangerous markup byte-identical', function (s
     'colour token' => ['#ffffff'],
     'ordinary link' => ['<a href="https://wire-up.dev" class="wu-link">docs</a>'],
     'inline image' => ['<img src="/media/shot.png" alt="a shot">'],
+    'prose that mentions a script scheme' => ['<p>Learn javascript: the good parts</p>'],
     'empty string' => [''],
 ]);
 
@@ -32,11 +33,23 @@ it('removes markup that can execute', function (string $value, string $expected)
     'javascript href' => ['<a href="javascript:alert(1)">x</a>', '<a>x</a>'],
     'vbscript href' => ['<a href="vbscript:msgbox(1)">x</a>', '<a>x</a>'],
     'html data uri src' => ['<img src="data:text/html;base64,PHN2Zz4=">', '<img>'],
+    'handler glued to the previous attribute' => ['<img src="x"onerror="alert(1)">', '<img src="x">'],
+    'entity encoded javascript href' => ['<a href="&#106;avascript:alert(1)">x</a>', '<a>x</a>'],
+    'named entity colon' => ['<a href="&#x6A;avascript&colon;alert(1)">x</a>', '<a>x</a>'],
+    'tab inside the scheme' => ["<a href=\"java\tscript:alert(1)\">x</a>", '<a>x</a>'],
+    'newline before the scheme' => ["<a href=\" \n javascript:alert(1)\">x</a>", '<a>x</a>'],
+    'svg xlink href' => ['<svg><a xlink:href="javascript:alert(1)"><text>x</text></a></svg>', '<svg><a><text>x</text></a></svg>'],
+    'svg animate rewriting an href' => ['<svg><a><animate attributeName="href" values="javascript:alert(1)"/><text>x</text></a></svg>', '<svg><a><text>x</text></a></svg>'],
+    'svg set rewriting an href' => ['<svg><set attributeName="xlink:href" to="0;javascript:alert(1)"/></svg>', '<svg></svg>'],
+    'markup escaping a wrapper element' => ['<p>ok</p></div><img src=x onerror=alert(1)>', '<p>ok</p><img src="x">'],
+    'second body tag carrying a handler' => ['<body onload=alert(1)><p>x</p>', '<p>x</p>'],
+    'form with fields inside' => ['<p>a</p><form action="//evil.test"><input name="password" onfocus="alert(1)"></form>', '<p>a</p>'],
 ]);
 
 it('blanks a bare url that would execute when clicked', function (): void {
     expect(BlockHtmlSanitizer::value('javascript:alert(1)'))->toBeEmpty()
         ->and(BlockHtmlSanitizer::value('  JavaScript:alert(1)'))->toBeEmpty()
+        ->and(BlockHtmlSanitizer::value("java\tscript:alert(1)"))->toBeEmpty()
         ->and(BlockHtmlSanitizer::value('data:text/html,<script>bad()</script>'))->toBeEmpty();
 });
 

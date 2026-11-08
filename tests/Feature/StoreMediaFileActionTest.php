@@ -94,7 +94,37 @@ it('ignores a thumbnail that is not a data uri or carries no payload', function 
 })->with([
     'not a data uri' => ['https://example.com/thumb.png'],
     'empty payload' => ['data:image/png;base64,'],
+    'not an image subtype' => ['data:image/php;base64,'.base64_encode('<?php echo 1;')],
 ]);
+
+it('sanitises svg content stored under another extension and saves it as svg', function (): void {
+    $svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.cookie)</script><rect width="4" height="4"/></svg>';
+
+    $media = resolve(StoreMediaFileAction::class)->handle(storedScratchFile('promo.html', $svg), 'promo.html');
+
+    $stored = Storage::disk(config()->string('filesystems.media'))->get($media->source);
+
+    expect($media->source)->toEndWith('.svg')
+        ->and($media->filename)->toBe('promo.svg')
+        ->and($stored)->not->toContain('<script');
+});
+
+it('stores a file under the extension of its detected type, not the name it was given', function (): void {
+    $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', true).'<?php system($_GET["c"]); ?>';
+
+    $media = resolve(StoreMediaFileAction::class)->handle(storedScratchFile('shell.php', $gif), 'shell.php');
+
+    expect($media->source)->toEndWith('.gif')
+        ->and($media->filename)->toBe('shell.gif')
+        ->and($media->mime_type)->toBe('image/gif');
+});
+
+it('refuses a file whose detected type is not an allowed media type', function (): void {
+    resolve(StoreMediaFileAction::class)->handle(
+        storedScratchFile('page.html', '<!doctype html><html><body><script>alert(1)</script></body></html>'),
+        'page.html',
+    );
+})->throws(RuntimeException::class, 'This kind of file can’t be uploaded.');
 
 it('prefers a caller supplied mime type over sniffing the file', function (): void {
     $media = resolve(StoreMediaFileAction::class)->handle(

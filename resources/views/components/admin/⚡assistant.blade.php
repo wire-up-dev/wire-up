@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Ai\Agents\SiteAssistant;
+use App\Ai\Tools\RoleCheckedTool;
 use App\Enums\RevisionSource;
 use App\Models\Page;
 use Illuminate\Support\Facades\Context;
@@ -48,6 +49,7 @@ return new class extends Component
     /**
      * @var array<int, array{role: string, content: string, tools?: array<int, array{name: string, status: string}>, pending?: array<int, array{name: string, args: array<string, mixed>, status: string}>, error?: bool, animate?: bool}>
      */
+    #[Locked]
     public array $messages = [];
 
     public function mount(): void
@@ -166,6 +168,15 @@ return new class extends Component
         $class = SiteAssistant::confirmableToolClass($pending['name']);
 
         if ($class === null) {
+            return;
+        }
+
+        $problem = RoleCheckedTool::problemFor(resolve($class), $pending['args']);
+
+        if ($problem !== null) {
+            $this->messages[$message]['pending'][$action]['status'] = 'rejected';
+            $this->messages[] = ['role' => 'assistant', 'content' => $problem, 'error' => true];
+
             return;
         }
 

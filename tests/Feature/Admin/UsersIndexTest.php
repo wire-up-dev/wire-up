@@ -328,3 +328,28 @@ it('will not disable your own account or the last owner who can sign in from the
 
     expect($owner->fresh()->active)->toBeTrue();
 });
+
+it('does not let a user manager invite someone with more access than they have', function (): void {
+    $manager = User::factory()->role(Role::factory()->create(['abilities' => ['users.view', 'users.create', 'users.edit'], 'bypass' => false]))->create(['active' => true]);
+
+    Livewire::actingAs($manager)
+        ->test('pages::admin.users-index')
+        ->set('name', 'Mallory')
+        ->set('email', 'mallory@example.com')
+        ->set('roleId', Role::query()->where('key', 'admin')->value('id'))
+        ->call('create')
+        ->assertHasErrors(['roleId']);
+
+    expect(User::query()->where('email', 'mallory@example.com')->exists())->toBeFalse();
+});
+
+it('does not let a user manager disable an account with more access than theirs', function (): void {
+    $manager = User::factory()->role(Role::factory()->create(['abilities' => ['users.view', 'users.edit'], 'bypass' => false]))->create(['active' => true]);
+    $administrator = User::factory()->admin()->create(['active' => true]);
+
+    Livewire::actingAs($manager)
+        ->test('pages::admin.users-index')
+        ->call('toggleStatus', $administrator->id);
+
+    expect($administrator->fresh()->active)->toBeTrue();
+});

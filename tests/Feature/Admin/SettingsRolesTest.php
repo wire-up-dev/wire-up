@@ -123,3 +123,17 @@ it('labels crud and non-crud (assistant "use") actions in the roles builder', fu
     expect($component->instance()->actionLabel('view'))->toBe(PermissionAction::View->label())
         ->and($component->instance()->actionLabel('use'))->toBe(__('Use'));
 });
+
+it('refuses to grant access the editor of the roles does not hold, even on their own role', function (): void {
+    $ownRole = Role::factory()->create(['key' => 'role-manager', 'name' => 'Role manager', 'abilities' => ['roles.view', 'roles.edit'], 'bypass' => false, 'is_protected' => false]);
+    $this->actingAs(User::factory()->role($ownRole)->create(['active' => true]));
+
+    $component = Livewire::test('pages::admin.settings-roles');
+    $index = collect($component->get('roles'))->search(fn (array $role): bool => $role['id'] === $ownRole->id);
+
+    $component->set("roles.{$index}.grants.4", ['view', 'edit'])
+        ->call('save')
+        ->assertHasErrors(['roles' => 'You can’t grant access you don’t have yourself.']);
+
+    expect($ownRole->fresh()->abilities)->toBe(['roles.view', 'roles.edit']);
+});

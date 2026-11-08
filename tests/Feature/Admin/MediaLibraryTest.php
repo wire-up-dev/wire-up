@@ -626,6 +626,17 @@ it('skips a heic upload that cannot be converted without crashing', function ():
     expect(Media::query()->count())->toBe(0);
 });
 
+it('refuses an html upload when the library accepts every type', function (): void {
+    $file = UploadedFile::fake()->createWithContent('page.html', '<!doctype html><html><body><script>alert(1)</script></body></html>');
+
+    Livewire::test('admin.media-library')
+        ->set('files', [$file])
+        ->call('save', [[]])
+        ->assertSet('files', []);
+
+    expect(Media::query()->count())->toBe(0);
+});
+
 it('uploads svg files and strips embedded scripts', function (): void {
     $svg = <<<'SVG'
     <svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40">

@@ -139,7 +139,7 @@ return new class extends Component
         $guard = resolve(UserGuard::class);
 
         if ($targetRole->id !== $this->user->role_id && ! $guard->canAssign($editor, $targetRole)) {
-            $this->addError('roleId', __('Only an owner can give out this role.'));
+            $this->addError('roleId', __('You can’t give out more access than you have.'));
 
             return;
         }

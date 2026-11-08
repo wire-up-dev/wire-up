@@ -79,13 +79,18 @@ final readonly class RemoteAccess
         SearchContentTool::class,
     ];
 
-    public function __construct(private AccessToken $token, private User $user) {}
+    public function __construct(private TokenAccess $access, private User $user) {}
 
     public static function current(): ?self
     {
         $token = request()->attributes->get(AccessToken::REQUEST_ATTRIBUTE);
 
-        return $token instanceof AccessToken ? new self($token, $token->user) : null;
+        return $token instanceof AccessToken ? new self($token->access, $token->user) : null;
+    }
+
+    public static function forUser(User $user): self
+    {
+        return new self(TokenAccess::Full, $user);
     }
 
     public static function level(string $class): ?TokenAccess
@@ -108,7 +113,7 @@ final readonly class RemoteAccess
             $level = self::level($class);
 
             return $level instanceof TokenAccess
-                && $this->token->access->allows($level)
+                && $this->access->allows($level)
                 && $this->unmet($this->abilities($class, [])) === null;
         }));
     }
@@ -133,13 +138,13 @@ final readonly class RemoteAccess
     {
         $level = self::level($tool::class) ?? TokenAccess::Full;
 
-        if (! $this->token->access->allows($level)) {
+        if (! $this->access->allows($level)) {
             return $level === TokenAccess::Full
                 ? __('Publishing, deleting and replace-text need a token with full access.')
                 : __('This token can only read. Make an edit token under Account → Security.');
         }
 
-        if ($this->token->access !== TokenAccess::Full && $this->publishes($tool, $arguments)) {
+        if ($this->access !== TokenAccess::Full && $this->publishes($tool, $arguments)) {
             return __('Publishing needs a token with full access. Leave out :argument to save a draft.', [
                 'argument' => $tool instanceof UpdateRecordTool ? '"status"' : '"publish"',
             ]);

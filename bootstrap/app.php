@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Middleware\LocaleRedirect;
+use App\Http\Middleware\LogOutInactiveUsers;
 use App\Http\Middleware\OnlyAdmins;
 use App\Http\Middleware\RequireTwoFactor;
 use App\Http\Middleware\ServeRedirects;
@@ -47,6 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->appendToGroup('web', [
             LocaleRedirect::class,
+            LogOutInactiveUsers::class,
             TrackUserAccess::class,
         ]);
 

@@ -633,13 +633,13 @@ return new class extends Component
                     'thumbnail' => $metadata['thumbnail'] ?? null,
                     'mime_type' => $file->getMimeType(),
                 ], $this->uploadPrivate);
-            } catch (Throwable) {
+            } catch (Throwable $exception) {
                 Flux::toast(
                     variant: 'danger',
                     heading: __('Upload Failed'),
-                    text: __('":filename" couldn\'t be converted. Please upload it as a JPG or PNG instead.', [
-                        'filename' => $file->getClientOriginalName(),
-                    ]),
+                    text: $exception instanceof RuntimeException
+                        ? __('":filename" wasn\'t uploaded. :reason', ['filename' => $file->getClientOriginalName(), 'reason' => __($exception->getMessage())])
+                        : __('":filename" couldn\'t be converted. Please upload it as a JPG or PNG instead.', ['filename' => $file->getClientOriginalName()]),
                     duration: 10000,
                 );
                 $file->delete();

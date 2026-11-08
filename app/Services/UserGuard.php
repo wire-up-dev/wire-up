@@ -16,12 +16,20 @@ final class UserGuard
             return $actor?->isDeveloper() ?? false;
         }
 
-        return ! ($target->role->bypass ?? false) || ($actor->role->bypass ?? false);
+        return $this->hasAllAccessOf($actor, $target->role);
     }
 
     public function canAssign(?User $actor, Role $role): bool
     {
-        return ! $role->isDeveloper() && (! $role->bypass || ($actor->role->bypass ?? false));
+        return ! $role->isDeveloper() && $this->hasAllAccessOf($actor, $role);
+    }
+
+    /**
+     * @param  array<int, string>  $abilities
+     */
+    public function canGrant(?User $actor, array $abilities): bool
+    {
+        return ($actor->role->bypass ?? false) || array_diff($abilities, $actor->role->abilities ?? []) === [];
     }
 
     public function loginLockReason(?User $actor, User $target): ?string
@@ -44,5 +52,14 @@ final class UserGuard
             ->where('active', true)
             ->whereHas('role', fn (Builder $query): Builder => $query->where('bypass', true))
             ->doesntExist();
+    }
+
+    private function hasAllAccessOf(?User $actor, ?Role $role): bool
+    {
+        if ($actor->role->bypass ?? false) {
+            return true;
+        }
+
+        return ! ($role->bypass ?? false) && $this->canGrant($actor, $role->abilities ?? []);
     }
 }

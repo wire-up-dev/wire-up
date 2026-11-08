@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Ai\Agents\SiteAssistant;
 use App\Ai\Contracts\HiddenFromAssistant;
+use App\Ai\Tools\AssistantTool;
 use App\Ai\Tools\ConfirmationTool;
 use App\Ai\Tools\DraftOnlyTool;
 use App\Ai\Tools\McpResourceTool;
@@ -15,6 +16,7 @@ use App\Mcp\Tools\CreatePageTool;
 use App\Mcp\Tools\GetPageTool;
 use App\Mcp\Tools\PublishPageTool;
 use App\Mcp\Tools\PublishRecordTool;
+use App\Mcp\Tools\UpdatePageTool;
 use App\Models\Page;
 use App\Models\Role;
 use App\Models\User;
@@ -84,7 +86,7 @@ it('exposes every WireUp tool and the block-types resource to the assistant', fu
 it('wraps tools for the SDK by their assistant policy', function (): void {
     $tools = collect((new SiteAssistant)->tools());
 
-    expect($tools->first(fn (object $t): bool => $t->name() === 'get-page'))->toBeInstanceOf(GetPageTool::class)
+    expect($tools->first(fn (object $t): bool => $t->name() === 'get-page'))->toBeInstanceOf(AssistantTool::class)
         ->and($tools->first(fn (object $t): bool => $t->name() === 'create-page'))->toBeInstanceOf(DraftOnlyTool::class)
         ->and($tools->first(fn (object $t): bool => $t->name() === 'create-record'))->toBeInstanceOf(DraftOnlyTool::class)
         ->and($tools->first(fn (object $t): bool => $t->name() === 'publish-page'))->toBeInstanceOf(ConfirmationTool::class)
@@ -101,6 +103,7 @@ it('marks publishing and deleting as requiring confirmation', function (): void 
 });
 
 it('does not publish when the confirmation tool runs during a stream', function (): void {
+    $this->actingAsAdmin();
     $page = Page::factory()->create(['status' => ContentStatus::DRAFT]);
 
     $output = new ConfirmationTool(new PublishPageTool)->handle(new ToolRequest(['page' => $page->id]));
@@ -110,6 +113,7 @@ it('does not publish when the confirmation tool runs during a stream', function 
 });
 
 it('forces the assistant create-page tool to drafts', function (): void {
+    $this->actingAsAdmin();
     $tool = new DraftOnlyTool(new CreatePageTool);
 
     expect($tool->schema(new JsonSchemaTypeFactory))->not->toHaveKey('publish');
@@ -117,6 +121,23 @@ it('forces the assistant create-page tool to drafts', function (): void {
     $tool->handle(new ToolRequest(['title' => 'Forced Draft', 'publish' => true]));
 
     expect(Page::query()->latest('id')->firstOrFail()->status)->toBe(ContentStatus::DRAFT);
+});
+
+it('refuses a tool the signed-in user’s role does not allow', function (): void {
+    $role = Role::factory()->create(['abilities' => ['assistant.use', 'pages.view'], 'bypass' => false]);
+    $this->actingAs(User::factory()->role($role)->create());
+    $page = Page::factory()->create(['title' => 'Original']);
+
+    $output = new AssistantTool(new UpdatePageTool)->handle(new ToolRequest(['page' => $page->id, 'title' => 'Hijacked']));
+
+    expect($output)->toContain('Your role can’t edit Pages')
+        ->and($page->refresh()->title)->toBe('Original');
+});
+
+it('refuses every tool when nobody is signed in', function (): void {
+    $output = new AssistantTool(new GetPageTool)->handle(new ToolRequest(['page' => 1]));
+
+    expect($output)->toContain('Sign in to use the assistant.');
 });
 
 it('bridges the block-types resource so the assistant can read the catalog', function (): void {

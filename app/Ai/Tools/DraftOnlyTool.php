@@ -6,16 +6,10 @@ namespace App\Ai\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
-use Laravel\Ai\Tools\McpServerTool;
 use Laravel\Ai\Tools\Request;
 
-final class DraftOnlyTool extends McpServerTool
+final class DraftOnlyTool extends RoleCheckedTool
 {
-    public function handle(Request $request): string
-    {
-        return parent::handle(new Request([...$request->toArray(), 'publish' => false]));
-    }
-
     /**
      * @return array<string, Type>
      */
@@ -26,5 +20,10 @@ final class DraftOnlyTool extends McpServerTool
         unset($properties['publish']);
 
         return $properties;
+    }
+
+    protected function run(Request $request): string
+    {
+        return parent::run(new Request([...$request->toArray(), 'publish' => false]));
     }
 }

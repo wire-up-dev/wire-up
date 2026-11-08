@@ -25,6 +25,11 @@ enum MediaType: string
         };
     }
 
+    public static function allowsMimeType(string $mimeType): bool
+    {
+        return array_any(self::cases(), fn (self $type): bool => in_array($mimeType, $type->allowedMimeTypes(), true));
+    }
+
     public function label(bool $plural = false): string
     {
         return match ($this) {

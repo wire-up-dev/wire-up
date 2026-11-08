@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLog;
 use App\Services\PermissionRegistry;
+use App\Services\UserGuard;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
@@ -116,6 +117,14 @@ return new class extends Component
             }
         }
 
+        foreach ($this->roles as $role) {
+            if (! $this->grantsOnlyHeldAccess($role)) {
+                $this->addError('roles', __('You can’t grant access you don’t have yourself.'));
+
+                return;
+            }
+        }
+
         $keptIds = array_values(array_filter(array_column($this->roles, 'id')));
 
         $removable = Role::query()
@@ -176,6 +185,22 @@ return new class extends Component
             'grants' => $grants,
             'open' => false,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $role
+     */
+    private function grantsOnlyHeldAccess(array $role): bool
+    {
+        $existing = $role['id'] ? Role::query()->find($role['id']) : null;
+
+        if ($existing?->bypass || $existing?->is_protected) {
+            return true;
+        }
+
+        $added = array_diff($this->serialize($role['grants']), $existing->abilities ?? []);
+
+        return resolve(UserGuard::class)->canGrant(auth()->user(), $added);
     }
 
     /**

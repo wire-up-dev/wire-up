@@ -9,10 +9,12 @@ use App\Models\Media;
 use enshrined\svgSanitize\Sanitizer;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\File;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Imagick;
 use RuntimeException;
+use Symfony\Component\Mime\MimeTypes;
 use Throwable;
 
 final readonly class StoreMediaFileAction
@@ -40,10 +42,14 @@ final readonly class StoreMediaFileAction
         $detectedMime = $metadata['mime_type'] ?? (string) mime_content_type($path);
         $private = $private && MediaType::fromMimeType($detectedMime) === MediaType::DOCUMENT;
 
-        $isSvg = $originalExtension === 'svg';
+        $isSvg = $originalExtension === 'svg' || $detectedMime === 'image/svg+xml';
         $isHeic = in_array($originalExtension, ['heic', 'heif'], true) || str_contains(mb_strtolower($detectedMime), 'hei');
 
-        $extension = $isHeic ? 'jpg' : $originalExtension;
+        $extension = match (true) {
+            $isHeic => 'jpg',
+            $isSvg => 'svg',
+            default => $this->extensionFor($detectedMime, $originalExtension),
+        };
         $filename = Str::uuid()->toString().'_'.Str::slug($basename).'.'.$extension;
         $width = $metadata['width'] ?? null;
         $height = $metadata['height'] ?? null;
@@ -77,6 +83,15 @@ final readonly class StoreMediaFileAction
             'metadata' => $metadata['metadata'] ?? null,
             'is_private' => $private,
         ]);
+    }
+
+    private function extensionFor(string $mimeType, string $originalExtension): string
+    {
+        throw_unless(MediaType::allowsMimeType($mimeType), RuntimeException::class, 'This kind of file can’t be uploaded.');
+
+        $extensions = MimeTypes::getDefault()->getExtensions($mimeType);
+
+        return in_array($originalExtension, $extensions, true) ? $originalExtension : (string) Arr::first($extensions);
     }
 
     /**
@@ -138,7 +153,7 @@ final readonly class StoreMediaFileAction
 
     private function storeThumbnail(?string $thumbnail, string $basename, bool $private): ?string
     {
-        if ($thumbnail === null || preg_match('/^data:image\/([a-zA-Z0-9]+);base64,/', $thumbnail, $matches) !== 1) {
+        if ($thumbnail === null || preg_match('/^data:image\/(png|jpe?g|webp|gif);base64,/', $thumbnail, $matches) !== 1) {
             return null;
         }
 
