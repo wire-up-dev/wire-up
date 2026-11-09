@@ -164,10 +164,27 @@ it('cycles to the next active locale on change-locale', function (): void {
 
     Livewire::test('pages::admin.pages-edit', ['page' => $page])
         ->assertSet('locale', 'en')
-        ->call('changeLocale')
+        ->dispatch('change-locale')
         ->assertSet('locale', 'fr')
-        ->call('changeLocale')
+        ->dispatch('change-locale')
         ->assertSet('locale', 'en');
+});
+
+it('does not create a category when the locale changes', function (): void {
+    Locale::query()->where('code', 'fr')->update(['active' => true]);
+    cache()->forget('site-locales');
+
+    $page = Page::factory()->create();
+
+    $this->actingAsAdmin();
+
+    Livewire::test('pages::admin.pages-edit', ['page' => $page])
+        ->set('categorySearch', 'Accidental')
+        ->dispatch('change-locale')
+        ->assertSet('locale', 'fr')
+        ->assertSet('categorySearch', 'Accidental');
+
+    expect(Category::query()->count())->toBe(0);
 });
 
 it('keeps the editing language from the address and ignores one that is not active', function (): void {

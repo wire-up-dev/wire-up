@@ -47,7 +47,6 @@ trait HasContentEditor
      */
     abstract protected function editorMedia(): Collection;
 
-    #[On('change-locale')]
     public function createCategory(CreateCategoryAction $action): void
     {
         $this->authorize('categories.create');
@@ -95,6 +94,7 @@ trait HasContentEditor
         return $pages + SettingsService::current()->authPageOptions();
     }
 
+    #[On('change-locale')]
     public function changeLocale(): void
     {
         $codes = array_keys($this->activeLocales);
