@@ -9,6 +9,7 @@ use App\Mcp\Tools\CreateRecordTool;
 use App\Models\Record;
 use App\Models\RecordType;
 use App\Services\ContentMarkdown;
+use App\Services\RecordFieldText;
 use Livewire\Livewire;
 
 /**
@@ -84,7 +85,7 @@ it('shows list values joined in the admin list, collection cards and markdown', 
     $record = newFieldsRecord($type);
     $record->update(['data' => ['labels' => ['Seaside', 'Quiet'], 'features' => ['Pool']]]);
 
-    expect($record->columnValue(newTypeField('labels', 'tags')))->toBe('Seaside, Quiet')
+    expect(RecordFieldText::column($record, newTypeField('labels', 'tags')))->toBe('Seaside, Quiet')
         ->and(ContentMarkdown::current()->render($record->refresh()))->toContain('**Labels:** Seaside, Quiet');
 });
 

@@ -9,7 +9,7 @@
     $linkType = data_get($content, 'button.link.type', 'url');
 
     $recordTypes = \App\Models\RecordType::ordered()->reject(fn ($type) => $type->admin_only)->values();
-    $categories = \App\Models\Category::query()->with('translations')->get()->sortBy(fn ($category) => $category->name)->values();
+    $categories = $this->categoryOptions;
 
     $selectedType = $selectedTypeId ? \App\Models\RecordType::ordered()->firstWhere('id', (int) $selectedTypeId) : null;
     $displayFields = $selectedType ? $selectedType->displayableFields() : [];

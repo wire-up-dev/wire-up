@@ -3,7 +3,7 @@
 @php
     $c = "blocks.{$index}.content";
     $b = "\$wire.blocks['".addslashes((string) $index)."'].content";
-    $recordTypes = \App\Models\RecordType::query()->orderBy('position')->get(['id', 'name']);
+    $recordTypes = \App\Models\RecordType::ordered();
     $content = data_get($block, 'content', []);
     $selectedSources = array_values(array_filter((array) data_get($content, 'sources', []), 'is_scalar'));
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Record;
 use App\Models\RecordType;
+use App\Services\RecordFieldText;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -164,7 +165,7 @@ return new class extends Component
             ],
             'columns' => array_map(fn (array $field): array => [
                 'label' => $recordType->fieldLabel($field),
-                'value' => $record->columnValue($field),
+                'value' => RecordFieldText::column($record, $field),
             ], $recordType->indexColumnFields()),
         ];
     }

@@ -13,6 +13,7 @@ use App\Models\Category;
 use App\Models\Record;
 use App\Models\RecordType;
 use App\Services\CsvExport;
+use App\Services\RecordFieldText;
 use App\Traits\WithBulkSelection;
 use App\Traits\WithSorting;
 use Flux\Flux;
@@ -240,7 +241,7 @@ return new class extends Component
         $rows = $records->map(fn (Record $record): array => [
             $record->title,
             ...($publishing ? [$record->slug, $record->computed_status->label(), $record->published_at?->format('Y-m-d H:i')] : []),
-            ...array_map($record->exportValue(...), $fields),
+            ...array_map(fn (array $field): string => RecordFieldText::export($record, $field), $fields),
             $record->categories->map(fn (Category $category): string => $category->name)->implode('; '),
             $record->updated_at->format('Y-m-d H:i'),
         ])->all();
@@ -602,7 +603,7 @@ return new class extends Component
 
                             @foreach ($this->columnFields as $field)
                                 <flux:table.cell class="whitespace-nowrap">
-                                    {{ $row->columnValue($field) }}</flux:table.cell>
+                                    {{ \App\Services\RecordFieldText::column($row, $field) }}</flux:table.cell>
                             @endforeach
 
                             @if ($this->hasMultipleActiveLocales())

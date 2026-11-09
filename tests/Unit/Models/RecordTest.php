@@ -9,6 +9,7 @@ use App\Models\Locale;
 use App\Models\Media;
 use App\Models\Record;
 use App\Models\RecordType;
+use App\Services\RecordFieldText;
 
 it('casts json and enum columns', function (): void {
     $record = Record::factory()->create([
@@ -220,13 +221,13 @@ it('formats column values per field type', function (): void {
         ],
     ]);
 
-    expect($record->columnValue(['key' => 'flag', 'type' => 'boolean']))->toBe('Yes')
-        ->and($record->columnValue(['key' => 'when', 'type' => 'date']))->toBe('2026-07-06')
-        ->and($record->columnValue(['key' => 'at', 'type' => 'datetime']))->toBe('2026-07-06 14:30')
-        ->and($record->columnValue(['key' => 'body', 'type' => 'rich-text']))->toBe('Some rich text here.')
-        ->and($record->columnValue(['key' => 'name', 'type' => 'text']))->toBe('Plain value')
-        ->and($record->columnValue(['key' => 'blank', 'type' => 'text']))->toBe('—')
-        ->and($record->columnValue(['key' => 'missing', 'type' => 'text']))->toBe('—');
+    expect(RecordFieldText::column($record, ['key' => 'flag', 'type' => 'boolean']))->toBe('Yes')
+        ->and(RecordFieldText::column($record, ['key' => 'when', 'type' => 'date']))->toBe('2026-07-06')
+        ->and(RecordFieldText::column($record, ['key' => 'at', 'type' => 'datetime']))->toBe('2026-07-06 14:30')
+        ->and(RecordFieldText::column($record, ['key' => 'body', 'type' => 'rich-text']))->toBe('Some rich text here.')
+        ->and(RecordFieldText::column($record, ['key' => 'name', 'type' => 'text']))->toBe('Plain value')
+        ->and(RecordFieldText::column($record, ['key' => 'blank', 'type' => 'text']))->toBe('—')
+        ->and(RecordFieldText::column($record, ['key' => 'missing', 'type' => 'text']))->toBe('—');
 });
 
 it('reads translatable column values in the current locale', function (): void {
@@ -236,7 +237,7 @@ it('reads translatable column values in the current locale', function (): void {
         'data' => ['tagline' => ['en' => 'Hello there']],
     ]);
 
-    expect($record->columnValue(['key' => 'tagline', 'type' => 'text', 'translatable' => true]))->toBe('Hello there');
+    expect(RecordFieldText::column($record, ['key' => 'tagline', 'type' => 'text', 'translatable' => true]))->toBe('Hello there');
 });
 
 it('matches records by title and searchable fields via the search scope', function (): void {
@@ -319,8 +320,8 @@ it('formats a money column value', function (): void {
         'data' => ['price' => 1999],
     ]);
 
-    expect($record->columnValue(['key' => 'price', 'type' => 'money']))->not->toBe('—')
-        ->and($record->columnValue(['key' => 'price', 'type' => 'money']))->toBeString();
+    expect(RecordFieldText::column($record, ['key' => 'price', 'type' => 'money']))->not->toBe('—')
+        ->and(RecordFieldText::column($record, ['key' => 'price', 'type' => 'money']))->toBeString();
 });
 
 it('counts attached media for a media column value', function (): void {
@@ -332,8 +333,8 @@ it('counts attached media for a media column value', function (): void {
 
     $fresh = Record::query()->with('media')->find($record->id);
 
-    expect($fresh->columnValue(['key' => 'gallery', 'type' => 'media-gallery']))->toBe('1')
-        ->and($fresh->columnValue(['key' => 'photo', 'type' => 'photo']))->toBe('0');
+    expect(RecordFieldText::column($fresh, ['key' => 'gallery', 'type' => 'media-gallery']))->toBe('1')
+        ->and(RecordFieldText::column($fresh, ['key' => 'photo', 'type' => 'photo']))->toBe('0');
 });
 
 it('tells whether a field has anything to show on the page', function (): void {
@@ -403,16 +404,16 @@ it('gives full field values for a spreadsheet export', function (): void {
 
     $fresh = Record::query()->with('media')->find($record->id);
 
-    expect($fresh->exportValue(['key' => 'notes', 'type' => 'text']))->toBe(str_repeat('Long notes. ', 10))
-        ->and($fresh->exportValue(['key' => 'body', 'type' => 'rich-text']))->toBe('Fish & chips Served hot')
-        ->and($fresh->exportValue(['key' => 'paperback', 'type' => 'boolean']))->toBe('No')
-        ->and($fresh->exportValue(['key' => 'released_at', 'type' => 'datetime']))->toBe('2026-07-06 14:30')
-        ->and($fresh->exportValue(['key' => 'labels', 'type' => 'tags']))->toBe('classic; fiction')
-        ->and($fresh->exportValue(['key' => 'tagline', 'type' => 'text', 'translatable' => true]))->toBe('A tale')
-        ->and($fresh->exportValue(['key' => 'blank', 'type' => 'text']))->toBeEmpty()
-        ->and($fresh->exportValue(['key' => 'missing', 'type' => 'number']))->toBeEmpty()
-        ->and($fresh->exportValue(['key' => 'sequels', 'type' => 'relationship', 'record_type' => 'book']))->toBe('Unreleased sequel')
-        ->and($fresh->exportValue(['key' => 'gallery', 'type' => 'media-gallery']))->toBe('cover.jpg; back-page.jpg');
+    expect(RecordFieldText::export($fresh, ['key' => 'notes', 'type' => 'text']))->toBe(str_repeat('Long notes. ', 10))
+        ->and(RecordFieldText::export($fresh, ['key' => 'body', 'type' => 'rich-text']))->toBe('Fish & chips Served hot')
+        ->and(RecordFieldText::export($fresh, ['key' => 'paperback', 'type' => 'boolean']))->toBe('No')
+        ->and(RecordFieldText::export($fresh, ['key' => 'released_at', 'type' => 'datetime']))->toBe('2026-07-06 14:30')
+        ->and(RecordFieldText::export($fresh, ['key' => 'labels', 'type' => 'tags']))->toBe('classic; fiction')
+        ->and(RecordFieldText::export($fresh, ['key' => 'tagline', 'type' => 'text', 'translatable' => true]))->toBe('A tale')
+        ->and(RecordFieldText::export($fresh, ['key' => 'blank', 'type' => 'text']))->toBeEmpty()
+        ->and(RecordFieldText::export($fresh, ['key' => 'missing', 'type' => 'number']))->toBeEmpty()
+        ->and(RecordFieldText::export($fresh, ['key' => 'sequels', 'type' => 'relationship', 'record_type' => 'book']))->toBe('Unreleased sequel')
+        ->and(RecordFieldText::export($fresh, ['key' => 'gallery', 'type' => 'media-gallery']))->toBe('cover.jpg; back-page.jpg');
 });
 
 it('builds a primary image srcset that stops at the stored crop, and none without an image', function (): void {

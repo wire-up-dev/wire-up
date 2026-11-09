@@ -31,7 +31,7 @@
                 {{ __('Inbox') }}</flux:sidebar.item>
         @endcan
         @can('orders.view')
-            @if (resolve(\App\Services\StripeService::class)->configured() || \App\Models\Order::query()->exists())
+            @if (resolve(\App\Services\StripeService::class)->configured() || \App\Models\Order::hasAny())
                 <flux:sidebar.item
                     icon="shopping-bag"
                     :href="route('admin.orders-index')"

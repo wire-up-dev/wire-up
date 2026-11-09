@@ -3,7 +3,7 @@
     $help = (string) ($field['help'] ?? '');
     $label = $field['label'][$locale] ?? \Illuminate\Support\Arr::first($field['label']) ?? $key;
     $path = "data.{$key}";
-    $targetTypeId = \App\Models\RecordType::query()->where('key', (string) ($field['record_type'] ?? ''))->value('id');
+    $targetTypeId = \App\Models\RecordType::ordered()->firstWhere('key', (string) ($field['record_type'] ?? ''))?->id;
     $multiple = (bool) ($field['multiple'] ?? false);
 @endphp
 

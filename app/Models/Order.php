@@ -50,6 +50,11 @@ final class Order extends Model
     /** @use HasFactory<OrderFactory> */
     use HasFactory;
 
+    public static function hasAny(): bool
+    {
+        return once(fn (): bool => self::query()->exists());
+    }
+
     public static function awaitingFulfilmentCount(): int
     {
         return once(fn (): int => self::query()->where('status', OrderStatus::PAID)->count());

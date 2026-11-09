@@ -13,6 +13,7 @@ use App\Mcp\Tools\UpdateContentTypeTool;
 use App\Models\Record;
 use App\Models\RecordType;
 use App\Services\ContentMarkdown;
+use App\Services\RecordFieldText;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -95,9 +96,9 @@ it('lists linked titles in the admin, but only published ones on cards, pages an
     $event->update(['data' => ['speakers' => [$ada->id, $draft->id]]]);
     $event->refresh();
 
-    expect(linkedRecord($events, 'No speakers yet')->columnValue(linkField()))->toBe('—')
-        ->and($event->columnValue(linkField()))->toBe('Ada, Secret Draft')
-        ->and($event->columnValue(linkField(), publishedOnly: true))->toBe('Ada')
+    expect(RecordFieldText::column(linkedRecord($events, 'No speakers yet'), linkField()))->toBe('—')
+        ->and(RecordFieldText::column($event, linkField()))->toBe('Ada, Secret Draft')
+        ->and(RecordFieldText::column($event, linkField(), publishedOnly: true))->toBe('Ada')
         ->and(ContentMarkdown::current()->render($event))->toContain('**Speakers:** Ada')
         ->not->toContain('Secret Draft');
 

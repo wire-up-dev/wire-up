@@ -31,7 +31,7 @@
             continue;
         }
 
-        $value = $record->columnValue($field, publishedOnly: true);
+        $value = \App\Services\RecordFieldText::column($record, $field, publishedOnly: true);
 
         if ($value !== '' && $value !== '—') {
             $meta[] = $value;
