@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\ActivityEvent;
-use App\Services\ActivityLog;
 use App\Services\BackupService;
 use App\Services\DatabaseDumper;
 use App\Services\ReleaseAssets;
@@ -79,7 +77,7 @@ final class UpdateCommand extends Command
         $preparation = [
             'Check free disk space' => fn () => $this->ensureDiskSpace($backups),
             'Fetch releases' => ['git', 'fetch', '--tags', '--force', 'origin'],
-            "Verify the {$tag} signature" => $signature->verifyTagCommand($tag),
+            "Verify the {$tag} signature" => fn () => $signature->verifyTag($tag),
             ...($prebuilt
                 ? ['Download frontend assets' => fn (): string => $assets->download($tag)]
                 : ['Check Node.js' => ['npm', '--version']]),
@@ -138,20 +136,15 @@ final class UpdateCommand extends Command
             }
         }
 
-        $updates->check();
-        $assets->discardSnapshot();
-
-        $error = $this->runStep($updates, $tag, 'Disable maintenance mode', [PHP_BINARY, 'artisan', 'up']);
+        $error = $this->runStep($updates, $tag, 'Disable maintenance mode', [PHP_BINARY, 'artisan', 'wireup:update:complete', $tag]);
 
         if ($error !== null) {
-            $updates->markFailed($tag, 'Disable maintenance mode', $error);
+            if ($updates->state()['status'] !== 'failed') {
+                $updates->markFailed($tag, 'Disable maintenance mode', $error);
+            }
 
             return $this->failInMaintenanceMode();
         }
-
-        $updates->markFinished($tag);
-
-        ActivityLog::record(ActivityEvent::SYSTEM_UPDATED, $tag);
 
         $this->newLine();
         $this->info("Wire Up is now on {$tag}.");

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Process;
 use Throwable;
 
 #[Queue('system')]
-#[Timeout(3600)]
+#[Timeout(UpdateService::TIME_LIMIT + 600)]
 #[Tries(1)]
 final class RunSystemUpdate implements ShouldBeUnique, ShouldQueue
 {
@@ -37,11 +37,11 @@ final class RunSystemUpdate implements ShouldBeUnique, ShouldQueue
         }
 
         $result = Process::path(base_path())
-            ->timeout(3500)
+            ->timeout(UpdateService::TIME_LIMIT)
             ->run([PHP_BINARY, 'artisan', 'wireup:update', '--tag='.$this->tag, '--force']);
 
-        if ($result->failed() && $updates->state()['status'] !== 'failed') {
-            $updates->markFailed($this->tag, 'update', mb_trim($result->output()."\n".$result->errorOutput()));
+        if ($result->failed() && ! $this->alreadyHandled($updates)) {
+            $this->markFailed($updates, mb_trim($result->output()."\n".$result->errorOutput()));
         }
     }
 
@@ -49,10 +49,22 @@ final class RunSystemUpdate implements ShouldBeUnique, ShouldQueue
     {
         $updates = resolve(UpdateService::class);
 
-        if ($updates->currentVersion() === $this->tag || $updates->state()['status'] === 'failed') {
+        if ($updates->currentVersion() === $this->tag || $this->alreadyHandled($updates)) {
             return;
         }
 
-        $updates->markFailed($this->tag, 'update', (string) $exception?->getMessage());
+        $this->markFailed($updates, (string) $exception?->getMessage());
+    }
+
+    private function alreadyHandled(UpdateService $updates): bool
+    {
+        return $updates->state()['status'] === 'failed' || $updates->updateIsLocked();
+    }
+
+    private function markFailed(UpdateService $updates, string $output): void
+    {
+        $state = $updates->state();
+
+        $updates->markFailed($this->tag, $state['status'] === 'running' ? (string) $state['step'] : 'update', $output, siteIsDown: app()->isDownForMaintenance());
     }
 }

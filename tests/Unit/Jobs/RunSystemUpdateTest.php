@@ -11,6 +11,7 @@ use Illuminate\Process\PendingProcess;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
@@ -64,6 +65,51 @@ it('marks the update failed when the process fails silently', function (): void 
 
     expect($service->state()['status'])->toBe('failed')
         ->and($service->state()['output'])->toContain('spawn boom');
+});
+
+it('says the site is still live when a failed update did not take it down', function (): void {
+    Process::fake(['*' => Process::result(errorOutput: 'spawn boom', exitCode: 1)]);
+
+    $service = resolve(UpdateService::class);
+    $service->markPending('v1.0.0');
+
+    new RunSystemUpdate('v1.0.0')->handle($service);
+
+    expect($service->state())->toMatchArray(['status' => 'failed', 'step' => 'update', 'site_down' => false]);
+});
+
+it('says the site is down and where the update stopped when it died in maintenance mode', function (): void {
+    config()->set('app.maintenance.driver', 'cache');
+    config()->set('app.maintenance.store', 'array');
+    Process::fake(['*' => function (): FakeProcessResult {
+        resolve(UpdateService::class)->markRunning('v1.0.0', 'Run database migrations');
+        app()->maintenanceMode()->activate([]);
+
+        return Process::result(errorOutput: 'Killed', exitCode: 137);
+    }]);
+
+    $service = resolve(UpdateService::class);
+    $service->markPending('v1.0.0');
+
+    new RunSystemUpdate('v1.0.0')->handle($service);
+
+    expect($service->state())->toMatchArray(['status' => 'failed', 'step' => 'Run database migrations', 'output' => 'Killed', 'site_down' => true]);
+});
+
+it('records nothing while another update still holds the lock', function (): void {
+    Process::fake(['*' => Process::result(output: 'Another update is already running.', exitCode: 1)]);
+    $running = Cache::lock('wireup:update:lock', 60);
+    $running->get();
+
+    $service = resolve(UpdateService::class);
+    $service->markPending('v1.0.0');
+
+    new RunSystemUpdate('v1.0.0')->handle($service);
+    new RunSystemUpdate('v1.0.0')->failed(new MaxAttemptsExceededException('App\Jobs\RunSystemUpdate has been attempted too many times.'));
+
+    expect($service->state()['status'])->toBe('pending');
+
+    $running->release();
 });
 
 it('preserves the failure recorded by the update command', function (): void {
@@ -135,6 +181,6 @@ it('has conservative queue settings', function (): void {
     $timeout = $reflection->getAttributes(Timeout::class)[0]->newInstance();
 
     expect($tries->tries)->toBe(1)
-        ->and($timeout->timeout)->toBe(3600)
+        ->and($timeout->timeout)->toBeGreaterThan(UpdateService::TIME_LIMIT)
         ->and($job->uniqueId())->toBe('wireup-update');
 });

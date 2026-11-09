@@ -166,6 +166,29 @@ it('does not queue an update while one is already underway', function (): void {
     Queue::assertNothingPushed();
 });
 
+it('does not queue an update while a manual update holds the lock', function (): void {
+    Queue::fake();
+    $this->actingAsAdmin();
+    seedAvailableUpdate();
+    $running = Cache::lock('wireup:update:lock', 60);
+    $running->get();
+
+    Livewire::test('pages::admin.settings-updates')
+        ->call('startUpdate');
+
+    Queue::assertNothingPushed();
+
+    $running->release();
+});
+
+it('says when a new release is waiting for its files', function (): void {
+    $this->actingAsAdmin();
+    Cache::forever('wireup:update:latest', ['version' => 'v0.9.0', 'checked_at' => now()->toIso8601String(), 'notes' => [], 'failed' => false, 'held_back' => 'v1.0.0']);
+
+    Livewire::test('pages::admin.settings-updates')
+        ->assertSee('v1.0.0 is out and will be offered once its files are ready.');
+});
+
 it('forbids starting an update without the edit permission', function (): void {
     $this->actingAs(settingsViewer());
     seedAvailableUpdate();

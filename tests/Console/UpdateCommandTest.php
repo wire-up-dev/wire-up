@@ -3,14 +3,12 @@
 declare(strict_types=1);
 
 use App\Console\Commands\UpdateCommand;
-use App\Enums\ActivityEvent;
-use App\Enums\RevisionSource;
-use App\Models\Activity;
 use App\Services\BackupService;
 use App\Services\DatabaseDumper;
 use App\Services\ReleaseSignature;
 use App\Services\SiteBundle;
 use App\Services\UpdateService;
+use Illuminate\Process\FakeProcessResult;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -27,7 +25,10 @@ beforeEach(function (): void {
     config()->set('wireup.build_path', $root.'/build');
     config()->set('wireup.backup_path', $root.'/backups');
 
-    Process::fake(['*rev-parse*' => Process::result(output: "abc1234def\n")]);
+    Process::fake([
+        '*rev-parse*' => Process::result(output: "abc1234def\n"),
+        '*cat-file*' => fn (PendingProcess $process): FakeProcessResult => Process::result(output: "object abc1234def\ntype commit\ntag ".end($process->command)."\n"),
+    ]);
 });
 
 function preUpdateBackup(string $tag): string
@@ -63,14 +64,13 @@ it('updates to the latest release', function (): void {
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['npm', 'run', 'build']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'queue:restart']);
-    Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'up']);
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'wireup:update:complete', 'v1.0.0']);
+    Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'up']);
 
     $service = resolve(UpdateService::class);
 
     expect($service->currentVersion())->toBe('v1.0.0')
-        ->and($service->state()['status'])->toBe('finished')
-        ->and($service->latestVersion())->toBe('v1.0.0')
-        ->and(Activity::query()->sole()->only(['event', 'source', 'subject_label']))->toBe(['event' => ActivityEvent::SYSTEM_UPDATED, 'source' => RevisionSource::SYSTEM, 'subject_label' => 'v1.0.0']);
+        ->and($service->latestVersion())->toBe('v1.0.0');
 });
 
 it('updates to a pinned tag', function (): void {
@@ -133,9 +133,9 @@ it('fails when no release tag exists', function (): void {
     expect(resolve(UpdateService::class)->state()['status'])->toBe('idle');
 });
 
-it('records the failure when disabling maintenance mode fails', function (): void {
+it('records the failure when the new version cannot finish the update', function (): void {
     Process::fake([
-        "*'up'*" => Process::result(errorOutput: 'up boom', exitCode: 1),
+        '*wireup:update:complete*' => Process::result(errorOutput: 'up boom', exitCode: 1),
         '*ls-remote*' => Process::result(output: "aaa\trefs/tags/v1.0.0"),
         '*' => Process::result(),
     ]);
@@ -150,7 +150,27 @@ it('records the failure when disabling maintenance mode fails', function (): voi
 
     expect($service->state()['status'])->toBe('failed')
         ->and($service->state()['step'])->toBe('Disable maintenance mode')
+        ->and($service->state()['site_down'])->toBeTrue()
         ->and($service->currentVersion())->toBe('v1.0.0');
+});
+
+it('keeps the failure the new version recorded while finishing the update', function (): void {
+    Process::fake([
+        '*wireup:update:complete*' => function (): FakeProcessResult {
+            resolve(UpdateService::class)->markFailed('v1.0.0', 'Disable maintenance mode', 'Failed to disable maintenance mode: disk full.');
+
+            return Process::result(exitCode: 1);
+        },
+        '*' => Process::result(),
+    ]);
+
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])
+        ->expectsOutputToContain('php artisan up')
+        ->assertExitCode(1);
+
+    expect(resolve(UpdateService::class)->state()['output'])->toBe('Failed to disable maintenance mode: disk full.');
 });
 
 it('brings the site back up without touching the code when the database backup fails', function (): void {
@@ -197,6 +217,7 @@ it('rolls back to the previous version when a migration fails', function (): voi
         ['git', 'remote', 'get-url', 'origin'],
         ['git', 'fetch', '--tags', '--force', 'origin'],
         resolve(ReleaseSignature::class)->verifyTagCommand('v1.0.0'),
+        ['git', 'cat-file', 'tag', 'v1.0.0'],
         ['npm', '--version'],
         [PHP_BINARY, 'artisan', 'down'],
         [PHP_BINARY, 'artisan', 'wireup:backup', '--name='.preUpdateBackup('v1.0.0')],
@@ -321,8 +342,7 @@ it('installs the prebuilt frontend assets instead of building them on the server
 
     Process::assertDidntRun(fn (PendingProcess $process): bool => is_array($process->command) && $process->command[0] === 'npm');
 
-    expect(File::get(config('wireup.build_path').'/manifest.json'))->toBe('{"release":"v1.0.0"}')
-        ->and(resolve(UpdateService::class)->state()['status'])->toBe('finished');
+    expect(File::get(config('wireup.build_path').'/manifest.json'))->toBe('{"release":"v1.0.0"}');
 });
 
 it('stops before maintenance mode when the prebuilt assets fail verification', function (): void {
@@ -372,6 +392,23 @@ it('refuses a release whose tag is not signed by a trusted key', function (): vo
     expect($state['status'])->toBe('failed')
         ->and($state['step'])->toBe('Verify the v1.0.0 signature')
         ->and($state['site_down'])->toBeFalse();
+});
+
+it('refuses a trusted tag that was signed for another release', function (): void {
+    Process::fake([
+        '*cat-file*' => Process::result(output: "object abc1234def\ntype commit\ntag v0.7.0\n"),
+        '*' => Process::result(),
+    ]);
+
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])
+        ->expectsOutputToContain('The v1.0.0 tag was signed as v0.7.0')
+        ->assertExitCode(1);
+
+    Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'down']);
+
+    expect(resolve(UpdateService::class)->state())->toMatchArray(['status' => 'failed', 'step' => 'Verify the v1.0.0 signature', 'site_down' => false]);
 });
 
 it('stops before maintenance mode when the release has to be built and Node.js is missing', function (): void {

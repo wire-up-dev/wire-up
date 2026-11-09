@@ -33,7 +33,8 @@ final class CheckForUpdatesCommand extends Command
         if ($latest !== null
             && (bool) config('site.auto_update')
             && $updates->updateAvailable()
-            && in_array($updates->state()['status'], ['idle', 'finished'], true)) {
+            && in_array($updates->state()['status'], ['idle', 'finished'], true)
+            && ! $updates->updateIsLocked()) {
             $updates->markPending($latest);
             dispatch(new RunSystemUpdate($latest));
             $this->components->info("Auto-update to {$latest} queued.");

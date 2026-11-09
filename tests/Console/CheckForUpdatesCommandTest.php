@@ -6,6 +6,7 @@ use App\Console\Commands\CheckForUpdatesCommand;
 use App\Jobs\RunSystemUpdate;
 use App\Models\Settings;
 use App\Services\UpdateService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
@@ -76,6 +77,28 @@ it('queues an automatic update when enabled', function (): void {
     Queue::assertPushedOn('system', RunSystemUpdate::class, fn (RunSystemUpdate $job): bool => $job->tag === 'v1.0.0');
 
     expect(resolve(UpdateService::class)->state()['status'])->toBe('pending');
+});
+
+it('does not queue an automatic update while a manual update holds the lock', function (): void {
+    Queue::fake();
+    Process::fake([
+        '*ls-remote*' => Process::result(output: "aaa\trefs/tags/v1.0.0"),
+        '*get-url*' => Process::result(),
+        '*fetch*' => Process::result(),
+        '*show*' => Process::result(output: ''),
+    ]);
+    Settings::set(['auto_update' => true]);
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+    $running = Cache::lock('wireup:update:lock', 60);
+    $running->get();
+
+    $this->artisan(CheckForUpdatesCommand::class)
+        ->doesntExpectOutputToContain('Auto-update')
+        ->assertExitCode(0);
+
+    Queue::assertNothingPushed();
+
+    $running->release();
 });
 
 it('does not queue an automatic update when disabled', function (): void {

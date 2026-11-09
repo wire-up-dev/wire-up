@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Services\ReleaseSignature;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
@@ -49,20 +50,51 @@ it('rejects altered messages, other keys, other namespaces and missing signature
     expect(new ReleaseSignature()->verifies("v1.0.0\nabc\n", $signature))->toBeFalse();
 })->with(['altered', 'stranger', 'namespace', 'missing']);
 
-it('verifies release tags with git', function (): void {
-    $repository = "{$this->directory}/repository";
-    $git = fn (string ...$arguments) => Process::path($repository)->run(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', '-c', 'gpg.format=ssh', ...$arguments])->throw();
+/**
+ * @return Closure(string ...): ProcessResult
+ */
+function signedTagRepository(string $directory): Closure
+{
+    $repository = "{$directory}/repository";
+    $git = fn (string ...$arguments): ProcessResult => Process::path($repository)->run(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', '-c', 'gpg.format=ssh', ...$arguments])->throw();
 
     File::ensureDirectoryExists($repository);
     $git('init', '--quiet');
     $git('commit', '--quiet', '--allow-empty', '-m', 'Release');
-    $git('-c', "user.signingkey={$this->directory}/trusted", 'tag', '-s', 'v1.0.0', '-m', 'v1.0.0');
-    $git('-c', "user.signingkey={$this->directory}/stranger", 'tag', '-s', 'v1.0.1', '-m', 'v1.0.1');
+    $git('-c', "user.signingkey={$directory}/trusted", 'tag', '-s', 'v1.0.0', '-m', 'v1.0.0');
+    $git('-c', "user.signingkey={$directory}/stranger", 'tag', '-s', 'v1.0.1', '-m', 'v1.0.1');
     $git('tag', '-a', 'v1.0.2', '-m', 'v1.0.2');
 
-    $verifies = fn (string $tag): bool => Process::path($repository)->run(new ReleaseSignature()->verifyTagCommand($tag))->successful();
+    return $git;
+}
+
+it('verifies release tags with git', function (): void {
+    signedTagRepository($this->directory);
+
+    $verifies = fn (string $tag): bool => Process::path("{$this->directory}/repository")->run(new ReleaseSignature()->verifyTagCommand($tag))->successful();
 
     expect($verifies('v1.0.0'))->toBeTrue()
         ->and($verifies('v1.0.1'))->toBeFalse()
         ->and($verifies('v1.0.2'))->toBeFalse();
 });
+
+it('accepts only a trusted signed tag that carries the name of the release being installed', function (): void {
+    $git = signedTagRepository($this->directory);
+    $git('update-ref', 'refs/tags/v2.0.0', mb_trim($git('rev-parse', 'v1.0.0')->output()));
+
+    $signature = new ReleaseSignature("{$this->directory}/repository");
+    $signature->verifyTag('v1.0.0');
+
+    expect(fn () => $signature->verifyTag('v2.0.0'))->toThrow(RuntimeException::class, 'The v2.0.0 tag was signed as v1.0.0, so the update did not start.')
+        ->and(fn () => $signature->verifyTag('v1.0.1'))->toThrow(RuntimeException::class, 'No principal matched')
+        ->and(fn () => $signature->verifyTag('v1.0.2'))->toThrow(RuntimeException::class, 'no signature found');
+});
+
+it('explains a tag that cannot be verified or read', function (array $fakes, string $message): void {
+    Process::fake($fakes);
+
+    expect(fn () => new ReleaseSignature()->verifyTag('v1.0.0'))->toThrow(RuntimeException::class, $message);
+})->with([
+    'a silent verification failure' => [fn (): array => ['*verify-tag*' => Process::result(exitCode: 1)], 'The v1.0.0 tag is not signed by a trusted key.'],
+    'an unreadable tag' => [fn (): array => ['*verify-tag*' => Process::result(), '*cat-file*' => Process::result(exitCode: 128)], 'The v1.0.0 tag could not be read, so the update did not start.'],
+]);

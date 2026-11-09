@@ -16,11 +16,17 @@ use Throwable;
 
 final readonly class UpdateService
 {
+    public const int TIME_LIMIT = 4 * 3600;
+
+    public const int HELD_BACK_ALERT_HOURS = 24;
+
     private const string CACHE_LATEST = 'wireup:update:latest';
 
     private const string CACHE_STATE = 'wireup:update:state';
 
     private const string LOCK = 'wireup:update:lock';
+
+    private const string CACHE_HELD_BACK = 'wireup:update:held-back';
 
     public function __construct(private ReleaseAssets $assets = new ReleaseAssets()) {}
 
@@ -48,7 +54,7 @@ final readonly class UpdateService
 
     public function updateLock(): Lock
     {
-        return Cache::lock(self::LOCK, 3600);
+        return Cache::lock(self::LOCK, self::TIME_LIMIT);
     }
 
     public function updateIsLocked(): bool
@@ -112,10 +118,14 @@ final readonly class UpdateService
 
         $latest = $result->failed() ? null : $this->highestTag($result->output());
         $current = $this->currentVersion() ?? $this->stampVersionFromFetchedTags();
+        $heldBack = null;
 
         if ($latest !== null && $current !== null && $this->isNewer($latest, $current) && $this->assets->stillBuilding($latest, $current)) {
+            $heldBack = $latest;
             $latest = $current;
         }
+
+        $this->trackHeldBack($heldBack);
 
         $notes = $latest !== null && $current !== null && $this->isNewer($latest, $current)
             ? $this->releaseNotes($current, $latest)
@@ -126,6 +136,7 @@ final readonly class UpdateService
             'checked_at' => now()->toIso8601String(),
             'notes' => $notes,
             'failed' => $result->failed(),
+            'held_back' => $heldBack,
         ]);
 
         return $latest;
@@ -134,6 +145,13 @@ final readonly class UpdateService
     public function latestVersion(): ?string
     {
         $version = data_get(Cache::get(self::CACHE_LATEST), 'version');
+
+        return is_string($version) ? $version : null;
+    }
+
+    public function heldBackRelease(): ?string
+    {
+        $version = data_get(Cache::get(self::CACHE_LATEST), 'held_back');
 
         return is_string($version) ? $version : null;
     }
@@ -263,6 +281,24 @@ final readonly class UpdateService
         } catch (Throwable $exception) {
             report($exception);
         }
+    }
+
+    private function trackHeldBack(?string $tag): void
+    {
+        if ($tag === null) {
+            Cache::forget(self::CACHE_HELD_BACK);
+
+            return;
+        }
+
+        $held = Cache::get(self::CACHE_HELD_BACK);
+        $since = is_array($held) && ($held['tag'] ?? null) === $tag && is_string($held['since'] ?? null)
+            ? CarbonImmutable::parse($held['since'])
+            : now()->toImmutable();
+
+        Cache::forever(self::CACHE_HELD_BACK, ['tag' => $tag, 'since' => $since->toIso8601String()]);
+
+        report_if($since->lt(now()->subHours(self::HELD_BACK_ALERT_HOURS)), new RuntimeException("Wire Up {$tag} came out more than a day ago, but its frontend files are still not signed, so this site is not offering it. Sign them with: composer release:sign {$tag}"));
     }
 
     private function stampVersionFromFetchedTags(): ?string

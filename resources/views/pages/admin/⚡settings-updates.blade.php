@@ -28,6 +28,11 @@ return new class extends Component
         return resolve(UpdateService::class)->latestVersion();
     }
 
+    public function heldBackRelease(): ?string
+    {
+        return resolve(UpdateService::class)->heldBackRelease();
+    }
+
     public function lastCheckedAt(): ?CarbonImmutable
     {
         return resolve(UpdateService::class)->lastCheckedAt();
@@ -75,7 +80,7 @@ return new class extends Component
         $updates = resolve(UpdateService::class);
         $tag = $updates->latestVersion();
 
-        if ($tag === null || ! $updates->updateAvailable() || $updates->updating()) {
+        if ($tag === null || ! $updates->updateAvailable() || $updates->updating() || $updates->updateIsLocked()) {
             return;
         }
 
@@ -159,6 +164,10 @@ return new class extends Component
                         >{{ __('Check now') }}</flux:button>
                     @endcan
                     <flux:text>{{ __('Last checked :time', ['time' => $this->lastCheckedAt()?->diffForHumans() ?? __('never')]) }}</flux:text>
+                    @if ($this->heldBackRelease() !== null)
+                        <flux:text>
+                            {{ __(':tag is out and will be offered once its files are ready.', ['tag' => $this->heldBackRelease()]) }}</flux:text>
+                    @endif
                 </div>
             </div>
 

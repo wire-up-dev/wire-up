@@ -7,12 +7,15 @@ namespace App\Services;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use RuntimeException;
 
-final class ReleaseSignature
+final readonly class ReleaseSignature
 {
     public const string PRINCIPAL = 'release@wire-up.dev';
 
     public const string NAMESPACE = 'wireup-release';
+
+    public function __construct(private ?string $repository = null) {}
 
     /**
      * @return list<string>
@@ -27,6 +30,20 @@ final class ReleaseSignature
             '-c', 'gpg.x509.program=false',
             'verify-tag', $tag,
         ];
+    }
+
+    public function verifyTag(string $tag): void
+    {
+        $verification = Process::path($this->repository ?? base_path())->run($this->verifyTagCommand($tag));
+
+        throw_if($verification->failed(), RuntimeException::class, mb_trim($verification->output()."\n".$verification->errorOutput()) ?: "The {$tag} tag is not signed by a trusted key.");
+
+        $object = Process::path($this->repository ?? base_path())->run(['git', 'cat-file', 'tag', $tag]);
+        $signedName = preg_match('/^tag (\S+)$/m', $object->output(), $match) === 1 ? $match[1] : null;
+
+        throw_if($signedName !== $tag, RuntimeException::class, $signedName === null
+            ? "The {$tag} tag could not be read, so the update did not start."
+            : "The {$tag} tag was signed as {$signedName}, so the update did not start.");
     }
 
     public function verifies(string $message, string $signature): bool

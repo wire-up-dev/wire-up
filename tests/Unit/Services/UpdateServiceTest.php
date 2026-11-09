@@ -7,6 +7,7 @@ use App\Notifications\SystemUpdateCompleted;
 use App\Services\UpdateService;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -167,6 +168,56 @@ it('holds back a release until its prebuilt frontend assets are published', func
     expect($service->check())->toBe('v0.9.0')
         ->and($service->updateAvailable())->toBeFalse()
         ->and($service->changelog())->toBeEmpty();
+});
+
+function holdBackUnsignedRelease(): UpdateService
+{
+    Process::fake([
+        '*ls-remote*' => Process::result(output: "aaa\trefs/tags/v1.0.0"),
+        '*get-url*' => Process::result(output: ReleaseArchive::REMOTE),
+        '*ssh-keygen*' => Process::result(),
+    ]);
+    Http::fake([
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => Http::response(str_repeat('b', 64)),
+        ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256.sig') => Http::response('Not Found', 404),
+        ReleaseArchive::url('v0.9.0', 'build.tar.gz.sha256') => Http::response(str_repeat('a', 64)),
+        ReleaseArchive::url('v0.9.0', 'build.tar.gz.sha256.sig') => Http::response(ReleaseArchive::SIGNATURE),
+    ]);
+
+    $service = new UpdateService();
+    $service->writeCurrentVersion('v0.9.0');
+
+    return $service;
+}
+
+it('remembers which release is held back until it is no longer waiting', function (): void {
+    $service = holdBackUnsignedRelease();
+
+    $service->check();
+
+    expect($service->heldBackRelease())->toBe('v1.0.0');
+
+    Process::fake(['*ls-remote*' => Process::result(output: "aaa\trefs/tags/v0.9.0")]);
+    $service->check();
+
+    expect($service->heldBackRelease())->toBeNull();
+});
+
+it('alerts the developer once a release has waited more than a day for its signed files', function (): void {
+    Exceptions::fake();
+    $service = holdBackUnsignedRelease();
+
+    $service->check();
+    $this->travel(UpdateService::HELD_BACK_ALERT_HOURS - 1)->hours();
+    $service->check();
+
+    Exceptions::assertNothingReported();
+
+    $this->travel(2)->hours();
+    $service->check();
+
+    Exceptions::assertReported(fn (RuntimeException $exception): bool => str_contains($exception->getMessage(), 'Wire Up v1.0.0 came out more than a day ago')
+        && str_contains($exception->getMessage(), 'composer release:sign v1.0.0'));
 });
 
 it('reports no update when either version is unknown', function (): void {
