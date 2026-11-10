@@ -22,4 +22,4 @@ it('keeps the oldest slug when one page holds several for a language, then forbi
         ->and(Schema::hasIndex('slugs', 'slugs_sluggable_locale_unique'))->toBeTrue()
         ->and(Schema::hasIndex('mediables', ['media_id']))->toBeTrue()
         ->and(Schema::hasIndex('mediables', 'mediable'))->toBeFalse();
-});
+})->group('sqlite-only');

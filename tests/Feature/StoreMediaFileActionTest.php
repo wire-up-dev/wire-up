@@ -138,32 +138,31 @@ it('prefers a caller supplied mime type over sniffing the file', function (): vo
 });
 
 it('fails with a friendly message when a heic image cannot be converted', function (): void {
-    resolve(StoreMediaFileAction::class)->handle(storedScratchFile('broken.heic', 'nonsense bytes'), 'broken.heic');
+    resolve(StoreMediaFileAction::class)->handle(storedScratchFile('broken.heic', (string) file_get_contents(base_path('tests/Fixtures/invalid.heic'))), 'broken.heic');
 })->throws(RuntimeException::class, 'The image could not be converted. Upload it as a JPG or PNG instead.');
 
-it('corrects the orientation of a converted image', function (int $orientation, int $expectedWidth, int $expectedHeight): void {
-    $source = new Imagick();
-    $source->newImage(4, 2, 'red');
-    $source->setImageFormat('jpeg');
-    $jpeg = $source->getImageBlob();
-    $source->clear();
+it('keeps a rotated phone photo upright when converting it', function (): void {
+    $media = resolve(StoreMediaFileAction::class)->handle(storedScratchFile('portrait.heic', (string) file_get_contents(base_path('tests/Fixtures/rotated.heic'))), 'portrait.heic');
 
-    $exif = "Exif\0\0MM\x00\x2A\x00\x00\x00\x08\x00\x01\x01\x12\x00\x03\x00\x00\x00\x01".pack('n', $orientation)."\x00\x00\x00\x00\x00\x00";
-    $segment = "\xFF\xE1".pack('n', mb_strlen($exif, '8bit') + 2).$exif;
-    $tagged = substr_replace($jpeg, "\xFF\xD8".$segment, 0, 2);
-
-    $media = resolve(StoreMediaFileAction::class)->handle(
-        storedScratchFile("rotated-{$orientation}.heic", $tagged),
-        "rotated-{$orientation}.heic",
-    );
+    $stored = new Imagick();
+    $stored->readImageBlob((string) Storage::disk(config()->string('filesystems.media'))->get($media->source));
+    $top = $stored->getImagePixelColor(16, 4)->getColor();
 
     expect($media->mime_type)->toBe('image/jpeg')
-        ->and($media->filename)->toBe("rotated-{$orientation}.jpg")
-        ->and($media->width)->toBe($expectedWidth)
-        ->and($media->height)->toBe($expectedHeight);
-})->with([
-    'upright needs no rotation' => [Imagick::ORIENTATION_TOPLEFT, 4, 2],
-    'upside down rotates 180' => [Imagick::ORIENTATION_BOTTOMRIGHT, 4, 2],
-    'rotated right turns 90' => [Imagick::ORIENTATION_RIGHTTOP, 2, 4],
-    'rotated left turns -90' => [Imagick::ORIENTATION_LEFTBOTTOM, 2, 4],
-]);
+        ->and($media->filename)->toBe('portrait.jpg')
+        ->and([$media->width, $media->height])->toBe([32, 64])
+        ->and($stored->getImageOrientation())->toBe(Imagick::ORIENTATION_TOPLEFT)
+        ->and($top['r'])->toBeGreaterThan(200)
+        ->and($top['b'])->toBeLessThan(60);
+});
+
+it('stores a png renamed to heic as the png it is, without converting it', function (): void {
+    $media = resolve(StoreMediaFileAction::class)->handle(storedScratchFile('photo.heic', storedPixelPng()), 'photo.heic');
+
+    expect($media->mime_type)->toBe('image/png')
+        ->and($media->filename)->toBe('photo.png');
+});
+
+it('refuses a disallowed file renamed to heic instead of converting it', function (): void {
+    resolve(StoreMediaFileAction::class)->handle(storedScratchFile('page.heic', '<!doctype html><html><body><script>alert(1)</script></body></html>'), 'page.heic');
+})->throws(RuntimeException::class, 'This kind of file can’t be uploaded.');

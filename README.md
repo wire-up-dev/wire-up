@@ -137,7 +137,7 @@ Requirements on the server: PHP 8.5, Composer, git. No database server is needed
     }
     ```
 
-3. Create `.env` from `.env.example` with production values (`APP_ENV=production`, `APP_URL`). SQLite is preconfigured; to use MySQL/PostgreSQL instead, set the `DB_*` variables.
+3. Create `.env` from `.env.example` and set `APP_URL`. It defaults to production (`APP_ENV=production`, warnings and errors only in the log); for local development set `APP_ENV=local`. SQLite is preconfigured; to use MySQL/PostgreSQL instead, set the `DB_*` variables.
 
 4. Install PHP dependencies and run the installer:
 

@@ -46,6 +46,8 @@ return new class extends Component
 
     public function toggleRead(int $id, MarkSubmissionReadAction $action): void
     {
+        $this->authorize('inbox.view');
+
         $submission = Submission::query()->find($id);
 
         if ($submission === null) {
@@ -80,6 +82,8 @@ return new class extends Component
 
     public function markSelectedRead(MarkSubmissionReadAction $action): void
     {
+        $this->authorize('inbox.view');
+
         $submissions = $this->selectedSubmissions()->reject(fn (Submission $submission): bool => $submission->isRead());
 
         foreach ($submissions as $submission) {
@@ -91,6 +95,8 @@ return new class extends Component
 
     public function markSelectedUnread(MarkSubmissionReadAction $action): void
     {
+        $this->authorize('inbox.view');
+
         $submissions = $this->selectedSubmissions()->filter(fn (Submission $submission): bool => $submission->isRead());
 
         foreach ($submissions as $submission) {

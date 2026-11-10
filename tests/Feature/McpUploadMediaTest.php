@@ -86,7 +86,7 @@ it('returns the existing item when the same file is imported twice', function ()
 });
 
 it('surfaces a conversion failure as a tool error', function (): void {
-    importable('broken.heic', 'not an image');
+    importable('broken.heic', (string) file_get_contents(base_path('tests/Fixtures/invalid.heic')));
 
     WireUpServer::tool(UploadMediaTool::class, ['path' => 'broken.heic'])
         ->assertHasErrors(['The image could not be converted. Upload it as a JPG or PNG instead.']);

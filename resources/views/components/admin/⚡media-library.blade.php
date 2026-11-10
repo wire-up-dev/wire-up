@@ -480,22 +480,18 @@ return new class extends Component
         $allowsVideo = $this->type === MediaType::VIDEO || in_array(MediaType::VIDEO->value, $this->allowedTypes, true);
         $maxKilobytes = UploadLimit::enforcedKilobytes($allowsVideo ? UploadLimit::VIDEO_MAX_KILOBYTES : UploadLimit::IMAGE_MAX_KILOBYTES);
 
-        $rules = ['files.*' => ['max:'.$maxKilobytes]];
+        $acceptedTypes = match (true) {
+            $this->type instanceof MediaType => [$this->type],
+            $this->allowedTypes !== [] => array_filter(array_map(MediaType::tryFrom(...), $this->allowedTypes)),
+            default => MediaType::cases(),
+        };
 
-        if ($this->type instanceof MediaType) {
-            $rules['files.*'][] = 'mimetypes:'.implode(',', $this->type->allowedMimeTypes());
-        } elseif ($this->allowedTypes !== []) {
-            $allowed = collect($this->allowedTypes)
-                ->map(fn (string $value): ?MediaType => MediaType::tryFrom($value))
-                ->filter()
-                ->flatMap(fn (MediaType $type): array => $type->allowedMimeTypes())
-                ->unique()
-                ->implode(',');
+        $acceptedMimeTypes = collect($acceptedTypes)
+            ->flatMap(fn (MediaType $type): array => $type->allowedMimeTypes())
+            ->unique()
+            ->implode(',');
 
-            if ($allowed !== '') {
-                $rules['files.*'][] = 'mimetypes:'.$allowed;
-            }
-        }
+        $rules = ['files.*' => ['max:'.$maxKilobytes, 'mimetypes:'.$acceptedMimeTypes]];
 
         $validatedFiles = [];
 

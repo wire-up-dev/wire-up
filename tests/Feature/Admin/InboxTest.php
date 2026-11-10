@@ -91,6 +91,18 @@ it('toggles a submission between read and unread from the index', function (): v
     expect($submission->fresh()->read_at)->toBeNull();
 });
 
+it('keeps read and unread changes to people who can see the inbox', function (string $method): void {
+    $submission = Submission::factory()->create(['read_at' => now()->subDay()]);
+    $this->actingAs(User::factory()->role(Role::factory()->create(['abilities' => ['pages.view']]))->create(['active' => true]));
+
+    Livewire::test('pages::admin.inbox-index')
+        ->set('selected', [(string) $submission->id])
+        ->call($method, ...($method === 'toggleRead' ? [$submission->id] : []))
+        ->assertForbidden();
+
+    expect($submission->fresh()->read_at)->not->toBeNull();
+})->with(['toggleRead', 'markSelectedRead', 'markSelectedUnread']);
+
 it('deletes a submission from the index', function (): void {
     $submission = Submission::factory()->create();
 

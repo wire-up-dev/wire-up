@@ -118,8 +118,8 @@ return new class extends Component
         }
 
         foreach ($this->roles as $role) {
-            if (! $this->grantsOnlyHeldAccess($role)) {
-                $this->addError('roles', __('You can’t grant access you don’t have yourself.'));
+            if (! $this->changesOnlyHeldAccess($role)) {
+                $this->addError('roles', __('You can’t change access you don’t have yourself.'));
 
                 return;
             }
@@ -133,12 +133,20 @@ return new class extends Component
             ->get();
 
         foreach ($removable as $role) {
+            if (! $this->holdsAll($role->abilities)) {
+                $this->addError('roles', __('You can’t change access you don’t have yourself.'));
+
+                return;
+            }
+
             if ($role->isInUse()) {
                 $this->addError('roles', __(':name still has members — reassign them first.', ['name' => $role->name]));
 
                 return;
             }
+        }
 
+        foreach ($removable as $role) {
             $role->delete();
 
             ActivityLog::record(ActivityEvent::ROLE_DELETED, $role);
@@ -190,7 +198,7 @@ return new class extends Component
     /**
      * @param  array<string, mixed>  $role
      */
-    private function grantsOnlyHeldAccess(array $role): bool
+    private function changesOnlyHeldAccess(array $role): bool
     {
         $existing = $role['id'] ? Role::query()->find($role['id']) : null;
 
@@ -198,9 +206,18 @@ return new class extends Component
             return true;
         }
 
-        $added = array_diff($this->serialize($role['grants']), $existing->abilities ?? []);
+        $requested = $this->serialize($role['grants']);
+        $current = $existing->abilities ?? [];
 
-        return resolve(UserGuard::class)->canGrant(auth()->user(), $added);
+        return $this->holdsAll([...array_diff($requested, $current), ...array_diff($current, $requested)]);
+    }
+
+    /**
+     * @param  array<int, string>  $abilities
+     */
+    private function holdsAll(array $abilities): bool
+    {
+        return resolve(UserGuard::class)->canGrant(auth()->user(), array_values(array_intersect($abilities, PermissionRegistry::abilityKeys())));
     }
 
     /**

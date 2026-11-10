@@ -43,7 +43,7 @@ final readonly class StoreMediaFileAction
         $private = $private && MediaType::fromMimeType($detectedMime) === MediaType::DOCUMENT;
 
         $isSvg = $originalExtension === 'svg' || $detectedMime === 'image/svg+xml';
-        $isHeic = in_array($originalExtension, ['heic', 'heif'], true) || str_contains(mb_strtolower($detectedMime), 'hei');
+        $isHeic = in_array(mime_content_type($path), ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'], true);
 
         $extension = match (true) {
             $isHeic => 'jpg',
@@ -113,15 +113,8 @@ final readonly class StoreMediaFileAction
     private function storeConvertedHeic(string $path, string $filename): array
     {
         try {
-            $imagick = new Imagick($path);
-
-            match ($imagick->getImageOrientation()) {
-                Imagick::ORIENTATION_BOTTOMRIGHT => $imagick->rotateImage('#000', 180),
-                Imagick::ORIENTATION_RIGHTTOP => $imagick->rotateImage('#000', 90),
-                Imagick::ORIENTATION_LEFTBOTTOM => $imagick->rotateImage('#000', -90),
-                default => null,
-            };
-
+            $imagick = new Imagick();
+            $imagick->readImage('heic:'.$path);
             $imagick->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
             $imagick->setImageFormat('jpeg');
             $imagick->setImageCompressionQuality(85);

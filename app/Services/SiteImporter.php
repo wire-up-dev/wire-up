@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Actions\GrantRecordTypeAbilitiesAction;
+use App\Enums\MediaType;
 use App\Integrations\IntegrationRegistry;
 use App\Models\Media;
 use App\Models\RecordType;
 use App\Models\Settings;
+use enshrined\svgSanitize\Sanitizer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Symfony\Component\Mime\MimeTypes;
 use ZipArchive;
 
 final class SiteImporter
@@ -66,6 +69,12 @@ final class SiteImporter
                 ]);
             }
 
+            if ($audit['refused'] !== []) {
+                $problems[] = __(':count media file(s) in the bundle aren’t a kind of file the media library accepts.', [
+                    'count' => (string) count($audit['refused']),
+                ]);
+            }
+
             if ($dryRun || $problems !== []) {
                 return ['manifest' => $manifest, 'problems' => $problems, 'tables' => $tables, 'media' => $media, 'imported' => false];
             }
@@ -99,12 +108,13 @@ final class SiteImporter
 
     /**
      * @param  array<int, mixed>  $media
-     * @return array{report: array{expected: int, present: int, missing: array<int, string>}, sources: array<int, string>}
+     * @return array{report: array{expected: int, present: int, missing: array<int, string>}, sources: array<int, string>, refused: array<int, string>}
      */
     private function auditMedia(ZipArchive $zip, array $media): array
     {
         $sources = [];
         $missing = [];
+        $refused = [];
 
         foreach ($media as $item) {
             $source = is_array($item) && is_string($item['source'] ?? null) ? $item['source'] : '';
@@ -115,13 +125,30 @@ final class SiteImporter
                 continue;
             }
 
+            if (! str_starts_with($source, 'media/') || $this->mimeTypesFor($source) === []) {
+                $refused[] = $source;
+
+                continue;
+            }
+
             $sources[] = $source;
         }
 
         return [
             'report' => ['expected' => count($media), 'present' => count($sources), 'missing' => $missing],
             'sources' => $sources,
+            'refused' => $refused,
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function mimeTypesFor(string $source): array
+    {
+        $extension = mb_strtolower(pathinfo($source, PATHINFO_EXTENSION));
+
+        return array_values(array_filter(MimeTypes::getDefault()->getMimeTypes($extension), MediaType::allowsMimeType(...)));
     }
 
     /**
@@ -173,6 +200,10 @@ final class SiteImporter
             $row['fields'] = $this->normalizeFields($row['fields'] ?? null);
         }
 
+        if ($table === 'blocks' && ($row['content'] ?? null) !== null) {
+            $row['content'] = $this->sanitizedBlockContent((string) ($row['type'] ?? ''), $row['content']);
+        }
+
         $key = (string) ($row['key'] ?? '');
 
         if ($table === 'settings' && in_array($key, IntegrationRegistry::secretKeys(), true) && is_string($row['value'] ?? null)) {
@@ -180,6 +211,13 @@ final class SiteImporter
         }
 
         return $row;
+    }
+
+    private function sanitizedBlockContent(string $type, mixed $content): string
+    {
+        $decoded = is_string($content) ? json_decode($content, true) : $content;
+
+        return (string) json_encode(BlockHtmlSanitizer::forBlock($type, is_array($decoded) ? $decoded : []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     private function normalizeFields(mixed $fields): string
@@ -221,7 +259,13 @@ final class SiteImporter
         $privateSources = Media::query()->where('is_private', true)->pluck('source')->flip();
 
         foreach ($sources as $source) {
-            ($privateSources->has($source) ? $privateDisk : $disk)->put($source, (string) $zip->getFromName($source));
+            $contents = (string) $zip->getFromName($source);
+
+            if (in_array('image/svg+xml', $this->mimeTypesFor($source), true)) {
+                $contents = (string) new Sanitizer()->sanitize($contents);
+            }
+
+            ($privateSources->has($source) ? $privateDisk : $disk)->put($source, $contents);
         }
     }
 

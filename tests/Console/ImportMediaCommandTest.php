@@ -76,7 +76,7 @@ it('keeps importing the remaining files after one fails', function (): void {
 
 it('reports a file it cannot convert without aborting the run', function (): void {
     $this->artisan('wireup:media:import', ['path' => [
-        cliFile('broken.heic', 'not an image'),
+        cliFile('broken.heic', (string) file_get_contents(base_path('tests/Fixtures/invalid.heic'))),
         cliFile('fine.svg'),
     ]])
         ->expectsOutputToContain('broken.heic')

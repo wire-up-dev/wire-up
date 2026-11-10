@@ -637,6 +637,17 @@ it('refuses an html upload when the library accepts every type', function (): vo
     expect(Media::query()->count())->toBe(0);
 });
 
+it('refuses an html file renamed to svg when the library accepts every type', function (): void {
+    $file = UploadedFile::fake()->createWithContent('logo.svg', '<!doctype html><html><body><script>alert(1)</script></body></html>')->mimeType('text/html');
+
+    Livewire::test('admin.media-library')
+        ->set('files', [$file])
+        ->call('save', [[]])
+        ->assertSet('files', []);
+
+    expect(Media::query()->count())->toBe(0);
+});
+
 it('uploads svg files and strips embedded scripts', function (): void {
     $svg = <<<'SVG'
     <svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40">

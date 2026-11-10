@@ -5,6 +5,12 @@ Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater sh
 ## Unreleased
 
 - Several Wire Up sites on one server now update one at a time. When automatic updates start on all of them at midnight, or you click Update now on two sites, each waits for the one before it to finish and Settings → Updates says it is waiting its turn. A small server no longer runs out of memory because every site updates at once, so Automatic updates can stay on everywhere.
+- Uploads are checked by what the file really is, not its name. A photo renamed to .heic is stored as the photo it is, any other renamed file is refused instead of reaching the image converter, and the media library checks the type of every upload even where it accepts every kind of file.
+- Importing images from a link and reading web pages ask for the uncompressed file, so a small compressed download can't swell past the size limit.
+- Marking messages read or unread in the inbox needs access to the inbox, like opening them does.
+- Editing roles no longer lets someone take away access they don't have themselves, or delete a role that has it.
+- Importing a site bundle cleans scripts out of block content and SVG files, as uploading and editing do, and refuses a bundle that carries files the media library wouldn't accept.
+- A new install's `.env` now defaults to production with warnings and errors only in the log, so the dashboard's server warnings show from the start.
 
 ## v0.8.2 — 2026-11-09
 

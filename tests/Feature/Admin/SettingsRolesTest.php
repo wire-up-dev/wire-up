@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\PermissionAction;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\PermissionRegistry;
 use Database\Seeders\RoleSeeder;
 use Livewire\Livewire;
 
@@ -133,7 +134,61 @@ it('refuses to grant access the editor of the roles does not hold, even on their
 
     $component->set("roles.{$index}.grants.4", ['view', 'edit'])
         ->call('save')
-        ->assertHasErrors(['roles' => 'You can’t grant access you don’t have yourself.']);
+        ->assertHasErrors(['roles' => 'You can’t change access you don’t have yourself.']);
 
     expect($ownRole->fresh()->abilities)->toBe(['roles.view', 'roles.edit']);
+});
+
+function rolesManager(): Role
+{
+    $manager = Role::factory()->create(['key' => 'role-manager', 'name' => 'Role manager', 'abilities' => ['roles.view', 'roles.edit', 'roles.delete', 'pages.view'], 'bypass' => false, 'is_protected' => false]);
+    test()->actingAs(User::factory()->role($manager)->create(['active' => true]));
+
+    return $manager;
+}
+
+it('refuses to take away access the editor of the roles does not hold', function (): void {
+    rolesManager();
+    $publisher = Role::factory()->create(['key' => 'publisher', 'name' => 'Publisher', 'abilities' => ['pages.view', 'settings.edit'], 'bypass' => false, 'is_protected' => false]);
+
+    $component = Livewire::test('pages::admin.settings-roles');
+    $index = collect($component->get('roles'))->search(fn (array $role): bool => $role['id'] === $publisher->id);
+    $settings = collect(PermissionRegistry::resources())->search(fn (array $resource): bool => $resource['key'] === 'settings');
+
+    $component->set("roles.{$index}.grants.{$settings}", [])
+        ->call('save')
+        ->assertHasErrors(['roles' => 'You can’t change access you don’t have yourself.']);
+
+    expect($publisher->fresh()->abilities)->toBe(['pages.view', 'settings.edit']);
+});
+
+it('lets the editor of the roles take away access they hold, and keeps access that no longer exists out of the way', function (): void {
+    rolesManager();
+    $publisher = Role::factory()->create(['key' => 'publisher', 'name' => 'Publisher', 'abilities' => ['pages.view', 'records.retired.view'], 'bypass' => false, 'is_protected' => false]);
+
+    $component = Livewire::test('pages::admin.settings-roles');
+    $index = collect($component->get('roles'))->search(fn (array $role): bool => $role['id'] === $publisher->id);
+    $pages = collect(PermissionRegistry::resources())->search(fn (array $resource): bool => $resource['key'] === 'pages');
+
+    $component->set("roles.{$index}.grants.{$pages}", [])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($publisher->fresh()->abilities)->toBeEmpty();
+});
+
+it('refuses to delete a role with access the editor of the roles does not hold', function (): void {
+    rolesManager();
+    $unused = Role::factory()->create(['key' => 'publisher', 'name' => 'Publisher', 'abilities' => ['settings.edit'], 'bypass' => false, 'is_protected' => false]);
+    $temp = Role::factory()->create(['key' => 'temp', 'name' => 'Temp', 'abilities' => ['pages.view'], 'bypass' => false, 'is_protected' => false]);
+
+    $component = Livewire::test('pages::admin.settings-roles');
+
+    foreach ([$temp, $unused] as $role) {
+        $component->call('confirmRemove', collect($component->get('roles'))->firstWhere('id', $role->id)['_key'])->call('removeRole');
+    }
+
+    $component->call('save')->assertHasErrors(['roles' => 'You can’t change access you don’t have yourself.']);
+
+    expect(Role::query()->whereKey([$unused->id, $temp->id])->count())->toBe(2);
 });

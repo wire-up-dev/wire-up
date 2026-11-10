@@ -98,6 +98,17 @@ it('aborts a download once it grows past the limit', function (): void {
     new PublicUrlGuard()->get('https://acme.example/big', 5, 2 * 1024 * 1024);
 })->throws(InvalidArgumentException::class, 'larger than the 2 MB limit');
 
+it('asks for the uncompressed file so a compressed bomb cannot slip past the limit', function (): void {
+    Http::fake(['acme.example/*' => function (Request $request, array $options): PromiseInterface {
+        expect($request->header('Accept-Encoding'))->toBe(['identity'])
+            ->and($options['decode_content'])->toBeFalse();
+
+        return Http::response('ok');
+    }]);
+
+    expect(new PublicUrlGuard()->get('https://acme.example/file', 5, 1024)->body())->toBe('ok');
+});
+
 it('passes other connection failures through', function (): void {
     Http::fake(['acme.example/*' => fn (): never => throw new ConnectionException('cURL error 6: Could not resolve host')]);
 

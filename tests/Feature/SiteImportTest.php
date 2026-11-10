@@ -219,6 +219,61 @@ it('refuses a bundle whose media file is absent and writes nothing', function ()
         ->and(DB::table('pages')->where('id', 510)->exists())->toBeFalse();
 });
 
+/**
+ * @return array<string, mixed>
+ */
+function bundledMedia(int $id, string $source): array
+{
+    return ['id' => $id, 'type' => 'image', 'source' => $source, 'etag' => "e{$id}", 'filename' => basename($source), 'alt_text' => null, 'mime_type' => 'image/jpeg', 'thumbnail' => null, 'size' => 1, 'duration' => null, 'width' => 1, 'height' => 1, 'metadata' => '[]', 'created_at' => null, 'updated_at' => null];
+}
+
+it('refuses a bundle carrying files the media library would never accept, and writes nothing', function (): void {
+    $bundle = makeBundle(
+        ['media' => [bundledMedia(320, 'media/page.html'), bundledMedia(321, 'favicon.ico'), bundledMedia(322, 'media/photo.jpg')]],
+        ['media/page.html' => '<script>alert(1)</script>', 'favicon.ico' => 'ICON', 'media/photo.jpg' => 'JPEG'],
+    );
+
+    $report = SiteImporter::current()->import($bundle, null);
+
+    expect($report['imported'])->toBeFalse()
+        ->and($report['problems'])->toBe(['2 media file(s) in the bundle aren’t a kind of file the media library accepts.'])
+        ->and(DB::table('media')->count())->toBe(0);
+
+    Storage::disk(config()->string('filesystems.media'))->assertMissing('media/page.html');
+    Storage::disk(config()->string('filesystems.media'))->assertMissing('media/photo.jpg');
+});
+
+it('cleans scripts out of an imported svg', function (): void {
+    $bundle = makeBundle(
+        ['media' => [bundledMedia(330, 'media/logo.svg')]],
+        ['media/logo.svg' => '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><rect width="2" height="2" onload="alert(2)"/></svg>'],
+    );
+
+    expect(SiteImporter::current()->import($bundle, null)['imported'])->toBeTrue();
+
+    $svg = (string) Storage::disk(config()->string('filesystems.media'))->get('media/logo.svg');
+
+    expect($svg)->toContain('<rect')
+        ->not->toContain('script')
+        ->not->toContain('onload');
+});
+
+it('strips dangerous markup from imported blocks, as the editor does when saving', function (): void {
+    $bundle = makeBundle([
+        'pages' => [['id' => 520, 'metadata' => '{}', 'status' => 'published', 'published_at' => null, 'created_by' => null, 'updated_by' => null, 'created_at' => null, 'updated_at' => null]],
+        'blocks' => [
+            ['id' => 700, 'blockable_type' => 'page', 'blockable_id' => 520, 'type' => 'text', 'position' => 0, 'content' => json_encode(['body' => ['en' => '<p onclick="alert(1)">Hello</p><script>alert(2)</script>']]), 'created_at' => null, 'updated_at' => null],
+            ['id' => 701, 'blockable_type' => 'page', 'blockable_id' => 520, 'type' => 'code', 'position' => 1, 'content' => json_encode(['code' => '<script>console.log(1)</script>']), 'created_at' => null, 'updated_at' => null],
+            ['id' => 702, 'blockable_type' => 'page', 'blockable_id' => 520, 'type' => 'divider', 'position' => 2, 'content' => null, 'created_at' => null, 'updated_at' => null],
+        ],
+    ]);
+
+    expect(SiteImporter::current()->import($bundle, null)['imported'])->toBeTrue()
+        ->and(json_decode((string) DB::table('blocks')->where('id', 700)->value('content'), true))->toBe(['body' => ['en' => '<p>Hello</p>']])
+        ->and(json_decode((string) DB::table('blocks')->where('id', 701)->value('content'), true))->toBe(['code' => '<script>console.log(1)</script>'])
+        ->and(DB::table('blocks')->where('id', 702)->value('content'))->toBeNull();
+});
+
 it('refuses a bundle from a newer install and writes nothing', function (): void {
     $page = Page::factory()->create(['status' => ContentStatus::PUBLISHED]);
 

@@ -64,9 +64,9 @@ final class PublicUrlGuard
             $exceeded = false;
 
             try {
-                $response = Http::withOptions([...$this->pinnedOptions($url), 'progress' => function (int $expected, int $received) use ($maxBytes, &$exceeded): bool {
+                $response = Http::withOptions([...$this->pinnedOptions($url), 'decode_content' => false, 'progress' => function (int $expected, int $received) use ($maxBytes, &$exceeded): bool {
                     return $exceeded = max($expected, $received) > $maxBytes;
-                }])->timeout($timeout)->get($url);
+                }])->withHeaders(['Accept-Encoding' => 'identity'])->timeout($timeout)->get($url);
             } catch (ConnectionException $exception) {
                 throw $exceeded ? $this->tooLarge($maxBytes) : $exception;
             }
