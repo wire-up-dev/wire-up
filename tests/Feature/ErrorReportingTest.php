@@ -9,6 +9,7 @@ use App\Services\ErrorReporter;
 use App\Services\SlackWebhookChannel;
 use App\Services\UpdateService;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Support\Facades\Event;
@@ -150,4 +151,23 @@ it('ignores an error raised while it is already sending a report', function (): 
     Http::assertSentCount(1);
 
     expect(ErrorLog::query()->pluck('message')->all())->toBe(['Something broke']);
+});
+
+it('still logs an error raised before the app has finished starting up', function (): void {
+    Model::reguard();
+
+    try {
+        report(new RuntimeException('The saved mail_password setting can’t be decrypted'));
+    } finally {
+        Model::unguard();
+    }
+
+    expect(ErrorLog::query()->sole()->message)->toBe('The saved mail_password setting can’t be decrypted');
+});
+
+it('never lets a failure while reporting break the page or command that raised the error', function (): void {
+    reportErrorsTo();
+    app()->bind(UpdateService::class, fn (): never => throw new RuntimeException('The cache store is unreachable'));
+
+    expect(fn () => resolve(ErrorReporter::class)->report(new RuntimeException('Something broke')))->not->toThrow(RuntimeException::class);
 });

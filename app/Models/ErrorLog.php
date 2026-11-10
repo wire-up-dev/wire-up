@@ -52,7 +52,7 @@ final class ErrorLog extends Model
         $fingerprint = self::fingerprint($exception);
 
         return rescue(fn (): ?self => self::query()->firstWhere('fingerprint', $fingerprint), null, report: false)
-            ?? new self(['fingerprint' => $fingerprint]);
+            ?? new self()->forceFill(['fingerprint' => $fingerprint]);
     }
 
     public static function unresolvedCount(): int
@@ -103,7 +103,7 @@ final class ErrorLog extends Model
 
     public function describe(Throwable $exception): self
     {
-        return $this->fill([
+        return $this->forceFill([
             'type' => $exception::class,
             'message' => Str::limit(mb_trim($exception->getMessage()), 5000),
             'file' => Str::limit($this->relative($exception->getFile()), 250),

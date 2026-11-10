@@ -35,6 +35,8 @@ final class ErrorReporter
             if ($this->routes() !== [] && ! resolve(UpdateService::class)->updating() && ($this->isFirstInAnHour($error->fingerprint) || $reopened)) {
                 $this->deliver(new ErrorReported($error));
             }
+        } catch (Throwable) {
+            return;
         } finally {
             self::$sending = false;
         }
