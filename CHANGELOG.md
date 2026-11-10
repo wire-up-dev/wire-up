@@ -2,7 +2,7 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
-## Unreleased
+## v0.8.2 — 2026-11-09
 
 - The dashboard's warnings about the scheduler, waiting emails and webhooks, and failed background tasks are now shown only to developers, since site owners can't act on them. A Dismiss button hides the failed tasks until another one fails.
 
