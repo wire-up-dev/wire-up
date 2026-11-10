@@ -22,7 +22,7 @@ trait HasTranslations
      */
     public function translations(): MorphMany
     {
-        return $this->morphMany(Translation::class, 'translatable');
+        return $this->morphMany(Translation::class, 'translatable')->orderBy('translations.id');
     }
 
     /**
