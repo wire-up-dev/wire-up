@@ -12,6 +12,8 @@ return [
 
     'release_signers' => base_path('config/allowed_signers'),
 
+    'server_update_lock' => env('WIREUP_SERVER_UPDATE_LOCK', sys_get_temp_dir().'/wireup-update.lock'),
+
     'backup_path' => storage_path('app/backups'),
 
     'transfer_path' => storage_path('app/transfers'),

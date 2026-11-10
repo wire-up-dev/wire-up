@@ -244,6 +244,11 @@ final readonly class UpdateService
         $this->writeState('pending', $tag);
     }
 
+    public function markWaiting(string $tag): void
+    {
+        $this->writeState('pending', $tag, __('Waiting for another site on this server to finish updating'));
+    }
+
     public function markRunning(string $tag, string $step): void
     {
         $this->writeState('running', $tag, $step);

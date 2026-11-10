@@ -8,6 +8,7 @@ use App\Services\BackupService;
 use App\Services\DatabaseDumper;
 use App\Services\ReleaseAssets;
 use App\Services\ReleaseSignature;
+use App\Services\ServerUpdateLock;
 use App\Services\UpdateService;
 use App\Traits\RunsSteps;
 use Closure;
@@ -26,7 +27,9 @@ final class UpdateCommand extends Command
 
     public const int MINIMUM_FREE_BYTES = 500 * 1024 * 1024;
 
-    public function handle(UpdateService $updates, ReleaseAssets $assets, ReleaseSignature $signature, DatabaseDumper $dumper, BackupService $backups): int
+    public const int WAITING = 75;
+
+    public function handle(UpdateService $updates, ReleaseAssets $assets, ReleaseSignature $signature, DatabaseDumper $dumper, BackupService $backups, ServerUpdateLock $serverLock): int
     {
         $lock = $updates->updateLock();
 
@@ -37,13 +40,13 @@ final class UpdateCommand extends Command
         }
 
         try {
-            return $this->update($updates, $assets, $signature, $dumper, $backups);
+            return $this->update($updates, $assets, $signature, $dumper, $backups, $serverLock);
         } finally {
             $lock->release();
         }
     }
 
-    private function update(UpdateService $updates, ReleaseAssets $assets, ReleaseSignature $signature, DatabaseDumper $dumper, BackupService $backups): int
+    private function update(UpdateService $updates, ReleaseAssets $assets, ReleaseSignature $signature, DatabaseDumper $dumper, BackupService $backups, ServerUpdateLock $serverLock): int
     {
         $tag = $this->targetTag($updates);
 
@@ -59,6 +62,21 @@ final class UpdateCommand extends Command
             return self::SUCCESS;
         }
 
+        if (! $serverLock->acquire()) {
+            $this->components->warn('Another site on this server is updating, so this one waits for its turn.');
+
+            return self::WAITING;
+        }
+
+        try {
+            return $this->install($tag, $updates, $assets, $signature, $dumper, $backups);
+        } finally {
+            $serverLock->release();
+        }
+    }
+
+    private function install(string $tag, UpdateService $updates, ReleaseAssets $assets, ReleaseSignature $signature, DatabaseDumper $dumper, BackupService $backups): int
+    {
         $this->info("Update Wire Up to {$tag}");
         $this->newLine();
 

@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Console\Commands\UpdateCommand;
 use App\Jobs\RunSystemUpdate;
 use App\Models\Settings;
 use App\Notifications\SystemUpdateCompleted;
 use App\Services\UpdateService;
 use Illuminate\Process\FakeProcessResult;
 use Illuminate\Process\PendingProcess;
+use Illuminate\Queue\Attributes\FailOnTimeout;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\MaxAttemptsExceededException;
@@ -112,6 +114,32 @@ it('records nothing while another update still holds the lock', function (): voi
     $running->release();
 });
 
+it('waits a minute and tries again while another site on the server is updating', function (): void {
+    Process::fake(['*' => Process::result(output: 'Another site on this server is updating, so this one waits for its turn.', exitCode: UpdateCommand::WAITING)]);
+
+    $service = resolve(UpdateService::class);
+    $service->markPending('v1.0.0');
+
+    $job = new RunSystemUpdate('v1.0.0')->withFakeQueueInteractions();
+    $job->handle($service);
+
+    $job->assertReleased(delay: RunSystemUpdate::WAIT_SECONDS);
+
+    expect($service->state())->toMatchArray(['status' => 'pending', 'tag' => 'v1.0.0', 'step' => 'Waiting for another site on this server to finish updating']);
+});
+
+it('never retries an update whose process could not finish', function (): void {
+    Process::fake(['*' => fn (): never => throw new RuntimeException('The update took too long.')]);
+
+    $service = resolve(UpdateService::class);
+    $service->markPending('v1.0.0');
+
+    $job = new RunSystemUpdate('v1.0.0')->withFakeQueueInteractions();
+    $job->handle($service);
+
+    $job->assertFailed()->assertNotReleased();
+});
+
 it('preserves the failure recorded by the update command', function (): void {
     Process::fake(['*' => function (PendingProcess $process): FakeProcessResult {
         resolve(UpdateService::class)->markFailed('v1.0.0', 'Run database migrations', 'original failure');
@@ -174,6 +202,7 @@ it('keeps an existing failure when the job fails afterwards', function (): void 
 });
 
 it('has conservative queue settings', function (): void {
+    $this->freezeTime();
     $job = new RunSystemUpdate('v1.0.0');
     $reflection = new ReflectionClass($job);
 
@@ -182,5 +211,7 @@ it('has conservative queue settings', function (): void {
 
     expect($tries->tries)->toBe(1)
         ->and($timeout->timeout)->toBeGreaterThan(UpdateService::TIME_LIMIT)
+        ->and($reflection->getAttributes(FailOnTimeout::class))->toHaveCount(1)
+        ->and($job->retryUntil()->getTimestamp())->toBe(now()->addHours(RunSystemUpdate::WAIT_HOURS)->getTimestamp())
         ->and($job->uniqueId())->toBe('wireup-update');
 });

@@ -6,6 +6,7 @@ use App\Console\Commands\UpdateCommand;
 use App\Services\BackupService;
 use App\Services\DatabaseDumper;
 use App\Services\ReleaseSignature;
+use App\Services\ServerUpdateLock;
 use App\Services\SiteBundle;
 use App\Services\UpdateService;
 use Illuminate\Process\FakeProcessResult;
@@ -24,6 +25,8 @@ beforeEach(function (): void {
     config()->set('wireup.updates_path', $root.'/updates');
     config()->set('wireup.build_path', $root.'/build');
     config()->set('wireup.backup_path', $root.'/backups');
+    config()->set('wireup.server_update_lock', $root.'/server-update.lock');
+    File::ensureDirectoryExists($root);
 
     foreach (['APP_CONFIG_CACHE' => 'config.php', 'APP_ROUTES_CACHE' => 'routes.php', 'APP_EVENTS_CACHE' => 'events.php'] as $variable => $file) {
         $_SERVER[$variable] = $root.'/cache/'.$file;
@@ -475,6 +478,28 @@ it('finds composer and git in the usual places when started by cron', function (
 
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['composer', 'install', '--no-dev', '--no-interaction', '--prefer-dist']
         && in_array('/usr/local/bin', explode(':', (string) ($process->environment['PATH'] ?? '')), true));
+});
+
+it('waits for its turn while another site on the same server is updating', function (): void {
+    Process::fake(['*' => Process::result()]);
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+    $otherSite = new ServerUpdateLock();
+    $otherSite->acquire();
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])
+        ->expectsOutputToContain('waits for its turn')
+        ->assertExitCode(UpdateCommand::WAITING);
+
+    Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'down']);
+
+    $updates = resolve(UpdateService::class);
+
+    expect($updates->state()['status'])->toBe('idle')
+        ->and($updates->updateIsLocked())->toBeFalse();
+
+    $otherSite->release();
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])->assertExitCode(0);
 });
 
 it('refuses to start while another update is running', function (): void {
