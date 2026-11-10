@@ -62,7 +62,7 @@ jobs:
             exit 1
           fi
 
-      - name: Publish release
+      - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -72,5 +72,5 @@ jobs:
             gh release upload "$TAG" build.tar.gz --clobber
             gh release upload "$TAG" build.tar.gz.sha256 --clobber
           else
-            gh release create "$TAG" build.tar.gz build.tar.gz.sha256 --verify-tag --title "$TAG" --notes-file notes.md
+            gh release create "$TAG" build.tar.gz build.tar.gz.sha256 --draft --verify-tag --title "$TAG" --notes-file notes.md
           fi
