@@ -2,7 +2,7 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
-## Unreleased
+## v0.8.0 — 2026-11-09
 
 - Remote MCP: AI tools such as Claude Code and Cursor can now work on a live site over HTTPS at `/mcp`, not only over SSH. A developer turns it on under Settings → Developer → Remote MCP, then each person makes a token under Account → Security (their role needs the new Remote MCP ability; owners and developers always have it). A token is read only, edit or full access (only full access can publish, delete or use replace-text), expires after 30 days, 90 days or a year, is shown once and can be revoked. Every call is checked against the person's role, so a token never does more than they could in the admin, and orders are never available remotely. Changes show in the activity log under the person's name, marked as made by an agent.
 - Off-site backups: turn on off-site copies under Settings → Backups and connect a Cloudflare R2, Backblaze B2, Amazon S3 or other S3-compatible bucket, and every backup is also copied there, so a lost server doesn't take the backups with it. A Test button checks that the key can write, list and delete in the bucket. The Backups screen marks which backups are also off-site, lists copies that are only off-site with a Download link, and keeps its own number of off-site copies (14 by default), so deleting a backup on the server leaves its off-site copy alone. A failed copy keeps the backup, shows on Settings → Backups with Try again, and for scheduled backups emails the owner. `php artisan wireup:backup:fetch` downloads an off-site copy onto a new server, ready to restore.
