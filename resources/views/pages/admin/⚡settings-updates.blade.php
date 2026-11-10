@@ -247,17 +247,39 @@ return new class extends Component
 
                     @php($changelog = $this->changelog())
                     @if ($changelog !== [])
-                        <div class="space-y-4">
-                            @foreach ($changelog as $section)
-                                <div wire:key="changelog-{{ $section['version'] }}">
-                                    <flux:heading size="sm">{{ $section['version'] }}</flux:heading>
-                                    <ul class="mt-1 list-disc space-y-1 ps-5 text-sm text-zinc-600 dark:text-zinc-300">
-                                        @foreach ($section['notes'] as $note)
-                                            <li>{{ $note }}</li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            @endforeach
+                        <div
+                            x-data="{ expanded: false, overflowing: false }"
+                            x-init="overflowing = $refs.notes.scrollHeight > $refs.notes.clientHeight + 1"
+                            class="space-y-2"
+                        >
+                            <div
+                                x-ref="notes"
+                                data-release-notes
+                                class="max-h-40 space-y-4 overflow-hidden"
+                                x-bind:class="{ 'mask-b-from-40%': overflowing && ! expanded, 'max-h-none!': expanded }"
+                            >
+                                @foreach ($changelog as $section)
+                                    <div wire:key="changelog-{{ $section['version'] }}">
+                                        <flux:heading size="sm">{{ $section['version'] }}</flux:heading>
+                                        <ul class="mt-1 list-disc space-y-1 ps-5 text-sm text-zinc-600 dark:text-zinc-300">
+                                            @foreach ($section['notes'] as $note)
+                                                <li>{{ $note }}</li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <flux:button
+                                x-show="overflowing"
+                                x-cloak
+                                size="sm"
+                                variant="ghost"
+                                class="-ms-2"
+                                x-on:click="expanded = ! expanded"
+                            >
+                                <span x-text="expanded ? @js(__('Show less')) : @js(__('Show all changes'))">{{ __('Show all changes') }}</span>
+                            </flux:button>
                         </div>
                     @else
                         <flux:text>{{ __('No release notes.') }}</flux:text>
