@@ -2,12 +2,12 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
-## Unreleased
+## v0.8.1 — 2026-11-09
 
-- Long release notes on Settings → Updates are folded to their first few lines with a Show all changes link, so Update now stays in view without scrolling.
-- The count on the selected Settings tab, such as Updates or Error log, is readable again in light and dark mode. It used to blend into the tab.
 - Each error in the error log has a Copy for AI button. It copies the error, where it happened, the request, the version and the stack trace as a ready-made prompt to paste into an AI assistant, and leaves out who was signed in.
+- Long release notes on Settings → Updates are folded to their first few lines with a Show all changes link, so Update now stays in view without scrolling.
 - Updates clear the cached settings and routes before the new version's files arrive, so the admin no longer mixes old and new while an update runs. If Settings → Updates still can't refresh for a moment as the site switches versions, it shows a short note with a Reload link instead of an error box.
+- The count on the selected Settings tab, such as Updates or Error log, is now readable in light and dark mode instead of blending into the tab.
 
 ## v0.8.0 — 2026-11-09
 
