@@ -2,6 +2,10 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
+## Unreleased
+
+- Updates clear the cached settings and routes before the new version's files arrive, so the admin no longer mixes old and new while an update runs. If Settings → Updates still can't refresh for a moment as the site switches versions, it shows a short note with a Reload link instead of an error box.
+
 ## v0.8.0 — 2026-11-09
 
 - Remote MCP: AI tools such as Claude Code and Cursor can now work on a live site over HTTPS at `/mcp`, not only over SSH. A developer turns it on under Settings → Developer → Remote MCP, then each person makes a token under Account → Security (their role needs the new Remote MCP ability; owners and developers always have it). A token is read only, edit or full access (only full access can publish, delete or use replace-text), expires after 30 days, 90 days or a year, is shown once and can be revoked. Every call is checked against the person's role, so a token never does more than they could in the admin, and orders are never available remotely. Changes show in the activity log under the person's name, marked as made by an agent.

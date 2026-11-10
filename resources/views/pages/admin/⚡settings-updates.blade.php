@@ -178,6 +178,10 @@ return new class extends Component
                             {{ __('Updating to :tag…', ['tag' => (string) $state['tag']]) }}</flux:callout.heading>
                         <flux:callout.text>
                             {{ $state['step'] ?? __('Waiting for the scheduler to start the update. This takes up to a minute.') }}</flux:callout.text>
+                        <flux:callout.text data-update-interrupted class="hidden">
+                            {{ __('The admin is switching to the new version, so this page may not refresh for a moment.') }}
+                            <flux:link href="{{ route('admin.settings-updates') }}">{{ __('Reload') }}</flux:link>
+                        </flux:callout.text>
                     </flux:callout>
                 </div>
             @elseif ($state['status'] === 'finished')
@@ -310,6 +314,21 @@ return new class extends Component
             </div>
         </div>
     </flux:modal>
+
+    @script
+        <script>
+            $wire.interceptRequest('refreshState', ({ onError, onFailure }) => {
+                const showNote = () => $wire.$el.querySelector('[data-update-interrupted]')?.classList.remove('hidden');
+
+                onError(({ preventDefault }) => {
+                    preventDefault();
+                    showNote();
+                });
+
+                onFailure(() => showNote());
+            });
+        </script>
+    @endscript
 </x-admin.settings-layout>
 
 @section('header-content')

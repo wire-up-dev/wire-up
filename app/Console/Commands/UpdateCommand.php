@@ -14,6 +14,7 @@ use Closure;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Number;
 use RuntimeException;
 
@@ -97,6 +98,7 @@ final class UpdateCommand extends Command
         $steps = [
             'Enable maintenance mode' => [PHP_BINARY, 'artisan', 'down'],
             'Back up database' => [PHP_BINARY, 'artisan', 'wireup:backup', '--name='.$backup],
+            'Clear cached configuration' => $this->clearCachedConfiguration(...),
             "Check out {$tag}" => ['git', '-c', 'advice.detachedHead=false', 'checkout', '--force', $tag],
             'Install PHP dependencies' => ['composer', 'install', '--no-dev', '--no-interaction', '--prefer-dist'],
             'Run database migrations' => [PHP_BINARY, 'artisan', 'migrate', '--force'],
@@ -117,6 +119,7 @@ final class UpdateCommand extends Command
             if ($error !== null) {
                 $version = $updates->currentVersion() ?? mb_substr($previous, 0, 7);
                 $codeChanged = in_array("Check out {$tag}", $started, true);
+                $cachesCleared = in_array('Clear cached configuration', $started, true);
 
                 return $this->rollBack($updates, $tag, $version, $label, $error, [
                     ...($codeChanged ? [
@@ -127,8 +130,10 @@ final class UpdateCommand extends Command
                         'Restore database' => [PHP_BINARY, 'artisan', 'wireup:backup:restore-database', $backup, '--force'],
                     ] : []),
                     'Restore frontend assets' => $assets->restoreSnapshot(...),
-                    ...($codeChanged ? [
+                    ...($cachesCleared ? [
                         'Cache configuration' => [PHP_BINARY, 'artisan', 'optimize'],
+                    ] : []),
+                    ...($codeChanged ? [
                         'Restart queue workers' => [PHP_BINARY, 'artisan', 'queue:restart'],
                     ] : []),
                     'Disable maintenance mode' => [PHP_BINARY, 'artisan', 'up'],
@@ -150,6 +155,11 @@ final class UpdateCommand extends Command
         $this->info("Wire Up is now on {$tag}.");
 
         return self::SUCCESS;
+    }
+
+    private function clearCachedConfiguration(): void
+    {
+        File::delete([$this->laravel->getCachedConfigPath(), $this->laravel->getCachedRoutesPath(), $this->laravel->getCachedEventsPath()]);
     }
 
     private function ensureDiskSpace(BackupService $backups): void

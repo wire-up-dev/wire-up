@@ -25,6 +25,10 @@ beforeEach(function (): void {
     config()->set('wireup.build_path', $root.'/build');
     config()->set('wireup.backup_path', $root.'/backups');
 
+    foreach (['APP_CONFIG_CACHE' => 'config.php', 'APP_ROUTES_CACHE' => 'routes.php', 'APP_EVENTS_CACHE' => 'events.php'] as $variable => $file) {
+        $_SERVER[$variable] = $root.'/cache/'.$file;
+    }
+
     Process::fake([
         '*rev-parse*' => Process::result(output: "abc1234def\n"),
         '*cat-file*' => fn (PendingProcess $process): FakeProcessResult => Process::result(output: "object abc1234def\ntype commit\ntag ".end($process->command)."\n"),
@@ -38,6 +42,8 @@ function preUpdateBackup(string $tag): string
 
 afterEach(function (): void {
     File::deleteDirectory(dirname((string) config('wireup.version_file')));
+
+    unset($_SERVER['APP_CONFIG_CACHE'], $_SERVER['APP_ROUTES_CACHE'], $_SERVER['APP_EVENTS_CACHE']);
 });
 
 it('updates to the latest release', function (): void {
@@ -71,6 +77,33 @@ it('updates to the latest release', function (): void {
 
     expect($service->currentVersion())->toBe('v1.0.0')
         ->and($service->latestVersion())->toBe('v1.0.0');
+});
+
+it('clears the cached configuration before the new files arrive, so the admin never mixes them', function (): void {
+    $cached = [app()->getCachedConfigPath(), app()->getCachedRoutesPath(), app()->getCachedEventsPath()];
+    $presentAtCheckout = null;
+
+    foreach ($cached as $file) {
+        File::ensureDirectoryExists(dirname($file));
+        File::put($file, '<?php return [];');
+    }
+
+    Process::fake([
+        '*checkout*' => function () use ($cached, &$presentAtCheckout): FakeProcessResult {
+            $presentAtCheckout = array_values(array_filter($cached, File::exists(...)));
+
+            return Process::result();
+        },
+        '*' => Process::result(),
+    ]);
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])->assertExitCode(0);
+
+    expect($cached[0])->toStartWith(dirname((string) config('wireup.version_file')))
+        ->and($presentAtCheckout)->toBe([]);
+
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize']);
 });
 
 it('updates to a pinned tag', function (): void {
@@ -188,6 +221,7 @@ it('brings the site back up without touching the code when the database backup f
 
     Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'migrate', '--force']);
     Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === ['git', '-c', 'advice.detachedHead=false', 'checkout', '--force', 'abc1234def']);
+    Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'up']);
 
     $state = resolve(UpdateService::class)->state();

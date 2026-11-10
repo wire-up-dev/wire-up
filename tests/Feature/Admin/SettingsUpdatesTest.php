@@ -247,6 +247,15 @@ it('shows progress while an update is underway', function (): void {
         ->assertSeeHtml('wire:poll.3s');
 });
 
+it('keeps a quiet note ready for when the admin briefly stops answering during an update', function (): void {
+    $this->actingAsAdmin();
+    resolve(UpdateService::class)->markRunning('v1.0.0', 'Install PHP dependencies');
+
+    Livewire::test('pages::admin.settings-updates')
+        ->assertSeeHtml('data-update-interrupted')
+        ->assertSee('The admin is switching to the new version, so this page may not refresh for a moment.');
+});
+
 it('shows the running step while an update is underway', function (): void {
     $this->actingAsAdmin();
     seedAvailableUpdate();
