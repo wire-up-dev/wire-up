@@ -51,6 +51,15 @@ return new class extends Component
         ];
     }
 
+    public function dismissFailedJobs(): void
+    {
+        $this->authorize(Role::DEVELOPER);
+
+        resolve(SystemHealth::class)->dismissFailedJobs();
+
+        unset($this->health);
+    }
+
     #[Computed]
     public function mailConfigured(): bool
     {
@@ -288,7 +297,9 @@ return new class extends Component
                 </x-slot>
             </flux:callout>
         @endunless
+    @endcan
 
+    @can('developer')
         @php($health = $this->health())
         @if ($health['showsWarnings'] && ! $health['schedulerRunning'])
             <flux:callout inline icon="clock" color="amber">
@@ -312,14 +323,13 @@ return new class extends Component
             <flux:callout inline icon="exclamation-triangle" color="red">
                 <flux:callout.heading>
                     {{ trans_choice('{1} :count background task failed this week|[2,*] :count background tasks failed this week', $health['failedJobs'], ['count' => $health['failedJobs']]) }}</flux:callout.heading>
-                @can('developer')
-                    <x-slot name="actions">
-                        <flux:button
-                            :href="route('admin.settings-errors')"
-                            wire:navigate
-                        >{{ __('See errors') }}</flux:button>
-                    </x-slot>
-                @endcan
+                <x-slot name="actions">
+                    <flux:button wire:click="dismissFailedJobs" variant="ghost">{{ __('Dismiss') }}</flux:button>
+                    <flux:button
+                        :href="route('admin.settings-errors')"
+                        wire:navigate
+                    >{{ __('See errors') }}</flux:button>
+                </x-slot>
             </flux:callout>
         @endif
     @endcan

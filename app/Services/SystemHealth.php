@@ -17,6 +17,8 @@ final class SystemHealth
 
     public const int WAITING_JOB_MINUTES = 15;
 
+    public const string FAILED_JOBS_DISMISSED = 'wireup:health:failed-jobs-dismissed';
+
     public function recordHeartbeat(): void
     {
         Cache::forever(self::HEARTBEAT, now()->toIso8601String());
@@ -50,6 +52,18 @@ final class SystemHealth
     {
         $table = config()->string('queue.failed.table', 'failed_jobs');
 
-        return Schema::hasTable($table) ? DB::table($table)->where('failed_at', '>', now()->subWeek())->count() : 0;
+        $since = now()->subWeek()->toImmutable();
+        $dismissed = Cache::get(self::FAILED_JOBS_DISMISSED);
+
+        if (is_string($dismissed) && CarbonImmutable::parse($dismissed)->gt($since)) {
+            $since = CarbonImmutable::parse($dismissed);
+        }
+
+        return Schema::hasTable($table) ? DB::table($table)->where('failed_at', '>', $since)->count() : 0;
+    }
+
+    public function dismissFailedJobs(): void
+    {
+        Cache::forever(self::FAILED_JOBS_DISMISSED, now()->toIso8601String());
     }
 }

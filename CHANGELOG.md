@@ -2,6 +2,10 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
+## Unreleased
+
+- The dashboard's warnings about the scheduler, waiting emails and webhooks, and failed background tasks are now shown only to developers, since site owners can't act on them. A Dismiss button hides the failed tasks until another one fails.
+
 ## v0.8.1 — 2026-11-09
 
 - Each error in the error log has a Copy for AI button. It copies the error, where it happened, the request, the version and the stack trace as a ready-made prompt to paste into an AI assistant, and leaves out who was signed in.
