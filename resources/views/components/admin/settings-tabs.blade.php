@@ -13,7 +13,15 @@
             <flux:tab :href="route($tab['route'])" :selected="$tab['current']" wire:navigate>
                 {{ $tab['label'] }}
                 @if ($tab['badge'] !== null)
-                    <flux:badge size="sm" class="ms-1.5">{{ $tab['badge'] }}</flux:badge>
+                    <flux:badge
+                        size="sm"
+                        @class([
+                            'ms-1.5',
+                            'bg-white/20! text-white! dark:bg-zinc-800/10! dark:text-zinc-800!' => $tab['current'],
+                        ])
+                    >
+                        {{ $tab['badge'] }}
+                    </flux:badge>
                 @endif
             </flux:tab>
         @endforeach
