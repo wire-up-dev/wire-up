@@ -126,6 +126,23 @@ final class ErrorLog extends Model
         ]);
     }
 
+    public function promptText(): string
+    {
+        return implode("\n", [
+            'This error happened on a Wire Up site, a CMS built on Laravel and Livewire. Explain the likely cause and how to fix it.',
+            '',
+            'Error: '.$this->type,
+            'Message: '.$this->message,
+            'Where: '.$this->file.':'.$this->line,
+            'Request: '.($this->address ?? 'Command line or queue'),
+            'Occurrences: '.$this->occurrences.' (first '.$this->created_at->format('M d, Y H:i').', last '.$this->last_seen_at->format('M d, Y H:i').')',
+            'Version: Wire Up '.($this->context['version'] ?? '?').', PHP '.($this->context['php'] ?? '?').', '.($this->context['environment'] ?? '?'),
+            '',
+            'Stack trace:',
+            ...$this->trace,
+        ]);
+    }
+
     public function resolve(?User $user): void
     {
         $this->update(['resolved_at' => now(), 'resolved_by' => $user?->id]);

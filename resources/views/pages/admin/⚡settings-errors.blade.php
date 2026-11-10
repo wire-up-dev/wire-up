@@ -397,6 +397,18 @@ return new class extends Component
                         wire:click="confirmDelete({{ $error->id }})"
                     >{{ __('Delete') }}</flux:button>
                     <flux:spacer />
+                    <div x-data="{ copied: false }">
+                        <flux:button
+                            icon="clipboard-document"
+                            x-on:click="
+                                navigator.clipboard.writeText(@js($error->promptText()));
+                                copied = true;
+                                setTimeout(() => (copied = false), 1600);
+                            "
+                        >
+                            <span x-text="copied ? @js(__('Copied')) : @js(__('Copy for AI'))">{{ __('Copy for AI') }}</span>
+                        </flux:button>
+                    </div>
                     @if ($error->isResolved())
                         <flux:button
                             icon="arrow-path"

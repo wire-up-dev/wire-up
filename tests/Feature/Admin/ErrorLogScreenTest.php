@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\ErrorLog;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Livewire\Livewire;
 
@@ -134,4 +135,40 @@ it('deletes errors one at a time and in bulk', function (): void {
         ->assertDispatched('toast-show', toastSays('2 errors deleted.'));
 
     expect(ErrorLog::query()->exists())->toBeFalse();
+});
+
+it('offers the error as a ready-made AI prompt, leaving out who was signed in', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-10 02:00:00'));
+    $member = User::factory()->member()->create(['name' => 'Mia Member']);
+    $error = ErrorLog::factory()->create([
+        'type' => QueryException::class,
+        'message' => 'SQLSTATE[HY000]: General error',
+        'file' => 'app/Actions/CreateOrderAction.php',
+        'line' => 42,
+        'address' => null,
+        'user_id' => $member->id,
+        'trace' => ['app/Actions/CreateOrderAction.php:42 App\\Actions\\CreateOrderAction->handle()'],
+        'context' => ['version' => 'v0.8.0', 'php' => '8.5.12', 'environment' => 'production'],
+        'occurrences' => 4,
+        'last_seen_at' => now()->addMinute(),
+    ]);
+    errorLogDeveloper();
+
+    expect($error->promptText())->toBe(implode("\n", [
+        'This error happened on a Wire Up site, a CMS built on Laravel and Livewire. Explain the likely cause and how to fix it.',
+        '',
+        'Error: Illuminate\Database\QueryException',
+        'Message: SQLSTATE[HY000]: General error',
+        'Where: app/Actions/CreateOrderAction.php:42',
+        'Request: Command line or queue',
+        'Occurrences: 4 (first Nov 10, 2026 02:00, last Nov 10, 2026 02:01)',
+        'Version: Wire Up v0.8.0, PHP 8.5.12, production',
+        '',
+        'Stack trace:',
+        'app/Actions/CreateOrderAction.php:42 App\Actions\CreateOrderAction->handle()',
+    ]))->not->toContain('Mia Member');
+
+    Livewire::withQueryParams(['error' => $error->id])
+        ->test('pages::admin.settings-errors')
+        ->assertSee('Copy for AI');
 });
