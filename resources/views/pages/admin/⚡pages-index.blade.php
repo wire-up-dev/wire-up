@@ -417,9 +417,9 @@ return new class extends Component
                             @endif
 
                             <flux:table.cell>
-                                <flux:badge color="{{ $row->computed_status->color() }}" size="sm">
+                                <x-admin.status-badge :color="$row->computed_status->color()">
                                     {{ $row->computed_status->label() }}
-                                </flux:badge>
+                                </x-admin.status-badge>
                             </flux:table.cell>
 
                             <flux:table.cell> {{ $row->updated_at?->format('M d, Y H:i') }} </flux:table.cell>

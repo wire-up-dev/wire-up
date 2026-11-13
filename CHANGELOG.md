@@ -11,6 +11,7 @@ Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater sh
 - Editing roles no longer lets someone take away access they don't have themselves, or delete a role that has it.
 - Importing a site bundle cleans scripts out of block content and SVG files, as uploading and editing do, and refuses a bundle that carries files the media library wouldn't accept.
 - A new install's `.env` now defaults to production with warnings and errors only in the log, so the dashboard's server warnings show from the start.
+- Statuses in the admin's tables and lists, such as Published, Paid, Delivered or Unresolved, now show as a quiet outlined pill with a small coloured dot instead of a filled coloured badge, so a long list is easier to scan.
 
 ## v0.8.2 — 2026-11-09
 

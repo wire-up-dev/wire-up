@@ -541,10 +541,8 @@ return new class extends Component
                                                 @if ($this->hasMultipleStaff && $item['editor']) ·{{ __('by :name', ['name' => $item['editor']]) }}@endif
                                             </flux:text>
                                         </div>
-                                        <flux:badge
-                                            size="sm"
-                                            :color="$item['status']->color()"
-                                        >{{ $item['status']->label() }}</flux:badge>
+                                        <x-admin.status-badge :color="$item['status']->color()">
+                                            {{ $item['status']->label() }}</x-admin.status-badge>
                                     </a>
                                 @endforeach
                             </div>

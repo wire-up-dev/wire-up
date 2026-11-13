@@ -172,7 +172,7 @@ return new class extends Component
                                         {{ __('as :name', ['name' => $activity->actingAs()]) }}</flux:text>
                                 @endif
                                 @if ($activity->viaAssistant())
-                                    <flux:badge size="sm" color="violet">{{ __('AI assistant') }}</flux:badge>
+                                    <x-admin.status-badge color="violet">{{ __('AI assistant') }}</x-admin.status-badge>
                                 @endif
                             </flux:table.cell>
                             <flux:table.cell>

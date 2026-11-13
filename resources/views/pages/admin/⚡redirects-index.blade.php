@@ -292,8 +292,8 @@ return new class extends Component
                                         <flux:text class="truncate" title="{{ $row->to }}">{{ $row->to }}</flux:text>
                                     </flux:table.cell>
                                     <flux:table.cell>
-                                        <flux:badge size="sm" :color="$row->status_code === 301 ? 'sky' : 'amber'">
-                                            {{ $row->status_code === 301 ? __('Permanent') : __('Temporary') }}</flux:badge>
+                                        <x-admin.status-badge :color="$row->status_code === 301 ? 'sky' : 'amber'">
+                                            {{ $row->status_code === 301 ? __('Permanent') : __('Temporary') }}</x-admin.status-badge>
                                     </flux:table.cell>
                                     <flux:table.cell align="end" class="tabular-nums">
                                         {{ number_format($row->hits) }}</flux:table.cell>

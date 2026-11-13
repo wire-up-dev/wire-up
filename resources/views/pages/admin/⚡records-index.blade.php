@@ -614,9 +614,9 @@ return new class extends Component
 
                             @unless ($recordType->admin_only)
                                 <flux:table.cell>
-                                    <flux:badge color="{{ $row->computed_status->color() }}" size="sm">
+                                    <x-admin.status-badge :color="$row->computed_status->color()">
                                         {{ $row->computed_status->label() }}
-                                    </flux:badge>
+                                    </x-admin.status-badge>
                                 </flux:table.cell>
                             @endunless
 

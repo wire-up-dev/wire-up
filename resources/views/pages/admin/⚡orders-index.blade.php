@@ -260,10 +260,8 @@ return new class extends Component
                         </div>
                     </flux:table.cell>
                     <flux:table.cell>
-                        <flux:badge
-                            size="sm"
-                            :color="$order->status->color()"
-                        >{{ $order->status->label() }}</flux:badge>
+                        <x-admin.status-badge :color="$order->status->color()">
+                            {{ $order->status->label() }}</x-admin.status-badge>
                         @if ($order->oversold)
                             <flux:badge
                                 size="sm"

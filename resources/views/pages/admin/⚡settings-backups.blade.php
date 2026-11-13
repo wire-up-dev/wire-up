@@ -388,17 +388,14 @@ return new class extends Component
                                     <flux:table.cell class="whitespace-nowrap">
                                         {{ $backup['created_at']->translatedFormat('M j, Y H:i') }}</flux:table.cell>
                                     <flux:table.cell>
-                                        <flux:badge
-                                            size="sm"
-                                            :color="$backup['kind'] === 'update' ? 'zinc' : ($backup['kind'] === 'automatic' ? 'sky' : 'green')"
-                                        >
+                                        <x-admin.status-badge :color="$backup['kind'] === 'update' ? 'zinc' : ($backup['kind'] === 'automatic' ? 'sky' : 'green')">
                                             {{
                                                 match ($backup['kind']) {
                                                     'automatic' => __('Automatic'),
                                                     'manual' => __('Manual'),
                                                     default => __('Before update'),
                                                 }
-                                            }}</flux:badge>
+                                            }}</x-admin.status-badge>
                                         @if (! $backup['local'])
                                             <flux:text
                                                 size="sm"

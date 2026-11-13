@@ -282,10 +282,10 @@ return new class extends Component
                             </flux:table.cell>
                             <flux:table.cell>
                                 @if ($row->last_error !== null)
-                                    <flux:badge size="sm" color="red" :title="$row->last_error">
-                                        {{ $row->last_status !== null ? __('Failed (:status)', ['status' => $row->last_status]) : __('Failed') }}</flux:badge>
+                                    <x-admin.status-badge color="red" :title="$row->last_error">
+                                        {{ $row->last_status !== null ? __('Failed (:status)', ['status' => $row->last_status]) : __('Failed') }}</x-admin.status-badge>
                                 @elseif ($row->last_delivered_at !== null)
-                                    <flux:badge size="sm" color="green">{{ __('Delivered') }}</flux:badge>
+                                    <x-admin.status-badge color="green">{{ __('Delivered') }}</x-admin.status-badge>
                                     <flux:text
                                         size="sm"
                                         class="mt-1"
@@ -343,11 +343,11 @@ return new class extends Component
                         <div class="min-w-0 space-y-1">
                             <div class="flex flex-wrap items-center gap-2">
                                 @if ($delivery->succeeded())
-                                    <flux:badge size="sm" color="green">{{ __('Delivered') }}</flux:badge>
+                                    <x-admin.status-badge color="green">{{ __('Delivered') }}</x-admin.status-badge>
                                 @elseif ($delivery->error !== null)
-                                    <flux:badge size="sm" color="red">{{ __('Failed') }}</flux:badge>
+                                    <x-admin.status-badge color="red">{{ __('Failed') }}</x-admin.status-badge>
                                 @else
-                                    <flux:badge size="sm" color="zinc">{{ __('Waiting') }}</flux:badge>
+                                    <x-admin.status-badge>{{ __('Waiting') }}</x-admin.status-badge>
                                 @endif
                                 <flux:text variant="strong">
                                     {{ WebhookEvent::tryFrom($delivery->event)?->label() ?? $delivery->event }}</flux:text>

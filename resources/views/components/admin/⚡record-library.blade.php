@@ -241,11 +241,8 @@ return new class extends Component
                             @endif
                         </div>
 
-                        <flux:badge
-                            color="{{ $record['status']['color'] }}"
-                            size="sm"
-                            class="shrink-0"
-                        >{{ $record['status']['label'] }}</flux:badge>
+                        <x-admin.status-badge :color="$record['status']['color']" class="shrink-0">
+                            {{ $record['status']['label'] }}</x-admin.status-badge>
                     </button>
                 @empty
                     @if ($loaded)

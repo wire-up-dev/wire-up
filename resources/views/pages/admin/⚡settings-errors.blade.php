@@ -270,9 +270,9 @@ return new class extends Component
                                 {{ $row->last_seen_at->format('M d, Y H:i') }}</flux:table.cell>
                             <flux:table.cell>
                                 @if ($row->isResolved())
-                                    <flux:badge size="sm" color="green">{{ __('Resolved') }}</flux:badge>
+                                    <x-admin.status-badge color="green">{{ __('Resolved') }}</x-admin.status-badge>
                                 @else
-                                    <flux:badge size="sm" color="red">{{ __('Unresolved') }}</flux:badge>
+                                    <x-admin.status-badge color="red">{{ __('Unresolved') }}</x-admin.status-badge>
                                 @endif
                             </flux:table.cell>
                             <flux:table.cell>
@@ -349,9 +349,9 @@ return new class extends Component
                 <div class="space-y-2 pe-8">
                     <div class="flex items-center gap-2">
                         @if ($error->isResolved())
-                            <flux:badge size="sm" color="green">{{ __('Resolved') }}</flux:badge>
+                            <x-admin.status-badge color="green">{{ __('Resolved') }}</x-admin.status-badge>
                         @else
-                            <flux:badge size="sm" color="red">{{ __('Unresolved') }}</flux:badge>
+                            <x-admin.status-badge color="red">{{ __('Unresolved') }}</x-admin.status-badge>
                         @endif
                         <flux:text size="sm" class="font-mono">{{ $error->type }}</flux:text>
                     </div>

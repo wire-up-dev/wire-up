@@ -282,9 +282,9 @@ return new class extends Component
                         <flux:table.cell class="whitespace-nowrap">{{ $row->role?->name }}</flux:table.cell>
 
                         <flux:table.cell>
-                            <flux:badge color="{{ $row->active ? 'green' : 'zinc' }}" size="sm">
+                            <x-admin.status-badge :color="$row->active ? 'green' : 'zinc'">
                                 {{ $row->active ? __('Active') : __('Disabled') }}
-                            </flux:badge>
+                            </x-admin.status-badge>
                         </flux:table.cell>
 
                         <flux:table.cell>

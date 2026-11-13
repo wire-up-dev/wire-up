@@ -133,10 +133,8 @@ return new class extends Component
                     <div class="min-w-0">
                         <div class="flex items-center gap-2">
                             <flux:heading class="truncate">{{ $token->name }}</flux:heading>
-                            <flux:badge
-                                size="sm"
-                                :color="$token->access === TokenAccess::Full ? 'amber' : 'zinc'"
-                            >{{ $token->access->label() }}</flux:badge>
+                            <x-admin.status-badge :color="$token->access === TokenAccess::Full ? 'amber' : 'zinc'">
+                                {{ $token->access->label() }}</x-admin.status-badge>
                         </div>
                         <flux:text size="sm">
                             {{ $token->isExpired() ? __('Expired') : __('Expires :date', ['date' => $token->expires_at->isoFormat('LL')]) }} · {{ $token->last_used_at ? __('Last used :time', ['time' => $token->last_used_at->diffForHumans()]) : __('Never used') }}

@@ -123,7 +123,8 @@ return new class extends Component
         <flux:fieldset>
             <div class="flex items-center justify-between gap-3">
                 <flux:legend class="mb-0!">{{ __('Order :reference', ['reference' => $order->reference]) }}</flux:legend>
-                <flux:badge size="sm" :color="$order->status->color()">{{ $order->status->label() }}</flux:badge>
+                <x-admin.status-badge :color="$order->status->color()">
+                    {{ $order->status->label() }}</x-admin.status-badge>
             </div>
             <flux:description>{{ __('Placed :date', ['date' => $order->created_at->format('M d, Y H:i')]) }}</flux:description>
 
