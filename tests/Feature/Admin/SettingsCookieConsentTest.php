@@ -22,14 +22,17 @@ it('opens the cookie consent screen from the site settings tabs', function (): v
         ->assertSee(route('admin.settings-identity'), false);
 });
 
-it('starts switched off with the default wording as placeholders', function (): void {
+it('starts switched off with the default wording filled in for each language', function (): void {
+    activateDutch();
+    config()->set('site.ui_translations', ['nl' => ['Accept' => 'Akkoord']]);
     $this->actingAsAdmin();
 
     Livewire::test('pages::admin.settings-cookie-consent')
         ->assertSet('enabled', false)
-        ->assertSet('message', [])
-        ->assertSee('We use cookies to understand how visitors use this site.')
-        ->assertSee('Cookie settings');
+        ->assertSet('message.en', '<p>We use cookies to understand how visitors use this site.</p>')
+        ->assertSet('accept', ['en' => 'Accept', 'nl' => 'Akkoord'])
+        ->assertSet('decline.nl', 'Decline')
+        ->assertSet('link.en', 'Cookie settings');
 });
 
 it('saves the switch and the wording for each language', function (): void {
@@ -51,9 +54,9 @@ it('saves the switch and the wording for each language', function (): void {
             'en' => '<p>We count visits. <a href="/privacy">Privacy</a></p>',
             'nl' => '<p>Wij tellen bezoeken.</p>',
         ])
-        ->and(Settings::get('cookie_consent_accept'))->toBe(['nl' => 'Akkoord'])
-        ->and(Settings::get('cookie_consent_decline'))->toBe(['nl' => 'Weigeren'])
-        ->and(Settings::get('cookie_consent_link'))->toBe(['en' => 'Cookies']);
+        ->and(Settings::get('cookie_consent_accept'))->toBe(['en' => 'Accept', 'nl' => 'Akkoord'])
+        ->and(Settings::get('cookie_consent_decline'))->toBe(['en' => 'Decline', 'nl' => 'Weigeren'])
+        ->and(Settings::get('cookie_consent_link'))->toBe(['en' => 'Cookies', 'nl' => 'Cookie settings']);
 });
 
 it('loads the saved wording back into the form', function (): void {
@@ -67,7 +70,7 @@ it('loads the saved wording back into the form', function (): void {
     Livewire::test('pages::admin.settings-cookie-consent')
         ->assertSet('enabled', true)
         ->assertSet('message', ['en' => '<p>Hello</p>'])
-        ->assertSet('accept', []);
+        ->assertSet('accept', ['en' => 'Accept']);
 });
 
 it('strips scripts from the message and drops empty editor paragraphs', function (): void {

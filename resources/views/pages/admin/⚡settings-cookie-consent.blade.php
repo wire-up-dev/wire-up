@@ -55,6 +55,13 @@ return new class extends Component
 
         $this->activeLocales = resolve('localization')->getActiveLocales();
 
+        foreach (array_keys($this->activeLocales) as $code) {
+            $this->message[$code] ??= '<p>'.e(__('We use cookies to understand how visitors use this site.', [], $code)).'</p>';
+            $this->accept[$code] ??= __('Accept', [], $code);
+            $this->decline[$code] ??= __('Decline', [], $code);
+            $this->link[$code] ??= __('Cookie settings', [], $code);
+        }
+
         if (! isset($this->locale) || ! array_key_exists($this->locale, $this->activeLocales)) {
             $this->locale = app()->getLocale();
         }
