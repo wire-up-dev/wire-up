@@ -98,14 +98,6 @@ final class RecordTypePresets
     /**
      * @return array<int, string>
      */
-    public static function bookableKeys(): array
-    {
-        return array_keys(self::bookableFields());
-    }
-
-    /**
-     * @return array<int, string>
-     */
     public static function keys(): array
     {
         return array_map(fn (array $preset): string => $preset['key'], self::all());

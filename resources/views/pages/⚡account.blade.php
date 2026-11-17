@@ -144,8 +144,7 @@ return new class extends Component
     {
         $bookings = resolve(BookingService::class);
 
-        return Booking::query()
-            ->where('user_id', $this->user->id)
+        return $this->user->bookings()
             ->where('status', BookingStatus::CONFIRMED)
             ->where('ends_at', '>=', now())
             ->oldest('starts_at')

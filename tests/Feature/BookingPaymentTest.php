@@ -56,6 +56,17 @@ it('confirms the booking instead of sending order emails once Stripe says it is 
     Notification::assertSentOnDemandTimes(BookingUpdate::class, 1);
 });
 
+it('leaves a booking that was cancelled before its payment arrived as it is', function (): void {
+    $booking = heldBooking();
+    $booking->update(['status' => BookingStatus::CANCELLED]);
+    Notification::fake();
+
+    expect(resolve(ConfirmBookingPaymentAction::class)->handle(Order::query()->findOrFail($booking->order_id)))->toBeTrue()
+        ->and($booking->refresh()->status)->toBe(BookingStatus::CANCELLED);
+
+    Notification::assertNothingSent();
+});
+
 it('frees the time when the checkout expires unpaid', function (): void {
     $booking = heldBooking();
 

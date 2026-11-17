@@ -9,13 +9,11 @@ use Database\Factories\BookingClaimFactory;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property-read int $id
  * @property-read int $booking_id
  * @property-read CarbonImmutable $starts_at
- * @property-read Booking $booking
  */
 #[WithoutTimestamps]
 final class BookingClaim extends Model
@@ -49,13 +47,5 @@ final class BookingClaim extends Model
             'booking_id' => 'integer',
             'starts_at' => 'immutable_datetime',
         ];
-    }
-
-    /**
-     * @return BelongsTo<Booking, $this>
-     */
-    public function booking(): BelongsTo
-    {
-        return $this->belongsTo(Booking::class);
     }
 }

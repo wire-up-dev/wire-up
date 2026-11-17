@@ -47,7 +47,6 @@ use Illuminate\Support\Str;
  * @property-read CarbonInterface $created_at
  * @property-read CarbonInterface $updated_at
  * @property-read Order|null $order
- * @property-read User|null $user
  * @property-read Collection<int, BookingClaim> $claims
  */
 final class Booking extends Model
@@ -107,14 +106,6 @@ final class Booking extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
-    }
-
-    /**
-     * @return BelongsTo<User, $this>
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
     }
 
     /**
