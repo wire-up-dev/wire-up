@@ -40,6 +40,9 @@ return new class extends Component
     #[Locked]
     public int $year;
 
+    #[Locked]
+    public string $consentLink = '';
+
     public function mount(): void
     {
         $service = SettingsService::current();
@@ -59,6 +62,10 @@ return new class extends Component
         $this->logoDark = $logos['dark'];
 
         $this->year = (int) now()->year;
+
+        if ($service->cookieConsentEnabled()) {
+            $this->consentLink = $service->cookieConsentText('link') ?: __('Cookie settings');
+        }
     }
 };
 ?>
@@ -87,6 +94,10 @@ return new class extends Component
                         rel="noopener noreferrer"
                         class="hover:underline"
                     >{{ __('Made with Wire Up') }}</a>
+                    @if ($consentLink !== '')
+                        &nbsp;|&nbsp;
+                        <x-site.cookie-settings-link :label="$consentLink" />
+                    @endif
                 </div>
             </div>
             @break
@@ -128,14 +139,17 @@ return new class extends Component
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-4 border-t border-current/10 py-4 text-[length:calc(var(--wire-body-size)*0.75)] opacity-70">
                     <span>&copy; {{ $year }} {{ $brand }}. {{ __('All Rights Reserved') }}</span>
-                    <span
-                        ><a
+                    <span class="flex flex-wrap items-center gap-4">
+                        @if ($consentLink !== '')
+                            <x-site.cookie-settings-link :label="$consentLink" />
+                        @endif
+                        <a
                             href="https://wire-up.dev"
                             target="_blank"
                             rel="noopener noreferrer"
                             class="hover:underline"
-                            >{{ __('Made with Wire Up') }}</a
-                        ></span>
+                        >{{ __('Made with Wire Up') }}</a>
+                    </span>
                 </div>
             </div>
             @break
@@ -148,6 +162,10 @@ return new class extends Component
                     rel="noopener noreferrer"
                     class="hover:underline"
                 >{{ __('Made with Wire Up') }}</a>
+                @if ($consentLink !== '')
+                    &nbsp;|&nbsp;
+                    <x-site.cookie-settings-link :label="$consentLink" />
+                @endif
             </div>
             @break
         @default
@@ -161,14 +179,17 @@ return new class extends Component
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-4 border-t border-current/10 py-4 text-[calc(var(--wire-body-size)*0.85)] opacity-70">
                     <span>&copy; {{ $year }} {{ $brand }}. {{ __('All Rights Reserved') }}</span>
-                    <span
-                        ><a
+                    <span class="flex flex-wrap items-center gap-4">
+                        @if ($consentLink !== '')
+                            <x-site.cookie-settings-link :label="$consentLink" />
+                        @endif
+                        <a
                             href="https://wire-up.dev"
                             target="_blank"
                             rel="noopener noreferrer"
                             class="hover:underline"
-                            >{{ __('Made with Wire Up') }}</a
-                        ></span>
+                        >{{ __('Made with Wire Up') }}</a>
+                    </span>
                 </div>
             </div>
     @endswitch

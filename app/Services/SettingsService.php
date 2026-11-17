@@ -544,6 +544,16 @@ final class SettingsService
         return mb_trim((string) config('site.body_scripts', ''));
     }
 
+    public function cookieConsentEnabled(): bool
+    {
+        return (bool) config('site.cookie_consent_enabled', false);
+    }
+
+    public function cookieConsentText(string $field): string
+    {
+        return $this->localeValue(config('site.cookie_consent_'.$field));
+    }
+
     /**
      * @return array<string, string>
      */

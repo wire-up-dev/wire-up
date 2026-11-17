@@ -1,4 +1,5 @@
 import "./passkeys";
+import "./consent";
 
 import.meta.glob(["../images/**/*"], {
     eager: true,

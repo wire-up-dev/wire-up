@@ -13,6 +13,7 @@ Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater sh
 - A new install's `.env` now defaults to production with warnings and errors only in the log, so the dashboard's server warnings show from the start.
 - Statuses in the admin's tables and lists, such as Published, Paid, Delivered or Unresolved, now show as a quiet outlined pill with a small coloured dot instead of a filled coloured badge, so a long list is easier to scan.
 - The order confirmation email can be translated on Settings → Translations, under a new Emails group, so customers get it in their own language with your wording.
+- Settings → Cookie consent can ask visitors before Google Analytics and your custom code load. It's off until you switch it on. The message and button labels can be written for each language, and a Cookie settings link in the footer lets visitors change their mind.
 
 ## v0.8.2 — 2026-11-09
 

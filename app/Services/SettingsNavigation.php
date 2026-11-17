@@ -20,6 +20,7 @@ final readonly class SettingsNavigation
                 $this->tab(__('General'), 'admin.settings-general'),
                 $this->tab(__('Identity'), 'admin.settings-identity'),
                 $this->tab(__('Social'), 'admin.settings-social'),
+                $this->tab(__('Cookie consent'), 'admin.settings-cookie-consent'),
             ]],
             'design' => [__('Design'), [
                 $this->tab(__('Design'), 'admin.settings-design'),

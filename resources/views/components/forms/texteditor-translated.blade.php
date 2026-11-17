@@ -1,4 +1,4 @@
-@props(['name' => 'title', 'locale' => 'en', 'label' => null, 'required' => false, 'multiLocale' => false, 'toolbar' => 'heading | bold italic underline | textcolor | bullet ordered | align | link ~ undo redo'])
+@props(['name' => 'title', 'locale' => 'en', 'label' => null, 'required' => false, 'multiLocale' => false, 'toolbar' => 'heading | bold italic underline | textcolor | bullet ordered | align | link ~ undo redo', 'placeholder' => null])
 
 <flux:field wire:key="{{ $name }}-{{ $locale }}">
     <div class="flex items-center gap-3">
@@ -22,6 +22,7 @@
         <flux:editor
             wire:model.lazy="{{ $name }}.{{ $locale }}"
             :required="$required"
+            :placeholder="$placeholder"
             class="**:data-[slot=content]:min-h-25!"
         >
             <flux:editor.toolbar :items="$toolbar.' | badge | source'" />

@@ -34,20 +34,10 @@
 
     @vite(['resources/css/site.css', 'resources/js/app.js'])
 
-    @if ($gaId = $site->googleAnalyticsId())
-        <script async src="https://www.googletagmanager.com/gtag/js?id={{ $gaId }}"></script>
-        <script>
-            window.dataLayer = window.dataLayer || [];
-            function gtag() {
-                dataLayer.push(arguments);
-            }
-            gtag('js', new Date());
-            gtag('config', @js($gaId));
-        </script>
-    @endif
-
-    @if ($site->headScripts() !== '')
-        {!! $site->headScripts() !!}
+    @if ($site->cookieConsentEnabled())
+        <template data-consent="head"><x-site.head-scripts :site="$site" /></template>
+    @else
+        <x-site.head-scripts :site="$site" />
     @endif
 
     @if ($googleFonts)

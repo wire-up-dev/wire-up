@@ -87,10 +87,17 @@
             <flux:toast />
         @endpersist
 
+        @php($consent = \App\Services\SettingsService::current()->cookieConsentEnabled())
+        @if ($consent)
+            <x-site.cookie-consent />
+        @endif
+
         @fluxScripts
 
         @php($bodyScripts = \App\Services\SettingsService::current()->bodyScripts())
-        @if ($bodyScripts !== '')
+        @if ($bodyScripts !== '' && $consent)
+            <template data-consent="body">{!! $bodyScripts !!}</template>
+        @elseif ($bodyScripts !== '')
             {!! $bodyScripts !!}
         @endif
     </body>

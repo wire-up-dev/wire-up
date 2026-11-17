@@ -1,4 +1,4 @@
-@props(['name' => 'title', 'locale' => app()->getLocale(), 'multiLocale' => false, 'label' => null, 'note' => '', 'required' => false])
+@props(['name' => 'title', 'locale' => app()->getLocale(), 'multiLocale' => false, 'label' => null, 'note' => '', 'required' => false, 'placeholder' => null])
 
 <flux:field wire:key="{{ $name }}-{{ $locale }}">
     <div class="flex items-center gap-3">
@@ -22,6 +22,6 @@
             <flux:text class="ml-auto text-sm">{{ $note }}</flux:text>
         @endif
     </div>
-    <flux:input wire:model.lazy="{{ $name }}.{{ $locale }}" :required="$required" />
+    <flux:input wire:model.lazy="{{ $name }}.{{ $locale }}" :required="$required" :placeholder="$placeholder" />
     <flux:error name="{{ $name }}.{{ $locale }}" />
 </flux:field>
