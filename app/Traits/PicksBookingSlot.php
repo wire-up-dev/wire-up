@@ -63,7 +63,17 @@ trait PicksBookingSlot
 
     public function pickSlot(string $slot): void
     {
-        $this->slot = in_array($slot, $this->monthSlots()[$this->date] ?? [], true) ? $slot : '';
+        foreach ($this->monthSlots() as $day => $slots) {
+            if (in_array($slot, $slots, true)) {
+                $this->date = $day;
+                $this->slot = $slot;
+                $this->slotPicked();
+
+                return;
+            }
+        }
+
+        $this->slot = '';
     }
 
     /**
@@ -85,31 +95,21 @@ trait PicksBookingSlot
     }
 
     /**
-     * @return list<array{date: string, day: int, inMonth: bool, available: bool}>
+     * @return list<array{date: string, label: string}>
      */
-    public function calendarDays(): array
+    public function availableDays(): array
     {
-        $first = CarbonImmutable::createFromFormat('!Y-m', $this->month, 'UTC') ?: CarbonImmutable::now()->startOfMonth();
-        $cursor = $first->startOfWeek(CarbonImmutable::MONDAY);
-        $last = $first->endOfMonth()->endOfWeek(CarbonImmutable::SUNDAY);
-        $days = [];
-
-        for (; $cursor <= $last; $cursor = $cursor->addDay()) {
-            $date = $cursor->format('Y-m-d');
-            $days[] = ['date' => $date, 'day' => $cursor->day, 'inMonth' => $cursor->month === $first->month, 'available' => isset($this->monthSlots()[$date])];
-        }
-
-        return $days;
+        return array_map(fn (string $day): array => [
+            'date' => $day,
+            'label' => CarbonImmutable::createFromFormat('!Y-m-d', $day, 'UTC')->locale(app()->getLocale())->isoFormat('ddd, MMMM D'),
+        ], array_keys($this->monthSlots()));
     }
 
-    /**
-     * @return list<string>
-     */
-    public function weekdayNames(): array
+    public function activeDate(): string
     {
-        $monday = CarbonImmutable::parse('2026-11-16')->locale(app()->getLocale());
+        $slots = $this->monthSlots();
 
-        return array_map(fn (int $offset): string => $monday->addDays($offset)->isoFormat('dd'), range(0, 6));
+        return array_key_exists($this->date, $slots) ? $this->date : (string) array_key_first($slots);
     }
 
     public function monthLabel(): string
@@ -137,7 +137,7 @@ trait PicksBookingSlot
         return array_map(fn (string $value): array => [
             'value' => $value,
             'label' => CarbonImmutable::parse($value)->setTimezone($this->visitorZone())->locale(app()->getLocale())->isoFormat('LT'),
-        ], $this->monthSlots()[$this->date] ?? []);
+        ], $this->monthSlots()[$this->activeDate()] ?? []);
     }
 
     public function chosenLabel(): string
@@ -163,6 +163,15 @@ trait PicksBookingSlot
     protected function slotMinimumNotice(): int
     {
         return 0;
+    }
+
+    protected function slotPicked(): void {}
+
+    protected function moveToOpenMonth(): void
+    {
+        while ($this->monthSlots() === [] && $this->canGoForward()) {
+            $this->changeMonth(1);
+        }
     }
 
     protected function initSlotPicker(): void

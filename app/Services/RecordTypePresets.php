@@ -270,7 +270,7 @@ final class RecordTypePresets
     private static function bookableFields(): array
     {
         return [
-            self::DURATION_FIELD => self::field(self::DURATION_FIELD, FieldType::NUMBER, 'Length in minutes', ['translatable' => false, 'required' => true, 'column' => true, 'help' => 'In steps of 5 minutes.']),
+            self::DURATION_FIELD => self::field(self::DURATION_FIELD, FieldType::NUMBER, 'Length', ['translatable' => false, 'required' => true, 'column' => true, 'help' => 'In minutes, in steps of 5.']),
             self::PRICE_FIELD => self::field(self::PRICE_FIELD, FieldType::MONEY, 'Price', ['column' => true, 'sortable' => true, 'translatable' => false]),
             self::CHARGE_FIELD => self::field(self::CHARGE_FIELD, FieldType::BOOLEAN, 'Charge when booking', ['translatable' => false, 'help' => 'Visitors pay through Stripe before the booking is confirmed.', 'placement' => FieldPlacement::HIDDEN->value]),
             self::LOCATION_FIELD => self::field(self::LOCATION_FIELD, FieldType::TEXT, 'Where it happens', ['help' => 'An address, or how you will meet online. Shown in the confirmation email.', 'placement' => FieldPlacement::HIDDEN->value]),

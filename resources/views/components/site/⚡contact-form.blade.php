@@ -509,7 +509,15 @@ return new class extends Component
     @endif
 
     @if ($this->sent)
-        <div class="wire-field [&>p]:m-0 [&_a]:text-(--wire-accent) [&_a]:underline rounded-(--wire-radius) bg-(--wire-input-bg) p-4 leading-(--wire-body-leading) text-(--wire-input-text)">
+        <div
+            @class([
+                '[&>p]:m-0 [&_a]:text-(--wire-accent) [&_a]:underline rounded-(--wire-radius) p-6 leading-(--wire-body-leading)',
+                'wire-card bg-(--wire-card-bg) text-(--wire-card-text)' => $panelStyle === '',
+                'mx-auto max-w-xl' => $this->layout === 'stacked',
+            ])
+            @if ($panelStyle !== '') style="{{ $panelStyle }}" @endif
+            data-contact-sent
+        >
             {!! $this->successMessage !!}
         </div>
     @else

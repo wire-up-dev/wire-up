@@ -359,3 +359,18 @@ it('sends one address at most three automatic replies an hour', function (): voi
     Notification::assertSentTimes(SubmissionAutoReply::class, 4);
     Notification::assertSentOnDemand(SubmissionAutoReply::class, fn (SubmissionAutoReply $notification, array $channels, AnonymousNotifiable $notifiable): bool => $notifiable->routes['mail'] === 'grace@example.com');
 });
+
+it('thanks the visitor in a card the width of the form it replaces', function (): void {
+    $stacked = contactForm(contactBlock(['recipient' => 'owner@example.com', 'layout' => 'stacked']))
+        ->set('name', 'Ada')->set('email', 'ada@example.com')->set('message', 'Hello');
+    test()->travel(5)->seconds();
+    $stacked->call('submit')->assertSet('sent', true)
+        ->assertSeeHtml('wire-card bg-(--wire-card-bg) text-(--wire-card-text) mx-auto max-w-xl');
+
+    $panelled = contactForm(contactBlock(['recipient' => 'owner@example.com', 'layout' => 'split', 'panelBg' => '#123456']))
+        ->set('name', 'Ada')->set('email', 'ada@example.com')->set('message', 'Hello');
+    test()->travel(5)->seconds();
+    $panelled->call('submit')->assertSet('sent', true)
+        ->assertSeeHtml('style="background-color:#123456')
+        ->assertDontSeeHtml('mx-auto max-w-xl');
+});

@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Actions\CancelBookingAction;
 use App\Actions\RescheduleBookingAction;
 use App\Enums\BookingActor;
+use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Services\BookingService;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Stripe\Exception\ApiErrorException;
@@ -22,9 +24,15 @@ return new class extends Component
 
     public string $time = '';
 
-    public function mount(Booking $booking): void
+    public bool $showMove = false;
+
+    public function mount(Booking $booking, BookingService $bookings): void
     {
         $this->booking = $booking;
+
+        if (request()->boolean('move') && $booking->status === BookingStatus::CONFIRMED && Gate::allows('bookings.edit')) {
+            $this->prefillMove($bookings);
+        }
     }
 
     /**
@@ -46,12 +54,7 @@ return new class extends Component
     {
         $this->authorize('bookings.edit');
 
-        $local = $this->booking->starts_at->setTimezone($bookings->timezone());
-        $this->day = $local->format('Y-m-d');
-        $this->time = $local->format('H:i');
-        $this->resetValidation();
-
-        Flux::modal('reschedule-booking')->show();
+        $this->prefillMove($bookings);
     }
 
     public function reschedule(RescheduleBookingAction $reschedule, BookingService $bookings): void
@@ -71,7 +74,7 @@ return new class extends Component
             return;
         }
 
-        Flux::modal('reschedule-booking')->close();
+        $this->showMove = false;
         Flux::toast(__('Booking moved.'), variant: 'success');
         $this->booking->refresh();
     }
@@ -82,6 +85,15 @@ return new class extends Component
             ->title(__('Booking :reference', ['reference' => $this->booking->reference]))
             ->layout('layouts::admin');
     }
+
+    private function prefillMove(BookingService $bookings): void
+    {
+        $local = $this->booking->starts_at->setTimezone($bookings->timezone());
+        $this->day = $local->format('Y-m-d');
+        $this->time = $local->format('H:i');
+        $this->resetValidation();
+        $this->showMove = true;
+    }
 };
 ?>
 
@@ -89,86 +101,122 @@ return new class extends Component
     $bookingService = resolve(\App\Services\BookingService::class);
     $siteZone = $bookingService->timezone();
     $order = $booking->order;
+    $canChange = $booking->status === \App\Enums\BookingStatus::CONFIRMED;
 @endphp
 
-<div class="max-w-3xl space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-            <flux:heading size="xl">{{ $booking->service_name }}</flux:heading>
-            <x-admin.status-badge :color="$booking->status->color()">
-                {{ $booking->status->label() }}</x-admin.status-badge>
-        </div>
-        @can('bookings.edit')
-            @if ($booking->status === \App\Enums\BookingStatus::CONFIRMED)
-                <div class="flex gap-2">
-                    <flux:button
-                        size="sm"
-                        icon="arrows-right-left"
-                        wire:click="openReschedule"
-                    >{{ __('Move') }}</flux:button>
-                    <flux:modal.trigger name="cancel-booking">
-                        <flux:button size="sm" variant="danger" icon="x-mark">{{ __('Cancel booking') }}</flux:button>
-                    </flux:modal.trigger>
+<div class="grid items-stretch gap-10 md:grid-cols-5">
+    <div class="md:col-span-3">
+        <div class="mb-10 max-w-5xl space-y-6">
+            <flux:fieldset class="pb-6">
+                <div class="flex items-center justify-between gap-3">
+                    <flux:legend class="mb-0!">{{ $booking->service_name }}</flux:legend>
+                    <x-admin.status-badge :color="$booking->status->color()">
+                        {{ $booking->status->label() }}</x-admin.status-badge>
                 </div>
+                <flux:description>
+                    {{ $bookingService->formatTime($booking->starts_at, $siteZone, app()->getLocale()) }}
+                </flux:description>
+
+                @if ($booking->clashed)
+                    <flux:callout icon="exclamation-triangle" color="red" class="mt-4">
+                        <flux:callout.heading>{{ __('This booking clashes with another one') }}</flux:callout.heading>
+                        <flux:callout.text>
+                            {{ __('The payment arrived after the checkout had expired and someone else had booked the time. Agree on a new time with them, or refund the order.') }}</flux:callout.text>
+                    </flux:callout>
+                @endif
+
+                <dl class="mt-6 grid gap-x-6 gap-y-4 sm:grid-cols-[8rem_1fr]">
+                    <dt class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Length') }}</dt>
+                    <dd>{{ trans_choice(':count minute|:count minutes', $booking->duration_minutes) }}</dd>
+                    <dt class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Time zone') }}</dt>
+                    <dd>{{ str_replace('_', ' ', $siteZone) }}</dd>
+                    @if ($booking->timezone !== $siteZone)
+                        <dt class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Their time') }}</dt>
+                        <dd>
+                            {{ $bookingService->formatTime($booking->starts_at, $booking->timezone, app()->getLocale()) }} ({{ str_replace('_', ' ', $booking->timezone) }})
+                        </dd>
+                    @endif
+                    <dt class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Name') }}</dt>
+                    <dd class="break-words">{{ $booking->name ?: __('Blocked time') }}</dd>
+                    @if ($booking->email)
+                        <dt class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Email') }}</dt>
+                        <dd class="break-words">{{ $booking->email }}</dd>
+                    @endif
+                    @if ($booking->phone)
+                        <dt class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Phone') }}</dt>
+                        <dd>{{ $booking->phone }}</dd>
+                    @endif
+                    @if ($order)
+                        <dt class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Order') }}</dt>
+                        <dd>
+                            @can('orders.view')
+                                <a
+                                    class="underline"
+                                    href="{{ route('admin.orders-show', $order) }}"
+                                    wire:navigate
+                                >{{ $order->reference }}</a>
+                            @else
+                                {{ $order->reference }}
+                            @endcan
+                        </dd>
+                    @endif
+                </dl>
+            </flux:fieldset>
+
+            @if ($booking->notes)
+                <flux:separator />
+
+                <flux:fieldset>
+                    <flux:legend>{{ __('Notes') }}</flux:legend>
+                    <flux:text class="mt-4 leading-relaxed whitespace-pre-line">{{ $booking->notes }}</flux:text>
+                </flux:fieldset>
             @endif
-        @endcan
+
+            <flux:text size="sm" variant="subtle">
+                {{ __('Reference :reference', ['reference' => $booking->reference]) }} · {{ $booking->source === \App\Enums\BookingActor::OWNER ? __('Added by staff') : __('Booked online') }}
+                @if ($booking->locale && count(resolve('localization')->getActiveLocales()) > 1)
+                    · {{ mb_strtoupper($booking->locale) }}
+                @endif
+            </flux:text>
+        </div>
     </div>
 
-    @if ($booking->clashed)
-        <flux:callout icon="exclamation-triangle" color="red">
-            <flux:callout.heading>{{ __('This booking clashes with another one') }}</flux:callout.heading>
-            <flux:callout.text>
-                {{ __('The payment arrived after the checkout had expired and someone else had booked the time. Agree on a new time with them, or refund the order.') }}</flux:callout.text>
-        </flux:callout>
-    @endif
-
-    <flux:card class="space-y-4">
-        <div class="grid gap-4 sm:grid-cols-2">
-            <div>
-                <flux:text>{{ __('When') }}</flux:text>
-                <flux:text variant="strong">{{ $bookingService->formatTime($booking->starts_at, $siteZone, app()->getLocale()) }}</flux:text>
-                <flux:text>{{ trans_choice(':count minute|:count minutes', $booking->duration_minutes) }} · {{ str_replace('_', ' ', $siteZone) }}</flux:text>
-                @if ($booking->timezone !== $siteZone)
-                    <flux:text>{{ __('Their time: :time', ['time' => $bookingService->formatTime($booking->starts_at, $booking->timezone, app()->getLocale()).' ('.str_replace('_', ' ', $booking->timezone).')']) }}</flux:text>
-                @endif
-            </div>
-            <div>
-                <flux:text>{{ __('Who') }}</flux:text>
-                <flux:text variant="strong">{{ $booking->name ?: __('Blocked time') }}</flux:text>
-                @if ($booking->email)
-                    <flux:link href="mailto:{{ $booking->email }}">{{ $booking->email }}</flux:link>
-                @endif
-                @if ($booking->phone)
-                    <flux:text>{{ $booking->phone }}</flux:text>
-                @endif
-            </div>
-        </div>
-
-        @if ($booking->notes)
-            <div>
-                <flux:text>{{ __('Notes') }}</flux:text>
-                <flux:text variant="strong" class="whitespace-pre-line">{{ $booking->notes }}</flux:text>
-            </div>
-        @endif
-
-        <flux:separator variant="subtle" />
-
-        <div class="flex flex-wrap gap-x-8 gap-y-2">
-            <flux:text>{{ __('Reference :reference', ['reference' => $booking->reference]) }}</flux:text>
-            <flux:text>{{ __('Booked :date', ['date' => $booking->created_at->format('M d, Y H:i')]) }}</flux:text>
-            @if ($booking->cancelled_at)
-                <flux:text>{{ __('Cancelled :date', ['date' => $booking->cancelled_at->format('M d, Y H:i')]) }}</flux:text>
-            @endif
-            @if ($order)
-                @can('orders.view')
-                    <flux:link
-                        href="{{ route('admin.orders-show', $order) }}"
-                        wire:navigate
-                    >{{ __('Order :reference', ['reference' => $order->reference]) }}</flux:link>
+    <div class="mb-10 md:col-span-2 md:mb-0">
+        <flux:card class="flex flex-col gap-6 md:sticky md:top-24">
+            @if ($canChange)
+                @can('bookings.edit')
+                    <flux:button variant="primary" icon="arrows-right-left" class="w-full" wire:click="openReschedule">
+                        {{ __('Move') }}
+                    </flux:button>
                 @endcan
+            @elseif ($booking->email)
+                <flux:button :href="'mailto:'.$booking->email" variant="primary" icon="envelope" class="w-full">
+                    {{ __('Email') }}
+                </flux:button>
             @endif
-        </div>
-    </flux:card>
+
+            <div class="grid grid-cols-2 gap-4">
+                <flux:button :href="route('admin.bookings-index')" wire:navigate icon="arrow-left">
+                    {{ __('Back') }}
+                </flux:button>
+                @if ($canChange)
+                    @can('bookings.edit')
+                        <flux:modal.trigger name="cancel-booking">
+                            <flux:button variant="danger" icon="x-mark" class="w-full">{{ __('Cancel') }}</flux:button>
+                        </flux:modal.trigger>
+                    @endcan
+                @endif
+            </div>
+
+            <flux:text size="sm">
+                @if ($booking->cancelled_at)
+                    {{ __('Cancelled') }} {{ $booking->cancelled_at->diffForHumans() }}
+                @else
+                    {{ __('Booked') }} {{ $booking->created_at->diffForHumans() }}
+                @endif
+            </flux:text>
+        </flux:card>
+    </div>
 
     @can('bookings.edit')
         <flux:modal name="cancel-booking" class="min-w-[22rem]">
@@ -180,7 +228,8 @@ return new class extends Component
                         <flux:text class="mt-2">{{ __('The payment isn’t refunded automatically. Refund it from the order.') }}</flux:text>
                     @endif
                 </div>
-                <div class="flex justify-end gap-2">
+                <div class="flex gap-2">
+                    <flux:spacer />
                     <flux:modal.close>
                         <flux:button variant="ghost">{{ __('Keep it') }}</flux:button>
                     </flux:modal.close>
@@ -189,7 +238,7 @@ return new class extends Component
             </div>
         </flux:modal>
 
-        <flux:modal name="reschedule-booking" class="w-full md:max-w-md">
+        <flux:modal name="reschedule-booking" wire:model.self="showMove" class="w-full md:max-w-md">
             <form wire:submit="reschedule" class="space-y-6">
                 <flux:heading size="lg">{{ __('Move booking') }}</flux:heading>
                 <div class="grid gap-4 sm:grid-cols-2">
@@ -197,7 +246,8 @@ return new class extends Component
                     <flux:input type="time" step="300" wire:model="time" label="{{ __('Time') }}" />
                 </div>
                 <flux:text>{{ __('Times are in :zone.', ['zone' => str_replace('_', ' ', $siteZone)]) }}</flux:text>
-                <div class="flex justify-end gap-2">
+                <div class="flex gap-2">
+                    <flux:spacer />
                     <flux:modal.close>
                         <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
                     </flux:modal.close>
@@ -209,9 +259,19 @@ return new class extends Component
 </div>
 
 @section('header-content')
-    <flux:breadcrumbs>
-        <flux:breadcrumbs.item href="{{ route('admin.bookings-index') }}" wire:navigate class="pl-3 md:pl-0">
-            {{ __('Bookings') }}</flux:breadcrumbs.item>
-        <flux:breadcrumbs.item>{{ $booking->reference }}</flux:breadcrumbs.item>
+    <flux:breadcrumbs class="hidden md:flex">
+        <flux:breadcrumbs.item :href="route('admin.bookings-index')" wire:navigate>
+            {{ __('Bookings') }}
+        </flux:breadcrumbs.item>
+        <flux:breadcrumbs.item>{{ $booking->name ?: $booking->reference }}</flux:breadcrumbs.item>
     </flux:breadcrumbs>
+    <flux:dropdown class="md:hidden">
+        <flux:navbar.item icon-trailing="chevron-down">
+            {{ \Illuminate\Support\Str::limit($booking->name ?: $booking->reference, 22) }}</flux:navbar.item>
+
+        <flux:navmenu>
+            <flux:navmenu.item :href="route('admin.bookings-index')" wire:navigate>
+                {{ __('Bookings') }}</flux:navmenu.item>
+        </flux:navmenu>
+    </flux:dropdown>
 @endsection

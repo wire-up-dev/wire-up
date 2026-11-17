@@ -103,7 +103,7 @@ it('cancels and moves a booking from its page', function (): void {
     $booking = Booking::factory()->claimed()->create(['starts_at' => CarbonImmutable::parse('2026-11-18 10:00', 'UTC'), 'timezone' => 'Asia/Tokyo', 'notes' => 'Bring notes', 'phone' => '555']);
     $this->actingAsAdmin();
 
-    $this->get(route('admin.bookings-show', $booking))->assertOk()->assertSee('Bring notes')->assertSee('Their time:')->assertSee('555');
+    $this->get(route('admin.bookings-show', $booking))->assertOk()->assertSee('Bring notes')->assertSee('Their time')->assertSee('555');
 
     Livewire::test('pages::admin.bookings-show', ['booking' => $booking])
         ->call('openReschedule')
@@ -149,7 +149,8 @@ it('links a paid booking to its order and shows a clash', function (): void {
     $booking = Booking::factory()->create(['order_id' => $order->id, 'clashed' => true, 'name' => null, 'email' => null]);
 
     $this->actingAsAdmin()->get(route('admin.bookings-show', $booking))
-        ->assertSee('Order '.$order->reference)
+        ->assertSee($order->reference)
+        ->assertSee(route('admin.orders-show', $order), false)
         ->assertSee('This booking clashes with another one')
         ->assertSee('Blocked time');
 });
@@ -165,6 +166,32 @@ it('lets viewers look but not change anything', function (): void {
     Livewire::test('pages::admin.bookings-show', ['booking' => $booking])->call('openReschedule')->assertForbidden();
     Livewire::test('pages::admin.bookings-show', ['booking' => $booking])->call('reschedule')->assertForbidden();
     Livewire::test('pages::admin.bookings-index')->call('add')->assertForbidden();
+    Livewire::test('pages::admin.bookings-index')->call('cancel', $booking->id)->assertForbidden();
+    Livewire::withQueryParams(['move' => 1])->test('pages::admin.bookings-show', ['booking' => $booking])->assertSet('showMove', false);
 
     expect($booking->refresh()->status)->toBe(BookingStatus::CONFIRMED);
+});
+
+it('cancels a booking or opens its move form from the row menu', function (): void {
+    Notification::fake();
+    $booking = Booking::factory()->claimed()->create(['name' => 'Row Person']);
+    $cancelled = Booking::factory()->cancelled()->create();
+    $this->actingAsAdmin();
+
+    $this->get(route('admin.bookings-index'))
+        ->assertSee(route('admin.bookings-show', ['booking' => $booking, 'move' => 1]), false);
+
+    Livewire::withQueryParams(['move' => 1])->test('pages::admin.bookings-show', ['booking' => $booking])
+        ->assertSet('showMove', true)
+        ->assertSet('time', $booking->starts_at->format('H:i'));
+
+    Livewire::withQueryParams(['move' => 1])->test('pages::admin.bookings-show', ['booking' => $cancelled])->assertSet('showMove', false);
+
+    Livewire::test('pages::admin.bookings-index')
+        ->call('cancel', $booking->id)
+        ->call('cancel', $booking->id)
+        ->call('cancel', 999999);
+
+    expect($booking->refresh()->status)->toBe(BookingStatus::CANCELLED)
+        ->and(Activity::query()->where('event', ActivityEvent::BOOKING_CANCELLED)->count())->toBe(1);
 });

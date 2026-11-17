@@ -1,7 +1,7 @@
 @php
     $site = \App\Services\SettingsService::current();
     $message = $site->cookieConsentText('message');
-    $buttonClass = 'wire-btn inline-flex flex-1 items-center justify-center rounded-(--wire-btn-radius) px-4 py-2 text-sm font-medium transition hover:opacity-90 sm:flex-none';
+    $buttonClass = 'wire-btn inline-flex cursor-pointer flex-1 items-center justify-center rounded-(--wire-btn-radius) px-4 py-2 text-sm font-medium transition hover:opacity-90 sm:flex-none';
 @endphp
 
 <div

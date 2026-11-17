@@ -17,6 +17,8 @@
         $items = array_values(array_filter(is_array($value) ? $value : [], fn (mixed $item): bool => is_string($item) && mb_trim($item) !== ''));
     } elseif ($fieldType === \App\Enums\FieldType::BOOLEAN) {
         $text = $value === null || $value === '' ? '' : ($value ? __('Yes') : __('No'));
+    } elseif ($key === \App\Services\RecordTypePresets::DURATION_FIELD && $record->recordType->bookable && is_numeric($value)) {
+        $text = __(':count min', ['count' => (int) $value]);
     } elseif ($fieldType === \App\Enums\FieldType::MONEY) {
         $text = is_numeric($value) ? \App\Services\SettingsService::current()->formatMoney($value) : '';
     } elseif ($fieldType === \App\Enums\FieldType::DATE) {

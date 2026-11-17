@@ -10,6 +10,7 @@ use App\Models\RecordType;
 use App\Models\Settings;
 use App\Services\BookingAvailability;
 use App\Services\BookingService;
+use App\Services\RecordFieldText;
 use Carbon\CarbonImmutable;
 
 beforeEach(function (): void {
@@ -129,4 +130,22 @@ it('writes times in the reader\'s zone and language and links to the right langu
         ->and($bookings->manageUrl($booking))->toEndWith('/nl/booking/manage/'.$booking->manage_token)
         ->and($bookings->manageUrl($booking, ['cancelled' => '1']))->toEndWith('?cancelled=1')
         ->and($bookings->serviceLocation($booking))->toBeEmpty();
+});
+
+it('shows a service length in minutes in the admin list and on its page', function (): void {
+    $service = bookableService(['duration_minutes' => 45]);
+    $plain = RecordType::factory()->create(['fields' => [['key' => 'duration_minutes', 'type' => 'number', 'label' => ['en' => 'Pages'], 'column' => true]]]);
+    $book = Record::factory()->for($plain, 'recordType')->create(['data' => ['duration_minutes' => 300]]);
+
+    expect(RecordFieldText::column($service, ['key' => 'duration_minutes', 'type' => 'number']))->toBe('45 min')
+        ->and(RecordFieldText::column($book, ['key' => 'duration_minutes', 'type' => 'number']))->toBe('300');
+
+    $this->actingAsAdmin()
+        ->get(route('admin.records-index', $service->recordType))
+        ->assertSee('Length')
+        ->assertSee('45 min');
+
+    $this->get(route('record', [$service->recordType->slug_prefix, 'service-'.$service->id]))
+        ->assertOk()
+        ->assertSee('45 min');
 });

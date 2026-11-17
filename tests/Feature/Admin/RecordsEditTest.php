@@ -576,3 +576,20 @@ it('copies a block from a page into a record', function (): void {
     expect(array_column($blocks, 'type'))->toBe(['rich-text'])
         ->and($blocks[0]['content']['body'])->toBe(['en' => '<p>Shared</p>']);
 });
+
+it('asks for a service length in minutes with a min suffix', function (): void {
+    $service = bookableService(['duration_minutes' => 30]);
+    $plain = RecordType::factory()->create(['fields' => [['key' => 'duration_minutes', 'type' => 'number', 'label' => ['en' => 'Pages']]]]);
+    $book = makeRecord($plain);
+
+    $this->actingAsAdmin();
+
+    Livewire::test('pages::admin.records-edit', ['recordType' => $service->recordType, 'record' => $service])
+        ->assertSee('Length')
+        ->assertSeeHtml('step="5"')
+        ->assertSee('min');
+
+    Livewire::test('pages::admin.records-edit', ['recordType' => $plain, 'record' => $book])
+        ->assertSeeHtml('step="any"')
+        ->assertDontSeeHtml('step="5"');
+});

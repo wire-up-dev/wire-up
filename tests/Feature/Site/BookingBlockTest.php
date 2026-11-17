@@ -6,6 +6,7 @@ use App\Enums\BlockType;
 use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Models\Order;
+use App\Models\Record;
 use App\Models\Settings;
 use App\Models\User;
 use App\Notifications\BookingAlert;
@@ -34,12 +35,11 @@ function filledBooking(Testable $widget, string $slot = '2026-11-17T10:00:00Z'):
 {
     test()->travel(5)->seconds();
 
-    return $widget->call('pickDate', '2026-11-17')
-        ->call('pickSlot', $slot)
-        ->call('toDetails')
+    return $widget->call('pickSlot', $slot)
         ->set('name', 'Ada Lovelace')
         ->set('email', 'Ada@Example.com')
-        ->set('notes', 'First session');
+        ->set('notes', 'First session')
+        ->call('toConfirm');
 }
 
 it('lets a visitor pick a service, a day and a time, then books it', function (): void {
@@ -55,11 +55,18 @@ it('lets a visitor pick a service, a day and a time, then books it', function ()
         ->call('chooseService', $intro->id)
         ->assertSet('step', 'time')
         ->assertSeeHtml('data-available-day="2026-11-17"')
-        ->call('toDetails')
-        ->assertHasErrors('time');
+        ->set('name', 'Ada')
+        ->set('email', 'ada@example.com')
+        ->call('toConfirm')
+        ->assertHasErrors('time')
+        ->assertSet('step', 'time')
+        ->call('pickDate', '2026-11-18')
+        ->assertSet('date', '2026-11-18');
 
     filledBooking($widget)
-        ->assertSet('step', 'details')
+        ->assertSet('date', '2026-11-17')
+        ->assertSet('step', 'confirm')
+        ->assertSee('Ada Lovelace')
         ->call('book')
         ->assertHasNoErrors()
         ->assertSet('step', 'done')
@@ -93,7 +100,7 @@ it('skips the service step when there is only one and fills in a signed-in membe
 
     test()->travel(5)->seconds();
 
-    $widget->call('pickDate', '2026-11-17')->call('pickSlot', '2026-11-17T09:00:00Z')->call('toDetails')->call('book')->assertSet('step', 'done');
+    $widget->call('pickSlot', '2026-11-17T09:00:00Z')->call('toConfirm')->call('book')->assertSet('step', 'done');
 
     expect(Booking::query()->sole()->user_id)->toBe($member->id);
 });
@@ -144,7 +151,8 @@ it('asks for a phone number only when the block wants one', function (): void {
 
     filledBooking(bookingWidget(['phone' => 'required']))->call('book')->assertHasErrors(['phone' => 'required']);
     filledBooking(bookingWidget(['phone' => 'off']))->set('phone', '555')->call('book')->assertHasNoErrors();
-    filledBooking(bookingWidget(['phone' => 'weird']), '2026-11-17T11:00:00Z')->assertSee('Phone (optional)')->set('phone', '555 0100')->call('book')->assertHasNoErrors();
+    bookingWidget(['phone' => 'weird'])->call('pickSlot', '2026-11-17T11:00:00Z')->assertSee('Phone (optional)');
+    filledBooking(bookingWidget(['phone' => 'weird']), '2026-11-17T11:00:00Z')->set('phone', '555 0100')->call('book')->assertHasNoErrors();
 
     expect(Booking::query()->orderBy('id')->pluck('phone')->all())->toBe([null, '555 0100']);
 });
@@ -154,7 +162,7 @@ it('refuses bots, rushed submissions, staff acting as a member and repeat attemp
 
     filledBooking(bookingWidget())->set('website', 'spam')->call('book')->assertHasErrors('form');
 
-    $rushed = bookingWidget()->call('pickDate', '2026-11-17')->call('pickSlot', '2026-11-17T10:00:00Z')->call('toDetails')->set('name', 'A')->set('email', 'a@example.com');
+    $rushed = bookingWidget()->call('pickSlot', '2026-11-17T10:00:00Z')->set('name', 'A')->set('email', 'a@example.com');
     $rushed->call('book')->assertHasErrors('form');
 
     foreach (range(1, 5) as $attempt) {
@@ -179,28 +187,79 @@ it('shows times in the visitor\'s zone and keeps to the months that can be booke
         ->call('pickDate', '2026-11-17');
 
     expect(array_column($widget->instance()->slotsForDate(), 'label'))->toContain('2:45 PM')
+        ->and($widget->instance()->availableDays()[0])->toBe(['date' => '2026-11-16', 'label' => 'Mon, November 16'])
         ->and($widget->instance()->canGoBack())->toBeFalse();
 
     $widget->call('previousMonth')->assertSet('month', '2026-11')
         ->call('nextMonth')->call('nextMonth')->call('nextMonth')->assertSet('month', '2027-01')
         ->call('pickDate', '2026-12-01')->assertSet('date', '')
-        ->call('useTimezone', 'Nowhere/Land')->assertSet('timezone', 'UTC')
-        ->call('back')->assertSet('step', 'time');
+        ->call('pickSlot', '2026-12-01T10:00:00Z')->assertSet('slot', '')
+        ->call('useTimezone', 'Nowhere/Land')->assertSet('timezone', 'UTC');
 
     expect($widget->instance()->monthLabel())->toBe('January 2027')
-        ->and($widget->instance()->weekdayNames())->toBe(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']);
+        ->and($widget->instance()->activeDate())->toBe('2027-01-01');
+});
+
+it('opens on the first month that still has free times', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-30 18:00', 'UTC'));
+    bookableService();
+
+    bookingWidget()->assertSet('month', '2026-12')->assertSeeHtml('data-available-day="2026-12-01"');
+});
+
+it('shows one step at a time and lets the visitor go back to change a choice', function (): void {
+    bookableService(['heading' => ['en' => 'Intro call']]);
+    bookableService(['heading' => ['en' => 'Deep dive']]);
+
+    $widget = bookingWidget()
+        ->assertSeeHtml('data-booking-step="service"')
+        ->assertDontSeeHtml('data-booking-step="time"')
+        ->call('goTo', 'details')
+        ->assertSet('step', 'service');
+
+    $first = Record::query()->orderBy('id')->firstOrFail();
+
+    $widget->call('chooseService', $first->id)
+        ->assertSeeHtml('data-booking-step="time"')
+        ->assertDontSeeHtml('data-booking-step="service"')
+        ->call('pickSlot', '2026-11-17T10:00:00Z')
+        ->assertSet('step', 'details')
+        ->assertSee('Intro call · Tuesday 17 November 2026, 10:00 AM')
+        ->call('goTo', 'time')
+        ->assertSet('step', 'time')
+        ->call('goTo', 'service')
+        ->assertSet('step', 'service')
+        ->call('goTo', 'nowhere')
+        ->assertSet('step', 'service');
+});
+
+it('keeps a single service on its time step', function (): void {
+    bookableService();
+
+    bookingWidget()->assertSet('step', 'time')->call('goTo', 'service')->assertSet('step', 'time');
 });
 
 it('ignores a service or time that is not on offer', function (): void {
     bookableService();
     bookableService();
 
-    bookingWidget()
-        ->call('chooseService', 999)->assertSet('step', 'service')
-        ->set('serviceId', 999)->set('step', 'details')->call('back')->assertSet('step', 'time')->assertSeeHtml('wire:click="chooseService(');
+    bookingWidget()->call('chooseService', 999)->assertSet('step', 'service');
 
     $widget = bookingWidget();
-    $widget->set('serviceId', Booking::query()->count() + 999)->set('step', 'details')->set('name', 'Ada')->set('email', 'ada@example.com');
+    $widget->set('serviceId', 999)->set('step', 'confirm')->set('name', 'Ada')->set('email', 'ada@example.com');
     test()->travel(5)->seconds();
     $widget->call('book')->assertSet('step', 'time')->assertHasErrors('time');
+});
+
+it('lines its heading up on the left unless it is set to the center, and keeps the steps centered', function (): void {
+    bookableService();
+
+    bookingWidget(['heading' => ['en' => '<p>Book</p>']])
+        ->assertSeeHtml('class="space-y-4"')
+        ->assertDontSeeHtml('space-y-4 text-center')
+        ->assertSeeHtml('class="mx-auto max-w-2xl space-y-12"');
+
+    bookingWidget(['heading' => ['en' => '<p>Book</p>'], 'align' => 'center'])
+        ->assertSeeHtml('class="space-y-4 text-center"')
+        ->assertSeeHtml('class="mx-auto max-w-2xl space-y-12"');
 });

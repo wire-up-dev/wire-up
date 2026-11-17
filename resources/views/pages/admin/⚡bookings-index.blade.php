@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\CancelBookingAction;
 use App\Actions\CreateBookingAction;
 use App\Enums\BookingActor;
 use App\Enums\BookingStatus;
@@ -19,6 +20,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Stripe\Exception\ApiErrorException;
 
 return new class extends Component
 {
@@ -53,6 +55,21 @@ return new class extends Component
     {
         if (in_array($property, ['search', 'status', 'when'], true)) {
             $this->resetPage();
+        }
+    }
+
+    /**
+     * @throws ApiErrorException
+     */
+    public function cancel(int $id, CancelBookingAction $cancel): void
+    {
+        $this->authorize('bookings.edit');
+
+        $booking = Booking::query()->find($id);
+
+        if ($booking instanceof Booking && $cancel->handle($booking, BookingActor::OWNER)) {
+            Flux::toast(__('Booking cancelled.'), variant: 'success');
+            unset($this->bookings);
         }
     }
 
@@ -234,6 +251,7 @@ return new class extends Component
             <flux:table.column>{{ __('Who') }}</flux:table.column>
             <flux:table.column>{{ __('Service') }}</flux:table.column>
             <flux:table.column class="w-40">{{ __('Status') }}</flux:table.column>
+            <flux:table.column class="w-10"></flux:table.column>
         </flux:table.columns>
 
         <flux:table.rows>
@@ -266,10 +284,50 @@ return new class extends Component
                             <flux:badge size="sm" color="red" icon="exclamation-triangle">{{ __('Clash') }}</flux:badge>
                         @endif
                     </flux:table.cell>
+                    <flux:table.cell>
+                        <flux:dropdown class="flex justify-end">
+                            <flux:button
+                                variant="ghost"
+                                size="sm"
+                                icon="ellipsis-horizontal"
+                                square
+                                :aria-label="__('Actions')"
+                            />
+                            <flux:menu>
+                                <flux:menu.item
+                                    icon="eye"
+                                    href="{{ route('admin.bookings-show', $booking) }}"
+                                    wire:navigate
+                                >
+                                    {{ __('View') }}
+                                </flux:menu.item>
+                                @can('bookings.edit')
+                                    @if ($booking->status === \App\Enums\BookingStatus::CONFIRMED)
+                                        <flux:menu.item
+                                            icon="arrows-right-left"
+                                            href="{{ route('admin.bookings-show', ['booking' => $booking, 'move' => 1]) }}"
+                                            wire:navigate
+                                        >
+                                            {{ __('Move…') }}
+                                        </flux:menu.item>
+                                        <flux:menu.separator />
+                                        <flux:menu.item
+                                            icon="x-circle"
+                                            variant="danger"
+                                            wire:click="cancel({{ $booking->id }})"
+                                            wire:confirm="{{ __('Cancel this booking? The time becomes free again.') }}"
+                                        >
+                                            {{ __('Cancel') }}
+                                        </flux:menu.item>
+                                    @endif
+                                @endcan
+                            </flux:menu>
+                        </flux:dropdown>
+                    </flux:table.cell>
                 </flux:table.row>
             @empty
                 <flux:table.row>
-                    <flux:table.cell colspan="4" class="py-10 text-center">
+                    <flux:table.cell colspan="5" class="py-10 text-center">
                         <flux:text>{{ $when === 'past' ? __('No past bookings yet.') : __('No upcoming bookings.') }}</flux:text>
                     </flux:table.cell>
                 </flux:table.row>

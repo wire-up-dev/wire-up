@@ -79,6 +79,7 @@ return new class extends Component
     public function startRescheduling(): void
     {
         $this->rescheduling = $this->canChange();
+        $this->moveToOpenMonth();
     }
 
     public function reschedule(RescheduleBookingAction $reschedule): void
@@ -124,7 +125,7 @@ return new class extends Component
 @php
     $booking = $this->booking();
     $bookings = resolve(\App\Services\BookingService::class);
-    $buttonClass = 'wire-btn inline-flex items-center justify-center rounded-(--wire-btn-radius) px-5 py-2.5 font-medium transition hover:opacity-90';
+    $buttonClass = 'wire-btn inline-flex cursor-pointer items-center justify-center rounded-(--wire-btn-radius) px-5 py-2.5 font-medium transition hover:opacity-90';
 @endphp
 
 <section class="w-full">
@@ -165,14 +166,14 @@ return new class extends Component
             @if ($rescheduling)
                 <div class="space-y-6">
                     <x-site.booking-calendar
-                        :days="$this->calendarDays()"
-                        :weekdays="$this->weekdayNames()"
+                        :title="__('Pick a new time')"
                         :month-label="$this->monthLabel()"
                         :can-go-back="$this->canGoBack()"
                         :can-go-forward="$this->canGoForward()"
-                        :date="$date"
+                        :days="$this->availableDays()"
+                        :date="$this->activeDate()"
                         :times="$this->slotsForDate()"
-                        :slot="$slot"
+                        :selected="$this->slot"
                         :timezone="$timezone"
                         :timezones="$this->timezoneOptions()"
                     />
@@ -185,7 +186,7 @@ return new class extends Component
                         <button
                             type="button"
                             wire:click="reschedule"
-                            @disabled($slot === '')
+                            @disabled($this->slot === '')
                             class="{{ $buttonClass }} bg-(--wire-primary-bg) text-(--wire-primary-text) [--wire-btn-border:var(--wire-primary-border)] disabled:opacity-50"
                         >
                             {{ __('Move to this time') }}

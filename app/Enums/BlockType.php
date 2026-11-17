@@ -476,6 +476,7 @@ enum BlockType: string
                 'recordIds' => [],
                 'showPrices' => true,
                 'phone' => 'optional',
+                'align' => 'left',
                 'submitText' => [],
                 'successMessage' => [],
                 'hasBackground' => false,

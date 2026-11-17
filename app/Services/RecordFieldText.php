@@ -43,6 +43,10 @@ final class RecordFieldText
             return '—';
         }
 
+        if ($key === RecordTypePresets::DURATION_FIELD && $record->recordType->bookable && is_numeric($value)) {
+            return __(':count min', ['count' => (int) $value]);
+        }
+
         return match ($type) {
             FieldType::BOOLEAN => $value ? __('Yes') : __('No'),
             FieldType::MONEY => SettingsService::current()->formatMoney(is_numeric($value) ? $value : null),

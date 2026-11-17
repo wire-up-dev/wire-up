@@ -44,6 +44,11 @@
         </flux:checkbox.group>
     @endif
 
+    <flux:radio.group wire:model.live="{{ $c }}.align" variant="segmented" label="{{ __('Heading alignment') }}">
+        <flux:radio value="left" icon="bars-3-bottom-left" label="{{ __('Left') }}" />
+        <flux:radio value="center" icon="bars-3" label="{{ __('Center') }}" />
+    </flux:radio.group>
+
     <flux:switch wire:model.live="{{ $c }}.showPrices" label="{{ __('Show prices') }}" align="left" />
 
     <flux:radio.group wire:model.live="{{ $c }}.phone" variant="segmented" label="{{ __('Phone number') }}">
