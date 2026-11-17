@@ -7,6 +7,7 @@ use App\Actions\CreateRecordAction;
 use App\Enums\ContentStatus;
 use App\Models\Locale;
 use App\Models\Media;
+use App\Models\Page;
 use App\Models\Record;
 use App\Models\RecordType;
 use App\Models\Role;
@@ -558,4 +559,20 @@ it('checks the edit and category abilities again on every save', function (): vo
     $this->actingAs($editor->fresh());
 
     $component->call('update')->assertForbidden();
+});
+
+it('copies a block from a page into a record', function (): void {
+    $type = RecordType::factory()->create();
+    $record = makeRecord($type);
+    $page = Page::factory()->create();
+    $page->updateBlocks([['id' => 'new-a', 'type' => 'rich-text', 'content' => ['body' => ['en' => '<p>Shared</p>']]]]);
+
+    $this->actingAsAdmin();
+
+    $blocks = array_values(Livewire::test('pages::admin.records-edit', ['recordType' => $type, 'record' => $record])
+        ->dispatch('block-source-selected', blockId: $page->blocks()->sole()->id)
+        ->get('blocks'));
+
+    expect(array_column($blocks, 'type'))->toBe(['rich-text'])
+        ->and($blocks[0]['content']['body'])->toBe(['en' => '<p>Shared</p>']);
 });

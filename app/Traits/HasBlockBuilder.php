@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Traits;
 
 use App\Enums\BlockType;
+use App\Services\BlockSources;
 use Flux\Flux;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -216,6 +217,38 @@ trait HasBlockBuilder
                 $blockId => array_merge($this->blocks[$blockId], ['position' => $index]),
             ])
             ->all();
+    }
+
+    #[On('block-source-selected')]
+    public function addBlockFromSource(int $blockId): void
+    {
+        $source = resolve(BlockSources::class)->copyable($blockId);
+
+        if ($source === null) {
+            return;
+        }
+
+        $blocks = array_values($this->blocks);
+        $position = min($this->insertPosition ?? count($blocks), count($blocks));
+
+        $copy = $this->withBlockDefaults([[
+            'id' => 'new-'.Str::uuid()->toString(),
+            'type' => $source->type->value,
+            'position' => $position,
+            'content' => $this->duplicatedContent($source->content ?? []),
+        ]]);
+
+        array_splice($blocks, $position, 0, $copy);
+
+        $this->blocks = collect($blocks)
+            ->mapWithKeys(fn (array $block, int $index): array => [
+                $block['id'] => array_merge($block, ['position' => $index]),
+            ])
+            ->all();
+
+        $this->insertPosition = null;
+
+        Flux::modal('block-picker')->close();
     }
 
     public function duplicateBlock(string $id): void

@@ -734,41 +734,58 @@ return new class extends Component
                                         });
                                     "
                                 >
-                                    <div class="space-y-4">
-                                        <flux:heading size="lg">{{ __('Add a block') }}</flux:heading>
-                                        <flux:input
-                                            x-ref="blockSearch"
-                                            x-model="q"
-                                            icon="magnifying-glass"
-                                            clearable
-                                            placeholder="{{ __('Search blocks…') }}"
-                                        />
-                                    </div>
-                                    <div class="grid min-h-100 grid-cols-1 content-start gap-3 overflow-y-auto overscroll-contain p-1 sm:grid-cols-3 md:h-[calc(100vh-20rem)] lg:grid-cols-5">
-                                        @foreach (\App\Enums\BlockType::sorted() as $pickerType)
-                                            <button
-                                                type="button"
-                                                wire:click="addBlock('{{ $pickerType->value }}')"
-                                                x-show="q.trim() === '' || @js($pickerSearches[$loop->index]).includes(q.toLowerCase().trim())"
-                                                class="flex h-fit flex-col gap-2 rounded-lg border border-zinc-200 p-4 text-left transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-white/5"
-                                            >
-                                                <flux:icon
-                                                    name="{{ $pickerType->icon() }}"
-                                                    class="size-6 text-zinc-400"
-                                                />
-                                                <flux:heading size="sm">{{ $pickerType->label() }}</flux:heading>
-                                                <flux:text size="sm">{{ $pickerType->description() }}</flux:text>
-                                            </button>
-                                        @endforeach
+                                    <flux:heading size="lg">{{ __('Add a block') }}</flux:heading>
+                                    <flux:tab.group>
+                                        <flux:tabs>
+                                            <flux:tab name="new">{{ __('New block') }}</flux:tab>
+                                            <flux:tab name="copy">{{ __('From another page') }}</flux:tab>
+                                        </flux:tabs>
 
-                                        <div
-                                            class="col-span-full py-10 text-center"
-                                            x-show="q.trim() !== '' && @js($pickerSearches->all()).every(h => ! h.includes(q.toLowerCase().trim()))"
-                                            x-cloak
-                                        >
-                                            <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('No blocks match your search.') }}</flux:text>
-                                        </div>
-                                    </div>
+                                        <flux:tab.panel name="copy">
+                                            <div class="min-h-100 overflow-y-auto overscroll-contain p-1 md:h-[calc(100vh-24rem)]">
+                                                <livewire:admin.block-source-picker
+                                                    exclude-type="record"
+                                                    :exclude-id="$record->id"
+                                                    lazy
+                                                />
+                                            </div>
+                                        </flux:tab.panel>
+
+                                        <flux:tab.panel name="new" class="space-y-4">
+                                            <flux:input
+                                                x-ref="blockSearch"
+                                                x-model="q"
+                                                icon="magnifying-glass"
+                                                clearable
+                                                placeholder="{{ __('Search blocks…') }}"
+                                            />
+                                            <div class="grid min-h-100 grid-cols-1 content-start gap-3 overflow-y-auto overscroll-contain p-1 sm:grid-cols-3 md:h-[calc(100vh-27rem)] lg:grid-cols-5">
+                                                @foreach (\App\Enums\BlockType::sorted() as $pickerType)
+                                                    <button
+                                                        type="button"
+                                                        wire:click="addBlock('{{ $pickerType->value }}')"
+                                                        x-show="q.trim() === '' || @js($pickerSearches[$loop->index]).includes(q.toLowerCase().trim())"
+                                                        class="flex h-fit flex-col gap-2 rounded-lg border border-zinc-200 p-4 text-left transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-white/5"
+                                                    >
+                                                        <flux:icon
+                                                            name="{{ $pickerType->icon() }}"
+                                                            class="size-6 text-zinc-400"
+                                                        />
+                                                        <flux:heading size="sm">{{ $pickerType->label() }}</flux:heading>
+                                                        <flux:text size="sm">{{ $pickerType->description() }}</flux:text>
+                                                    </button>
+                                                @endforeach
+
+                                                <div
+                                                    class="col-span-full py-10 text-center"
+                                                    x-show="q.trim() !== '' && @js($pickerSearches->all()).every(h => ! h.includes(q.toLowerCase().trim()))"
+                                                    x-cloak
+                                                >
+                                                    <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('No blocks match your search.') }}</flux:text>
+                                                </div>
+                                            </div>
+                                        </flux:tab.panel>
+                                    </flux:tab.group>
                                 </div>
                             </flux:modal>
 

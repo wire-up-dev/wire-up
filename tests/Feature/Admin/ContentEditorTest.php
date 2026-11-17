@@ -6,6 +6,10 @@ use App\Enums\BlockType;
 use App\Enums\ContentStatus;
 use App\Models\Block;
 use App\Models\Page;
+use App\Models\Record;
+use App\Models\RecordType;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Support\Arr;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -1241,4 +1245,58 @@ it('ignores a duplicate request for a block that is not there', function (): voi
     $component = editor($this->page);
 
     expect($component->call('duplicateBlock', 'no-such-block')->get('blocks'))->toHaveCount(1);
+});
+
+it('copies a block from another page into the chosen spot', function (): void {
+    $this->page->slugs()->create(['locale' => 'en', 'slug' => 'sample']);
+    $this->page->updateBlocks([
+        ['id' => 'new-a', 'type' => 'rich-text', 'content' => ['body' => ['en' => '<p>first</p>']]],
+        ['id' => 'new-b', 'type' => 'divider', 'content' => []],
+    ]);
+    $other = Page::factory()->create(['title' => 'Services']);
+    $other->updateBlocks([
+        ['id' => 'new-c', 'type' => 'feature-cards', 'content' => ['items' => [['id' => 'card-1', 'title' => ['en' => 'One']]]]],
+    ]);
+    $source = $other->blocks()->sole();
+
+    $blocks = array_values(editor($this->page)
+        ->call('openBlockPicker', 1)
+        ->dispatch('block-source-selected', blockId: $source->id)
+        ->call('update')
+        ->assertHasNoErrors()
+        ->get('blocks'));
+
+    expect(array_column($blocks, 'type'))->toBe(['rich-text', 'feature-cards', 'divider'])
+        ->and($blocks[1]['content']['items'][0]['title'])->toBe(['en' => 'One'])
+        ->and($blocks[1]['content']['items'][0]['id'])->not->toBe('card-1')
+        ->and($this->page->blocks()->count())->toBe(3)
+        ->and($source->fresh()?->content['items'][0]['id'])->toBe('card-1')
+        ->and($other->blocks()->count())->toBe(1);
+});
+
+it('adds a copied block at the end when no spot was chosen', function (): void {
+    $this->page->updateBlocks([['id' => 'new-a', 'type' => 'divider', 'content' => []]]);
+    $record = Record::factory()->for(RecordType::factory()->create(), 'recordType')->create();
+    $record->updateBlocks([['id' => 'new-b', 'type' => 'rich-text', 'content' => ['body' => ['en' => '<p>From a record</p>']]]]);
+
+    $blocks = array_values(editor($this->page)
+        ->dispatch('block-source-selected', blockId: $record->blocks()->sole()->id)
+        ->get('blocks'));
+
+    expect(array_column($blocks, 'type'))->toBe(['divider', 'rich-text'])
+        ->and($blocks[1]['content']['body'])->toBe(['en' => '<p>From a record</p>']);
+});
+
+it('refuses to copy a block the editor is not allowed to see', function (): void {
+    $hidden = RecordType::factory()->create(['key' => 'secrets']);
+    $record = Record::factory()->for($hidden, 'recordType')->create();
+    $record->updateBlocks([['id' => 'new-a', 'type' => 'divider', 'content' => []]]);
+    $role = Role::query()->create(['key' => 'page-editor', 'name' => 'Page editor', 'abilities' => ['pages.view', 'pages.edit'], 'bypass' => false, 'is_protected' => false]);
+    $this->actingAs(User::factory()->role($role)->create(['active' => true]));
+
+    $component = editor($this->page)
+        ->dispatch('block-source-selected', blockId: $record->blocks()->sole()->id)
+        ->dispatch('block-source-selected', blockId: 999999);
+
+    expect($component->get('blocks'))->toBeEmpty();
 });
