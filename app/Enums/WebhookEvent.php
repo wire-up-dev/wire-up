@@ -12,6 +12,9 @@ enum WebhookEvent: string
     case ORDER_FULFILLED = 'order.fulfilled';
     case ORDER_REFUNDED = 'order.refunded';
     case ORDER_CANCELLED = 'order.cancelled';
+    case BOOKING_CONFIRMED = 'booking.confirmed';
+    case BOOKING_RESCHEDULED = 'booking.rescheduled';
+    case BOOKING_CANCELLED = 'booking.cancelled';
     case PING = 'ping';
 
     /**
@@ -26,6 +29,9 @@ enum WebhookEvent: string
             self::ORDER_FULFILLED,
             self::ORDER_REFUNDED,
             self::ORDER_CANCELLED,
+            self::BOOKING_CONFIRMED,
+            self::BOOKING_RESCHEDULED,
+            self::BOOKING_CANCELLED,
         ];
     }
 
@@ -49,6 +55,9 @@ enum WebhookEvent: string
             self::ORDER_FULFILLED => __('Order fulfilled'),
             self::ORDER_REFUNDED => __('Order refunded'),
             self::ORDER_CANCELLED => __('Order cancelled'),
+            self::BOOKING_CONFIRMED => __('Booking confirmed'),
+            self::BOOKING_RESCHEDULED => __('Booking moved'),
+            self::BOOKING_CANCELLED => __('Booking cancelled'),
             self::PING => __('Test'),
         };
     }

@@ -1883,3 +1883,19 @@ it('keeps a theme-token text colour in block copy', function (): void {
         ->assertSee('data-color-token="accent"', false)
         ->assertSee('style="color:var(--wire-accent)"', false);
 });
+
+it('renders the booking block for visitors', function (): void {
+    bookableService();
+    publishPageWithBlocks('book-a-call', [
+        ['id' => 'new-1', 'type' => 'booking', 'content' => array_replace_recursive(BlockType::BOOKING->defaultContent(), [
+            'heading' => ['en' => '<p>Book a call</p>'],
+            'hasBackground' => true,
+        ])],
+    ]);
+
+    $this->get(route('page', 'book-a-call'))
+        ->assertOk()
+        ->assertSee('Book a call')
+        ->assertSeeLivewire('site.booking')
+        ->assertSee('bg-(--wire-card-bg)', false);
+});

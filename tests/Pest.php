@@ -215,3 +215,42 @@ function errorAtLine(int $line, string $message = 'Something broke'): RuntimeExc
 
     return $exception;
 }
+
+/**
+ * @param  array<string, mixed>  $data
+ */
+function bookableService(array $data = []): Record
+{
+    $type = RecordType::query()->where('bookable', true)->first() ?? RecordType::factory()->bookable()->create();
+
+    $record = Record::factory()->create([
+        'record_type_id' => $type->id,
+        'data' => ['heading' => ['en' => 'Coaching call'], 'duration_minutes' => 60, ...$data],
+        'title' => 'Coaching call',
+        'status' => ContentStatus::PUBLISHED,
+        'published_at' => now()->subDay(),
+    ]);
+
+    $record->slugs()->create(['locale' => config()->string('app.default_locale', 'en'), 'slug' => 'service-'.$record->id, 'base_path' => $type->slug_prefix]);
+
+    return $record;
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ */
+function openBookingHours(array $overrides = []): void
+{
+    $day = [['start' => '09:00', 'end' => '17:00']];
+
+    Settings::set([
+        'booking_timezone' => 'UTC',
+        'booking_hours' => [1 => $day, 2 => $day, 3 => $day, 4 => $day, 5 => $day, 6 => $day, 7 => $day],
+        'booking_interval' => 60,
+        'booking_buffer' => 0,
+        'booking_notice_hours' => 0,
+        'booking_days_ahead' => 60,
+        'booking_reminder_hours' => 24,
+        ...$overrides,
+    ]);
+}

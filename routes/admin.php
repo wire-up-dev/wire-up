@@ -41,6 +41,11 @@ Route::middleware('can:inbox.view')->group(function (): void {
     Route::livewire('inbox/{submission}', 'pages::admin.inbox-show')->name('inbox-show');
 });
 
+Route::middleware('can:bookings.view')->group(function (): void {
+    Route::livewire('bookings', 'pages::admin.bookings-index')->name('bookings-index');
+    Route::livewire('bookings/{booking}', 'pages::admin.bookings-show')->name('bookings-show');
+});
+
 Route::middleware('can:orders.view')->group(function (): void {
     Route::livewire('orders', 'pages::admin.orders-index')->name('orders-index');
     Route::livewire('orders/{order}', 'pages::admin.orders-show')->name('orders-show');
@@ -76,6 +81,7 @@ Route::middleware('can:settings.view')->group(function (): void {
     Route::livewire('settings/translations', 'pages::admin.settings-translations')->name('settings-translations');
     Route::livewire('settings/social', 'pages::admin.settings-social')->name('settings-social');
     Route::livewire('settings/cookie-consent', 'pages::admin.settings-cookie-consent')->name('settings-cookie-consent');
+    Route::livewire('settings/bookings', 'pages::admin.settings-bookings')->name('settings-bookings');
     Route::livewire('settings/integrations', 'pages::admin.settings-integrations')->name('settings-integrations');
     Route::livewire('settings/webhooks', 'pages::admin.settings-webhooks')->name('settings-webhooks');
     Route::livewire('settings/shop', 'pages::admin.settings-shop')->name('settings-shop');

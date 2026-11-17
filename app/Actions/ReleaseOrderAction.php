@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class ReleaseOrderAction
 {
+    public function __construct(private ReleaseBookingHoldAction $releaseBookingHold) {}
+
     public function handle(Order $order): void
     {
         DB::transaction(function () use ($order): void {
@@ -20,6 +22,8 @@ final readonly class ReleaseOrderAction
             if (! $locked->status->holdsStock()) {
                 return;
             }
+
+            $this->releaseBookingHold->handle($locked);
 
             $items = $locked->items()->where('reserved_stock', '>', 0)->whereNotNull('record_id')->get();
 

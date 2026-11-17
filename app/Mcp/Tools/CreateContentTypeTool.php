@@ -34,6 +34,7 @@ final class CreateContentTypeTool extends Tool
                 'has_detail_page' => ['nullable', 'boolean'],
                 'has_index_page' => ['nullable', 'boolean'],
                 'sellable' => ['nullable', 'boolean'],
+                'bookable' => ['nullable', 'boolean'],
                 'admin_only' => ['nullable', 'boolean'],
                 ...Records::fieldRules(),
             ],
@@ -67,10 +68,15 @@ final class CreateContentTypeTool extends Tool
             ? Records::serializeFields($validated['fields'], $locale)
             : ($preset['fields'] ?? []);
 
-        $sellable = (bool) ($validated['sellable'] ?? $preset['sellable'] ?? false) && ! (bool) ($validated['admin_only'] ?? false);
+        $bookable = (bool) ($validated['bookable'] ?? false) && ! (bool) ($validated['admin_only'] ?? false);
+        $sellable = (bool) ($validated['sellable'] ?? $preset['sellable'] ?? false) && ! $bookable && ! (bool) ($validated['admin_only'] ?? false);
 
         if ($sellable) {
             $fields = RecordTypePresets::withSellableFields($fields);
+        }
+
+        if ($bookable) {
+            $fields = RecordTypePresets::withBookableFields($fields);
         }
 
         $key = $this->uniqueKey($preset['key'] ?? Str::slug($name, '_'));
@@ -95,6 +101,7 @@ final class CreateContentTypeTool extends Tool
             'has_detail_page' => (bool) ($validated['has_detail_page'] ?? true),
             'has_index_page' => (bool) ($validated['has_index_page'] ?? false),
             'sellable' => $sellable,
+            'bookable' => $bookable,
             'admin_only' => (bool) ($validated['admin_only'] ?? false),
             'fields' => $fields,
         ]);
@@ -134,6 +141,9 @@ final class CreateContentTypeTool extends Tool
 
             'sellable' => $schema->boolean()
                 ->description('Sell the records of this type: adds current_price (money), billing (select: One-time, Monthly, Yearly) and shippable (boolean) fields if missing, and shows a buy button on each record once Stripe is connected. Defaults to true for the product preset, false otherwise.'),
+
+            'bookable' => $schema->boolean()
+                ->description('Take bookings for the records of this type: each record becomes a service visitors can book with the booking block. Adds duration_minutes (number, steps of 5), current_price (money), charge_when_booking (boolean, only used once Stripe is connected) and booking_location (text) fields if missing. Turning it on turns sellable off. Defaults to false.'),
 
             'admin_only' => $schema->boolean()
                 ->description('Keep this type off the site: no record pages or listing, not offered to collection blocks, and documents attached to its records are stored privately (only signed-in staff can open them). Use it for internal lists such as clients or leads. Defaults to false.'),

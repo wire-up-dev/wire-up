@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\BookingFeedController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ImageController;
 use App\Http\Controllers\OgImageController;
@@ -21,6 +22,7 @@ Route::group(['prefix' => resolve('localization')->setLocale()], function (): vo
 
     Route::livewire('cart', 'pages::cart')->name('cart');
     Route::livewire('checkout/success', 'pages::checkout-success')->name('checkout.success');
+    Route::livewire('booking/manage/{token}', 'pages::booking-manage')->where('token', '[A-Za-z0-9]{40,64}')->name('booking.manage');
 
     Route::middleware('guest')->group(function (): void {
         Route::livewire('login', 'pages::auth.login')->name('login');
@@ -47,6 +49,12 @@ Route::get('img/{options}/{path}', [ImageController::class, 'show'])
     ->where('path', '.*')
     ->withoutMiddleware('web')
     ->name('image.show');
+
+Route::get('booking/feed/{token}.ics', BookingFeedController::class)
+    ->where('token', '[A-Za-z0-9]{40,64}')
+    ->withoutMiddleware('web')
+    ->middleware('throttle:30,1')
+    ->name('booking.feed');
 
 Route::get('og/{type}/{id}/{locale}.png', [OgImageController::class, 'show'])
     ->where(['type' => 'page|record', 'id' => '[0-9]+', 'locale' => '[A-Za-z_-]+'])

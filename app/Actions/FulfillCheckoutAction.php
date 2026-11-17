@@ -19,7 +19,7 @@ use Stripe\Exception\ApiErrorException;
 
 final readonly class FulfillCheckoutAction
 {
-    public function __construct(private StripeService $stripe) {}
+    public function __construct(private StripeService $stripe, private ConfirmBookingPaymentAction $confirmBooking) {}
 
     /**
      * @throws ApiErrorException
@@ -54,7 +54,9 @@ final readonly class FulfillCheckoutAction
                     'oversold' => $oversold,
                 ]);
 
-                $this->notify($locked);
+                if (! $this->confirmBooking->handle($locked)) {
+                    $this->notify($locked);
+                }
             } elseif (! $paid && $locked->status === OrderStatus::PENDING) {
                 $locked->update([...$this->details($session), 'status' => OrderStatus::PROCESSING]);
             }

@@ -17,6 +17,12 @@ final class RecordTypePresets
 
     public const array BILLING_OPTIONS = ['One-time', 'Monthly', 'Yearly'];
 
+    public const string DURATION_FIELD = 'duration_minutes';
+
+    public const string CHARGE_FIELD = 'charge_when_booking';
+
+    public const string LOCATION_FIELD = 'booking_location';
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -70,6 +76,31 @@ final class RecordTypePresets
         }
 
         return array_values($fields);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $fields
+     * @return array<int, array<string, mixed>>
+     */
+    public static function withBookableFields(array $fields): array
+    {
+        $existingKeys = array_column($fields, 'key');
+
+        foreach (self::bookableFields() as $key => $definition) {
+            if (! in_array($key, $existingKeys, true)) {
+                $fields[] = $definition;
+            }
+        }
+
+        return array_values($fields);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function bookableKeys(): array
+    {
+        return array_keys(self::bookableFields());
     }
 
     /**
@@ -230,6 +261,19 @@ final class RecordTypePresets
             self::PRICE_FIELD => self::field(self::PRICE_FIELD, FieldType::MONEY, 'Current price', ['column' => true, 'sortable' => true, 'translatable' => false]),
             self::BILLING_FIELD => self::field(self::BILLING_FIELD, FieldType::SELECT, 'Billing', ['translatable' => false, 'options' => self::BILLING_OPTIONS, 'placement' => FieldPlacement::HIDDEN->value]),
             self::SHIPPABLE_FIELD => self::field(self::SHIPPABLE_FIELD, FieldType::BOOLEAN, 'Needs shipping', ['translatable' => false, 'placement' => FieldPlacement::HIDDEN->value]),
+        ];
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private static function bookableFields(): array
+    {
+        return [
+            self::DURATION_FIELD => self::field(self::DURATION_FIELD, FieldType::NUMBER, 'Length in minutes', ['translatable' => false, 'required' => true, 'column' => true, 'help' => 'In steps of 5 minutes.']),
+            self::PRICE_FIELD => self::field(self::PRICE_FIELD, FieldType::MONEY, 'Price', ['column' => true, 'sortable' => true, 'translatable' => false]),
+            self::CHARGE_FIELD => self::field(self::CHARGE_FIELD, FieldType::BOOLEAN, 'Charge when booking', ['translatable' => false, 'help' => 'Visitors pay through Stripe before the booking is confirmed.', 'placement' => FieldPlacement::HIDDEN->value]),
+            self::LOCATION_FIELD => self::field(self::LOCATION_FIELD, FieldType::TEXT, 'Where it happens', ['help' => 'An address, or how you will meet online. Shown in the confirmation email.', 'placement' => FieldPlacement::HIDDEN->value]),
         ];
     }
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Booking;
 use App\Models\Category;
 use App\Models\Media;
 use App\Models\Order;
@@ -33,6 +34,7 @@ return [
         'user' => User::class,
         'role' => Role::class,
         'order' => Order::class,
+        'booking' => Booking::class,
         'submission' => Submission::class,
         'redirect' => Redirect::class,
         'webhook' => Webhook::class,

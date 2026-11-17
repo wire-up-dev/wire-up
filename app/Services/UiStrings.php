@@ -34,13 +34,15 @@ final class UiStrings
             'Account' => [resource_path('views/pages/⚡account.blade.php'), resource_path('views/components/shared')],
             'Cart' => [resource_path('views/pages/⚡cart.blade.php'), resource_path('views/pages/⚡checkout-success.blade.php')],
             'Sign in' => [resource_path('views/pages/auth')],
-            'Site' => [resource_path('views/components/site')],
+            'Site' => [resource_path('views/components/site'), resource_path('views/pages/⚡booking-manage.blade.php')],
             'Emails' => [
                 resource_path('views/mail/order-confirmation.blade.php'),
                 resource_path('views/mail/submission-auto-reply.blade.php'),
+                resource_path('views/mail/booking-update.blade.php'),
                 resource_path('views/vendor/mail/html/message.blade.php'),
                 app_path('Notifications/OrderConfirmation.php'),
                 app_path('Notifications/SubmissionAutoReply.php'),
+                app_path('Notifications/BookingUpdate.php'),
             ],
         ];
     }

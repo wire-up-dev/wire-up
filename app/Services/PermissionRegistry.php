@@ -21,6 +21,8 @@ final class PermissionRegistry
 
     public const string GROUP_SHOP = 'shop';
 
+    public const string GROUP_BOOKINGS = 'bookings';
+
     /**
      * @return array<int, array{key: string, label: string, group: string, actions: array<int, string>}>
      */
@@ -67,6 +69,7 @@ final class PermissionRegistry
             ['key' => 'assistant', 'label' => __('AI Assistant'), 'group' => self::GROUP_ADMINISTRATION, 'actions' => ['use']],
             ['key' => 'mcp', 'label' => __('Remote MCP'), 'group' => self::GROUP_ADMINISTRATION, 'actions' => ['use']],
             ['key' => 'orders', 'label' => __('Orders'), 'group' => self::GROUP_SHOP, 'actions' => [PermissionAction::View->value, PermissionAction::Edit->value]],
+            ['key' => 'bookings', 'label' => __('Bookings'), 'group' => self::GROUP_BOOKINGS, 'actions' => [PermissionAction::View->value, PermissionAction::Edit->value]],
             ['key' => 'activity', 'label' => __('Activity log'), 'group' => self::GROUP_ADMINISTRATION, 'actions' => [PermissionAction::View->value]],
         ];
     }

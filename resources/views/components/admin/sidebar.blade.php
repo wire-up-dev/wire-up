@@ -42,6 +42,17 @@
                     {{ __('Orders') }}</flux:sidebar.item>
             @endif
         @endcan
+        @can('bookings.view')
+            @if (resolve(\App\Services\BookingService::class)->isOpen() || \App\Models\Booking::hasAny())
+                <flux:sidebar.item
+                    icon="calendar-days"
+                    :href="route('admin.bookings-index')"
+                    :current="request()->routeIs('admin.bookings-*')"
+                    wire:navigate.hover
+                >
+                    {{ __('Bookings') }}</flux:sidebar.item>
+            @endif
+        @endcan
         @can('users.view')
             <flux:sidebar.item
                 icon="users"

@@ -6,8 +6,11 @@ use App\Actions\DeleteUserAction;
 use App\Actions\SyncSubscriptionFromCheckoutAction;
 use App\Actions\UpdateUserAction;
 use App\Actions\UpdateUserPasswordAction;
+use App\Enums\BookingStatus;
+use App\Models\Booking;
 use App\Models\Record;
 use App\Models\User;
+use App\Services\BookingService;
 use App\Services\Impersonation;
 use Flux\Flux;
 use Illuminate\Container\Attributes\CurrentUser;
@@ -129,6 +132,28 @@ return new class extends Component
             ->map(fn (Subscription $subscription): array => [
                 'name' => $this->subscriptionName($subscription),
                 'status' => $this->subscriptionStatus($subscription),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{service: string, when: string, url: string}>
+     */
+    #[Computed]
+    public function bookings(): array
+    {
+        $bookings = resolve(BookingService::class);
+
+        return Booking::query()
+            ->where('user_id', $this->user->id)
+            ->where('status', BookingStatus::CONFIRMED)
+            ->where('ends_at', '>=', now())
+            ->oldest('starts_at')
+            ->get()
+            ->map(fn (Booking $booking): array => [
+                'service' => $booking->service_name,
+                'when' => $bookings->formatTime($booking->starts_at, $booking->timezone, app()->getLocale()),
+                'url' => $bookings->manageUrl($booking),
             ])
             ->all();
     }
@@ -303,6 +328,24 @@ return new class extends Component
     <livewire:shared.passkeys />
 
     <flux:separator />
+
+    @if ($this->bookings !== [])
+        <section class="space-y-4">
+            <flux:heading size="lg">{{ __('Upcoming bookings') }}</flux:heading>
+
+            @foreach ($this->bookings as $index => $booking)
+                <div wire:key="booking-{{ $index }}" class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <flux:text variant="strong">{{ $booking['service'] }}</flux:text>
+                        <flux:text>{{ $booking['when'] }}</flux:text>
+                    </div>
+                    <flux:link href="{{ $booking['url'] }}">{{ __('Change or cancel') }}</flux:link>
+                </div>
+            @endforeach
+        </section>
+
+        <flux:separator />
+    @endif
 
     @if ($justSubscribed || $this->subscriptions !== [])
         <section class="space-y-4">

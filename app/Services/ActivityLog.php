@@ -8,6 +8,7 @@ use App\Enums\ActivityEvent;
 use App\Enums\ContentStatus;
 use App\Enums\RevisionSource;
 use App\Models\Activity;
+use App\Models\Booking;
 use App\Models\Category;
 use App\Models\Media;
 use App\Models\Order;
@@ -76,7 +77,7 @@ final class ActivityLog
             $subject instanceof Page, $subject instanceof Record => $subject->title,
             $subject instanceof Media => (string) $subject->filename,
             $subject instanceof User, $subject instanceof Role, $subject instanceof RecordType, $subject instanceof Category => $subject->name,
-            $subject instanceof Order => $subject->reference,
+            $subject instanceof Order, $subject instanceof Booking => $subject->reference,
             $subject instanceof Submission => (string) ($subject->name ?? $subject->email ?? $subject->form_name),
             $subject instanceof Redirect => $subject->from,
             $subject instanceof Webhook => $subject->name,

@@ -565,3 +565,20 @@ it('keeps the other languages when an agent renames a record', function (): void
     expect($record->translationsFor('title'))->toMatchArray(['en' => 'Renamed', 'nl' => 'Nederlandse Titel'])
         ->and($record->translationsFor('description'))->toMatchArray(['en' => 'New text', 'nl' => 'Nederlandse tekst']);
 });
+
+it('creates and switches content types that take bookings', function (): void {
+    WireUpServer::tool(CreateContentTypeTool::class, ['name' => 'Sessions', 'bookable' => true, 'sellable' => true])
+        ->assertOk()
+        ->assertSee('"bookable":true')
+        ->assertSee('"sellable":false');
+
+    expect(array_column(RecordType::query()->where('slug_prefix', 'sessions')->firstOrFail()->fields, 'key'))->toBe(['duration_minutes', 'current_price', 'charge_when_booking', 'booking_location']);
+
+    $type = RecordType::factory()->create(['key' => 'calls', 'fields' => []]);
+
+    WireUpServer::tool(UpdateContentTypeTool::class, ['type' => 'calls', 'bookable' => true])->assertOk();
+    WireUpServer::tool(UpdateContentTypeTool::class, ['type' => 'calls', 'fields' => [['key' => 'topic', 'type' => 'text', 'label' => 'Topic']]])->assertOk();
+
+    expect($type->refresh()->bookable)->toBeTrue()
+        ->and(array_column($type->fields, 'key'))->toBe(['topic', 'duration_minutes', 'current_price', 'charge_when_booking', 'booking_location']);
+});

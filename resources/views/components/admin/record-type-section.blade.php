@@ -117,6 +117,13 @@
                     description="{{ __('Adds price, billing and shipping fields, and a buy button once Stripe is connected.') }}"
                     align="left"
                 />
+
+                <flux:switch
+                    wire:model.live="types.{{ $index }}.bookable"
+                    label="{{ __('Take bookings for these records') }}"
+                    description="{{ __('Adds length, price and location fields, so each record is a service visitors can book with the Booking block.') }}"
+                    align="left"
+                />
             @endunless
 
             <div class="space-y-3">

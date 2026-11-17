@@ -11,6 +11,7 @@ enum ActivityArea: string
     case SIGN_INS = 'sign_ins';
     case SETTINGS = 'settings';
     case SHOP = 'shop';
+    case BOOKINGS = 'bookings';
     case INBOX = 'inbox';
     case SYSTEM = 'system';
 
@@ -22,6 +23,7 @@ enum ActivityArea: string
             self::SIGN_INS => __('Sign-ins'),
             self::SETTINGS => __('Settings'),
             self::SHOP => __('Shop'),
+            self::BOOKINGS => __('Bookings'),
             self::INBOX => __('Inbox'),
             self::SYSTEM => __('System'),
         };
@@ -35,6 +37,7 @@ enum ActivityArea: string
             self::SIGN_INS => 'key',
             self::SETTINGS => 'cog-6-tooth',
             self::SHOP => 'shopping-bag',
+            self::BOOKINGS => 'calendar-days',
             self::INBOX => 'inbox',
             self::SYSTEM => 'server-stack',
         };

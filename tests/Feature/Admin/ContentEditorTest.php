@@ -1313,3 +1313,13 @@ it('shows the automatic reply wording once the contact form reply is switched on
         ->assertSee('Reply subject')
         ->assertSee('Reply message');
 });
+
+it('edits the booking block and offers the bookable services', function (): void {
+    $this->page->updateBlocks([['id' => 'new-a', 'type' => 'booking', 'content' => []]]);
+
+    editor($this->page)->assertSee('Turn on Bookable for a content type');
+
+    bookableService(['heading' => ['en' => 'Intro call']]);
+
+    editor($this->page)->assertDontSee('Turn on Bookable for a content type')->assertSee('Coaching call')->assertSee('Leave all unticked to offer every service.');
+});

@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Models\Booking;
 use App\Models\User;
 use App\Services\SettingsService;
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -219,4 +221,20 @@ it('renders ordinary menu items as plain links, never as forms', function (): vo
     $this->blade('<x-site.nav :items="$items" />', ['items' => $items])
         ->assertDontSee('<form', false)
         ->assertSee(route('login'), false);
+});
+
+it('lists the member\'s upcoming bookings with a link to change them', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-16 08:00', 'UTC'));
+    $member = User::factory()->create(['active' => true]);
+    $upcoming = Booking::factory()->create(['user_id' => $member->id, 'service_name' => 'Intro call', 'starts_at' => CarbonImmutable::parse('2026-11-20 10:00', 'UTC')]);
+    Booking::factory()->create(['user_id' => $member->id, 'service_name' => 'Old call', 'starts_at' => CarbonImmutable::parse('2026-10-01 10:00', 'UTC')]);
+    Booking::factory()->cancelled()->create(['user_id' => $member->id, 'service_name' => 'Dropped call']);
+
+    $this->actingAs($member)->get(route('account'))
+        ->assertOk()
+        ->assertSee('Upcoming bookings')
+        ->assertSee('Intro call')
+        ->assertSee('/booking/manage/'.$upcoming->manage_token, false)
+        ->assertDontSee('Old call')
+        ->assertDontSee('Dropped call');
 });

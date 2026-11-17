@@ -33,6 +33,7 @@ final class UpdateContentTypeTool extends Tool
                 'has_detail_page' => ['nullable', 'boolean'],
                 'has_index_page' => ['nullable', 'boolean'],
                 'sellable' => ['nullable', 'boolean'],
+                'bookable' => ['nullable', 'boolean'],
                 'admin_only' => ['nullable', 'boolean'],
                 ...Records::fieldRules(),
             ],
@@ -65,7 +66,7 @@ final class UpdateContentTypeTool extends Tool
             $attributes['breadcrumbs'] = (bool) $validated['breadcrumbs'];
         }
 
-        foreach (['has_detail_page', 'has_index_page', 'sellable', 'admin_only'] as $flag) {
+        foreach (['has_detail_page', 'has_index_page', 'sellable', 'bookable', 'admin_only'] as $flag) {
             if (($validated[$flag] ?? null) !== null) {
                 $attributes[$flag] = (bool) $validated[$flag];
             }
@@ -86,6 +87,10 @@ final class UpdateContentTypeTool extends Tool
             if ($linkError !== null) {
                 return Response::error($linkError);
             }
+        }
+
+        if (($attributes['bookable'] ?? $type->bookable) && (isset($attributes['fields']) || ($attributes['bookable'] ?? false))) {
+            $attributes['fields'] = RecordTypePresets::withBookableFields($attributes['fields'] ?? $type->fields);
         }
 
         if (($attributes['sellable'] ?? $type->sellable) && (isset($attributes['fields']) || ($attributes['sellable'] ?? false))) {
@@ -129,6 +134,9 @@ final class UpdateContentTypeTool extends Tool
 
             'sellable' => $schema->boolean()
                 ->description('Sell the records of this type: adds current_price (money), billing (select: One-time, Monthly, Yearly) and shippable (boolean) fields if missing, and shows a buy button on each record once Stripe is connected.'),
+
+            'bookable' => $schema->boolean()
+                ->description('Take bookings for the records of this type: each record becomes a service visitors can book with the booking block. Adds duration_minutes (number, steps of 5), current_price (money), charge_when_booking (boolean, only used once Stripe is connected) and booking_location (text) fields if missing. Turning it on turns sellable off. Defaults to false.'),
 
             'admin_only' => $schema->boolean()
                 ->description('Keep this type off the site: no record pages or listing, not offered to collection blocks, and documents attached to its records are stored privately (only signed-in staff can open them). Use it for internal lists such as clients or leads. Turning it on makes the existing documents private.'),

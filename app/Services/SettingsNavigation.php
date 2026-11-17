@@ -30,6 +30,9 @@ final readonly class SettingsNavigation
                 $this->tab(__('Content Types'), 'admin.settings-content-types'),
                 $this->tab(__('Translations'), 'admin.settings-translations'),
             ]],
+            'bookings' => [__('Availability'), [
+                resolve(BookingService::class)->isOpen() ? $this->tab(__('Availability'), 'admin.settings-bookings') : null,
+            ]],
             'integrations' => [__('Integrations'), [
                 $this->tab(__('App Integrations'), 'admin.settings-integrations'),
                 $this->tab(__('Webhooks'), 'admin.settings-webhooks'),

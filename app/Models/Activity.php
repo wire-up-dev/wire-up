@@ -137,6 +137,7 @@ final class Activity extends Model
             $this->subject instanceof User => route('admin.users-edit', $this->subject),
             $this->subject instanceof Role => route('admin.settings-roles'),
             $this->subject instanceof Order => route('admin.orders-show', $this->subject),
+            $this->subject instanceof Booking => route('admin.bookings-show', $this->subject),
             $this->subject instanceof Submission => route('admin.inbox-show', $this->subject),
             $this->subject instanceof Redirect => route('admin.redirects-index', ['q' => $this->subject->from]),
             default => null,

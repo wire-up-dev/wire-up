@@ -56,6 +56,9 @@ enum ActivityEvent: string
     case ORDER_FULFILLED = 'order.fulfilled';
     case ORDER_REFUNDED = 'order.refunded';
     case ORDER_CANCELLED = 'order.cancelled';
+    case BOOKING_CREATED = 'booking.created';
+    case BOOKING_RESCHEDULED = 'booking.rescheduled';
+    case BOOKING_CANCELLED = 'booking.cancelled';
     case SUBMISSION_DELETED = 'submission.deleted';
     case SITE_IMPORTED = 'system.site_imported';
     case BACKUP_CREATED = 'system.backup_created';
@@ -122,6 +125,9 @@ enum ActivityEvent: string
             self::ORDER_FULFILLED => __('Fulfilled order'),
             self::ORDER_REFUNDED => __('Refunded order'),
             self::ORDER_CANCELLED => __('Cancelled order'),
+            self::BOOKING_CREATED => __('Added booking'),
+            self::BOOKING_RESCHEDULED => __('Moved booking'),
+            self::BOOKING_CANCELLED => __('Cancelled booking'),
             self::SUBMISSION_DELETED => __('Deleted message'),
             self::SITE_IMPORTED => __('Imported site'),
             self::BACKUP_CREATED => __('Created backup'),
@@ -145,6 +151,7 @@ enum ActivityEvent: string
             'auth' => ActivityArea::SIGN_INS,
             'settings', 'role', 'redirect' => ActivityArea::SETTINGS,
             'order' => ActivityArea::SHOP,
+            'booking' => ActivityArea::BOOKINGS,
             'submission' => ActivityArea::INBOX,
             default => ActivityArea::SYSTEM,
         };

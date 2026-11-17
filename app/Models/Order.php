@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 /**
  * @property-read int $id
@@ -44,6 +46,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read CarbonInterface $updated_at
  * @property-read User|null $user
  * @property-read Collection<int, OrderItem> $items
+ * @property-read Booking|null $booking
  */
 final class Order extends Model
 {
@@ -57,7 +60,16 @@ final class Order extends Model
 
     public static function awaitingFulfilmentCount(): int
     {
-        return once(fn (): int => self::query()->where('status', OrderStatus::PAID)->count());
+        return once(fn (): int => self::query()->where('status', OrderStatus::PAID)->whereDoesntHave('booking')->count());
+    }
+
+    public static function newReference(): string
+    {
+        do {
+            $reference = Str::upper(Str::random(8));
+        } while (self::query()->where('reference', $reference)->exists());
+
+        return $reference;
     }
 
     public function stripeDashboardUrl(): ?string
@@ -105,6 +117,14 @@ final class Order extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return HasOne<Booking, $this>
+     */
+    public function booking(): HasOne
+    {
+        return $this->hasOne(Booking::class);
     }
 
     /**

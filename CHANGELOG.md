@@ -16,6 +16,7 @@ Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater sh
 - Settings → Cookie consent can ask visitors before Google Analytics and your custom code load. It's off until you switch it on. The message and button labels can be written for each language, and a Cookie settings link in the footer lets visitors change their mind.
 - Add block has a From another page tab: find a page or record, pick one of its blocks and a copy lands where you're adding. The copy is yours to change without touching the original.
 - Contact forms can send an automatic reply to the visitor, in the language they wrote in, with a subject and message you write for each language. It never repeats what they wrote, and one address gets at most three replies an hour, so the form can't be used to send mail to strangers.
+- Bookings for people who sell their time, such as coaches. Switch on Bookable for a content type and each record becomes a service with a length, price and place. A new Booking block lets visitors pick a service, a day and a free time in their own time zone, then book it. If Stripe is connected and the service charges when booking, they pay first. Settings → Bookings holds your weekly hours, breaks, notice, closed days and a private calendar link for Google, Apple or Outlook. Visitors get a confirmation with a calendar file and a reminder, and can cancel or move the booking themselves up to a cutoff. The new Bookings screen lists them all, and you can add phone bookings or block time there.
 
 ## v0.8.2 — 2026-11-09
 

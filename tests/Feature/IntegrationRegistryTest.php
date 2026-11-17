@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Integrations\Assistant;
+use App\Integrations\BookingFeed;
 use App\Integrations\CardIntegration;
 use App\Integrations\ErrorReports;
 use App\Integrations\GoogleAnalytics;
@@ -38,6 +39,7 @@ it('leaves every credential and install-specific setting out of site exports', f
         'newsletter_double_opt_in', 'sentry_dsn', 'sentry_traces_sample_rate', 'nightwatch_token',
         'nightwatch_ingest_uri', 'nightwatch_request_sample_rate', 'offsite_endpoint', 'offsite_region',
         'offsite_bucket', 'offsite_folder', 'offsite_access_key', 'offsite_secret_key', 'remote_mcp_enabled',
+        'booking_feed_token',
     ])->and(array_diff(IntegrationRegistry::secretKeys(), IntegrationRegistry::unexportedKeys()))->toBeEmpty();
 });
 
@@ -56,6 +58,7 @@ it('shows a saved secret only as a hint', function (Integration $integration, st
     'nightwatch token' => [new Nightwatch, 'nightwatch_token', 'token-4321', '…4321'],
     'off-site secret key' => [new OffsiteBackups, 'offsite_secret_key', 'off-site-secret-2468', '…2468'],
     'remote mcp switch' => [new RemoteMcp, 'remote_mcp_enabled', '1', ''],
+    'booking feed link' => [new BookingFeed, 'booking_feed_token', 'abc123', ''],
 ]);
 
 it('counts an integration as connected once its key settings are saved', function (CardIntegration $integration, array $saved): void {

@@ -71,7 +71,7 @@ final readonly class CreateCheckoutAction
         $subtotal = array_sum(array_column($lines, 'lineAmount'));
 
         $order = Order::query()->create([
-            'reference' => $this->reference(),
+            'reference' => Order::newReference(),
             'status' => OrderStatus::PENDING,
             'user_id' => $user?->id,
             'email' => $user?->email,
@@ -164,14 +164,5 @@ final readonly class CreateCheckoutAction
         }
 
         return $params;
-    }
-
-    private function reference(): string
-    {
-        do {
-            $reference = Str::upper(Str::random(8));
-        } while (Order::query()->where('reference', $reference)->exists());
-
-        return $reference;
     }
 }

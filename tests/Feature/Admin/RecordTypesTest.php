@@ -317,3 +317,33 @@ it('starts preset fields where the preset puts them', function (): void {
         'sku' => 'hidden',
     ]);
 });
+
+it('adds the booking fields when a type takes bookings, and keeps selling and booking apart', function (): void {
+    $this->actingAsAdmin();
+
+    $component = Livewire::test('pages::admin.settings-content-types')
+        ->call('addCustom')
+        ->set('types.0.name', 'Sessions')
+        ->set('types.0.slug_prefix', 'sessions')
+        ->set('types.0.sellable', true)
+        ->set('types.0.bookable', true)
+        ->assertSet('types.0.sellable', false);
+
+    expect(array_column($component->get('types.0.fields'), 'key'))->toContain('duration_minutes', 'current_price', 'charge_when_booking', 'booking_location');
+
+    $component->set('types.0.sellable', true)->assertSet('types.0.bookable', false)->set('types.0.bookable', true)->call('update')->assertHasNoErrors();
+
+    $type = RecordType::query()->where('slug_prefix', 'sessions')->firstOrFail();
+
+    expect($type->bookable)->toBeTrue()
+        ->and($type->sellable)->toBeFalse()
+        ->and(array_column($type->fields, 'key'))->toContain('duration_minutes', 'charge_when_booking');
+});
+
+it('never lets a type be bookable and sellable, or bookable while kept off the site', function (): void {
+    $both = RecordType::factory()->create(['sellable' => true, 'bookable' => true]);
+    $hidden = RecordType::factory()->create(['bookable' => true, 'admin_only' => true]);
+
+    expect($both->refresh()->sellable)->toBeFalse()
+        ->and($hidden->refresh()->bookable)->toBeFalse();
+});

@@ -34,6 +34,7 @@ final class RecordTypeFactory extends Factory
             'has_detail_page' => true,
             'has_index_page' => false,
             'sellable' => false,
+            'bookable' => false,
             'admin_only' => false,
             'position' => 0,
         ];
@@ -53,6 +54,14 @@ final class RecordTypeFactory extends Factory
         return $this->state(fn (array $attributes): array => [
             'sellable' => true,
             'fields' => RecordTypePresets::withSellableFields([]),
+        ]);
+    }
+
+    public function bookable(): self
+    {
+        return $this->state(fn (array $attributes): array => [
+            'bookable' => true,
+            'fields' => RecordTypePresets::withBookableFields([]),
         ]);
     }
 }

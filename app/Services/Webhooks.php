@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\WebhookEvent;
 use App\Jobs\DeliverWebhook;
+use App\Models\Booking;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Submission;
@@ -85,6 +86,25 @@ final readonly class Webhooks
             'country' => $submission->country,
             'created_at' => $submission->created_at->toAtomString(),
             'admin_url' => route('admin.inbox-show', $submission),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function bookingData(Booking $booking): array
+    {
+        return [
+            'reference' => $booking->reference,
+            'status' => $booking->status->value,
+            'service' => $booking->service_name,
+            'starts_at' => $booking->starts_at->toAtomString(),
+            'ends_at' => $booking->ends_at->toAtomString(),
+            'timezone' => $booking->timezone,
+            'customer' => ['name' => $booking->name, 'email' => $booking->email, 'phone' => $booking->phone],
+            'notes' => $booking->notes,
+            'order_reference' => $booking->order?->reference,
+            'admin_url' => route('admin.bookings-show', $booking),
         ];
     }
 
