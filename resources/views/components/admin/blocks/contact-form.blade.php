@@ -238,6 +238,31 @@
         description="{{ __('Separate multiple addresses with a comma.') }}"
     />
 
+    <flux:switch
+        wire:model.live="{{ $c }}.autoReply"
+        label="{{ __('Send an automatic reply') }}"
+        description="{{ __('Sent only when the visitor gives an email address.') }}"
+        align="left"
+    />
+
+    @if (($block['content']['autoReply'] ?? false) === true)
+        <x-forms.input-translated
+            name="{{ $c }}.autoReplySubject"
+            :locale="$locale"
+            :multi-locale="$multiLocale"
+            label="{{ __('Reply subject') }}"
+            :placeholder="__('Thanks for your message')"
+        />
+        <x-forms.texteditor-translated
+            name="{{ $c }}.autoReplyMessage"
+            :locale="$locale"
+            :multi-locale="$multiLocale"
+            label="{{ __('Reply message') }}"
+            :placeholder="__('We got your message and will reply soon.')"
+            toolbar="bold italic | bullet ordered | link ~ undo redo"
+        />
+    @endif
+
     <flux:switch wire:model.live="{{ $c }}.hasBackground" label="{{ __('Use background color') }}" align="left" />
 
     <div class="grid gap-4 md:grid-cols-2">

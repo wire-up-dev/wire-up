@@ -37,8 +37,10 @@ final class UiStrings
             'Site' => [resource_path('views/components/site')],
             'Emails' => [
                 resource_path('views/mail/order-confirmation.blade.php'),
+                resource_path('views/mail/submission-auto-reply.blade.php'),
                 resource_path('views/vendor/mail/html/message.blade.php'),
                 app_path('Notifications/OrderConfirmation.php'),
+                app_path('Notifications/SubmissionAutoReply.php'),
             ],
         ];
     }

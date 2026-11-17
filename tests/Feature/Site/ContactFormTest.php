@@ -2,17 +2,23 @@
 
 declare(strict_types=1);
 
+use App\Actions\CreateSubmissionAction;
 use App\Enums\BlockType;
 use App\Models\Block;
+use App\Models\Locale;
 use App\Models\Page;
 use App\Models\Settings;
 use App\Models\Submission;
+use App\Notifications\SubmissionAutoReply;
 use App\Notifications\SubmissionReceived;
+use Illuminate\Mail\Mailer;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mime\Email;
 
 /**
  * @param  array<string, mixed>  $overrides
@@ -290,4 +296,66 @@ it('persists custom field values into metadata', function (): void {
         'colour' => ['label' => 'Colour', 'value' => 'Blue', 'position' => 0],
         'terms' => ['label' => 'Accept terms', 'value' => true, 'position' => 1],
     ]);
+});
+
+it('sends the visitor an automatic reply in their language without what they wrote', function (): void {
+    Locale::query()->where('code', 'nl')->update(['active' => true]);
+    cache()->forget('site-locales');
+    Settings::set(['contact_email' => 'hello@example.com']);
+    $block = contactBlock([
+        'recipient' => 'owner@example.com',
+        'autoReply' => true,
+        'autoReplySubject' => ['en' => 'Thanks!', 'nl' => 'Bedankt!'],
+        'autoReplyMessage' => ['en' => '<p>We will call you.</p>', 'nl' => '<p>We bellen je terug.</p>'],
+    ]);
+    app()->setLocale('nl');
+
+    $component = contactForm($block)
+        ->set('name', 'Ada Lovelace')
+        ->set('email', 'ada@example.com')
+        ->set('message', 'My secret question');
+
+    test()->travel(5)->seconds();
+
+    $component->call('submit')->assertHasNoErrors()->assertSet('sent', true);
+
+    $reply = collect(resolve(Mailer::class)->getSymfonyTransport()->messages())
+        ->map(fn (SentMessage $sent): Email => $sent->getOriginalMessage())
+        ->first(fn (Email $email): bool => $email->getTo()[0]->getAddress() === 'ada@example.com');
+
+    expect($reply)->not->toBeNull()
+        ->and($reply->getSubject())->toBe('Bedankt!')
+        ->and($reply->getReplyTo()[0]->getAddress())->toBe('hello@example.com')
+        ->and($reply->getHtmlBody())->toContain('We bellen je terug.')
+        ->and($reply->getHtmlBody())->not->toContain('My secret question', 'Ada Lovelace');
+});
+
+it('skips the automatic reply when it is off, there is no address or email is not set up', function (): void {
+    Notification::fake();
+    $submit = function (Block $block, string $email = 'ada@example.com'): void {
+        $component = contactForm($block)->set('name', 'Ada')->set('email', $email)->set('message', 'Hello');
+        test()->travel(5)->seconds();
+        $component->call('submit')->assertHasNoErrors();
+    };
+
+    $submit(contactBlock(['recipient' => 'owner@example.com']));
+    $submit(contactBlock(['recipient' => 'owner@example.com', 'autoReply' => true, 'fields' => ['email' => ['required' => false]]]), '');
+
+    config(['mail.default' => 'log']);
+    $submit(contactBlock(['recipient' => 'owner@example.com', 'autoReply' => true]));
+
+    Notification::assertSentTimes(SubmissionAutoReply::class, 0);
+    expect(Submission::query()->count())->toBe(3);
+});
+
+it('sends one address at most three automatic replies an hour', function (): void {
+    Notification::fake();
+    $block = contactBlock(['autoReply' => true]);
+
+    foreach (['ada@example.com', 'Ada@Example.com ', 'ada@example.com', 'ADA@example.com', 'grace@example.com'] as $email) {
+        resolve(CreateSubmissionAction::class)->handle(['type' => 'contact', 'email' => $email, 'block_id' => $block->id, 'locale' => 'en']);
+    }
+
+    Notification::assertSentTimes(SubmissionAutoReply::class, 4);
+    Notification::assertSentOnDemand(SubmissionAutoReply::class, fn (SubmissionAutoReply $notification, array $channels, AnonymousNotifiable $notifiable): bool => $notifiable->routes['mail'] === 'grace@example.com');
 });

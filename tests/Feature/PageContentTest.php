@@ -115,6 +115,27 @@ it('renders the contact form block with its present fields and submit label', fu
         ->assertSee('Leave this field empty');
 });
 
+it('keeps the recipient and the automatic reply out of the page sent to visitors', function (): void {
+    publishPageWithBlocks('contact-private', [
+        ['id' => 'new-1', 'type' => 'contact-form', 'content' => array_replace_recursive(
+            BlockType::CONTACT_FORM->defaultContent(),
+            [
+                'recipient' => 'owner-inbox@example.com',
+                'autoReply' => true,
+                'autoReplySubject' => ['en' => 'Reply subject words'],
+                'autoReplyMessage' => ['en' => '<p>Reply message words</p>'],
+            ],
+        )],
+    ]);
+
+    $this->get(route('page', 'contact-private'))
+        ->assertOk()
+        ->assertDontSee('owner-inbox@example.com')
+        ->assertDontSee('Reply subject words')
+        ->assertDontSee('Reply message words')
+        ->assertDontSee('autoReply');
+});
+
 it('hides a blank label when a placeholder is set and keeps an accessible name', function (): void {
     publishPageWithBlocks('contact-nolabel', [
         ['id' => 'new-1', 'type' => 'contact-form', 'content' => array_replace_recursive(

@@ -452,6 +452,9 @@ enum BlockType: string
                 'submitText' => [],
                 'successMessage' => [],
                 'recipient' => '',
+                'autoReply' => false,
+                'autoReplySubject' => [],
+                'autoReplyMessage' => [],
                 'fieldOrder' => ['name', 'email', 'message'],
                 'fields' => [
                     'name' => ['required' => true, 'label' => [], 'placeholder' => [], 'column' => 'left'],

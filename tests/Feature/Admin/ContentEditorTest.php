@@ -1300,3 +1300,16 @@ it('refuses to copy a block the editor is not allowed to see', function (): void
 
     expect($component->get('blocks'))->toBeEmpty();
 });
+
+it('shows the automatic reply wording once the contact form reply is switched on', function (): void {
+    $this->page->updateBlocks([['id' => 'new-a', 'type' => 'contact-form', 'content' => []]]);
+
+    $component = editor($this->page);
+    $id = (string) array_first($component->get('blocks'))['id'];
+
+    $component->assertSee('Send an automatic reply')
+        ->assertDontSee('Reply subject')
+        ->set("blocks.{$id}.content.autoReply", true)
+        ->assertSee('Reply subject')
+        ->assertSee('Reply message');
+});

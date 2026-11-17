@@ -15,6 +15,7 @@ Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater sh
 - The order confirmation email can be translated on Settings → Translations, under a new Emails group, so customers get it in their own language with your wording.
 - Settings → Cookie consent can ask visitors before Google Analytics and your custom code load. It's off until you switch it on. The message and button labels can be written for each language, and a Cookie settings link in the footer lets visitors change their mind.
 - Add block has a From another page tab: find a page or record, pick one of its blocks and a copy lands where you're adding. The copy is yours to change without touching the original.
+- Contact forms can send an automatic reply to the visitor, in the language they wrote in, with a subject and message you write for each language. It never repeats what they wrote, and one address gets at most three replies an hour, so the form can't be used to send mail to strangers.
 
 ## v0.8.2 — 2026-11-09
 

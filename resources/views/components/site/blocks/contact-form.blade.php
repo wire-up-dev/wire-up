@@ -4,7 +4,7 @@
     $content = $block->content ?? [];
     $hasBg = (bool) ($content['hasBackground'] ?? false);
     $config = $content;
-    unset($config['recipient']);
+    unset($config['recipient'], $config['autoReply'], $config['autoReplySubject'], $config['autoReplyMessage']);
     $pageId = $block->blockable_type === 'page' ? $block->blockable_id : null;
     $key = $block->id ?? md5((string) json_encode($content));
 @endphp
