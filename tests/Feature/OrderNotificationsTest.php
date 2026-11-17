@@ -10,6 +10,7 @@ use App\Notifications\OrderConfirmation;
 use App\Notifications\OrderReceived;
 use App\Services\SlackWebhookChannel;
 use Illuminate\Http\Client\Request;
+use Illuminate\Mail\Mailer;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -128,6 +129,21 @@ it('writes the customer receipt with the totals and replies to the site contact'
         ->and($mail->subject)->toContain('RCPT0001')
         ->and($mail->replyTo)->toBe([['hello@example.com', null]])
         ->and((string) $mail->render())->toContain('Walnut lamp', 'Toronto');
+});
+
+it('writes the customer receipt in their language with the owner\'s own wording', function (): void {
+    config()->set('site.ui_translations', ['nl' => [
+        'Thank you for your order' => 'Bedankt voor je bestelling',
+        'All rights reserved.' => 'Alle rechten voorbehouden.',
+    ]]);
+    $order = Order::factory()->paid()->create(['locale' => 'nl']);
+    OrderItem::factory()->for($order)->create();
+
+    Notification::route('mail', 'ada@example.com')->notifyNow(new OrderConfirmation($order)->locale('nl'));
+
+    $html = resolve(Mailer::class)->getSymfonyTransport()->messages()->last()->getOriginalMessage()->getHtmlBody();
+
+    expect($html)->toContain('Bedankt voor je bestelling', 'Alle rechten voorbehouden.');
 });
 
 it('writes a guest owner email without a reply-to address', function (): void {

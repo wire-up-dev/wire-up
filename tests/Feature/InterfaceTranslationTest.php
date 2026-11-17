@@ -43,9 +43,14 @@ it('scans the visitor-facing views into a grouped, de-duplicated catalog', funct
     $groups = collect($catalog)->pluck('group');
     $strings = collect($catalog)->flatMap(fn (array $group): array => $group['strings']);
 
-    expect($groups->all())->toBe(['Account', 'Cart', 'Sign in', 'Site', 'Form messages'])
+    $emails = collect($catalog)->firstWhere('group', 'Emails')['strings'] ?? [];
+
+    expect($groups->all())->toBe(['Account', 'Cart', 'Sign in', 'Site', 'Emails', 'Form messages'])
         ->and($strings)->toContain('My account')
         ->and($strings)->toContain('Log out')
+        ->and($emails)->toContain('All rights reserved.')
+        ->and($emails)->toContain('Your :brand order :reference')
+        ->and($emails)->toContain('Thank you for your order')
         ->and($strings->count())->toBe($strings->unique()->count());
 });
 

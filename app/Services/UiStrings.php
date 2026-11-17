@@ -35,6 +35,11 @@ final class UiStrings
             'Cart' => [resource_path('views/pages/⚡cart.blade.php'), resource_path('views/pages/⚡checkout-success.blade.php')],
             'Sign in' => [resource_path('views/pages/auth')],
             'Site' => [resource_path('views/components/site')],
+            'Emails' => [
+                resource_path('views/mail/order-confirmation.blade.php'),
+                resource_path('views/vendor/mail/html/message.blade.php'),
+                app_path('Notifications/OrderConfirmation.php'),
+            ],
         ];
     }
 
