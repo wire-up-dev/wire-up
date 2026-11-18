@@ -17,7 +17,7 @@ use Stripe\Exception\ApiErrorException;
 
 final readonly class IssueRefundAction
 {
-    public function __construct(private StripeService $stripe) {}
+    public function __construct(private StripeService $stripe, private CancelRefundedBookingAction $cancelBooking) {}
 
     /**
      * @throws ApiErrorException
@@ -58,5 +58,7 @@ final readonly class IssueRefundAction
 
             ActivityLog::record(ActivityEvent::ORDER_REFUNDED, $order, ['amount' => $amount, 'currency' => $order->currency]);
         });
+
+        $this->cancelBooking->handle($order);
     }
 }

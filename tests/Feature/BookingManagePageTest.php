@@ -158,5 +158,11 @@ it('frees the time when the visitor backs out of paying', function (): void {
 it('says a payment is still on its way', function (): void {
     $booking = confirmedBooking(attributes: ['status' => BookingStatus::PENDING_PAYMENT, 'confirmed_at' => null]);
 
-    $this->get(route('booking.manage', $booking->manage_token))->assertSee('We are waiting for your payment to go through.');
+    $this->get(route('booking.manage', $booking->manage_token))
+        ->assertSee('We are waiting for your payment to go through.')
+        ->assertSee('wire:poll.5s', false);
+
+    $booking->update(['status' => BookingStatus::CONFIRMED]);
+
+    $this->get(route('booking.manage', $booking->manage_token))->assertDontSee('wire:poll', false);
 });

@@ -13,7 +13,15 @@
     @if ($services->isEmpty())
         <flux:callout icon="information-circle" variant="secondary">
             <flux:callout.text>
-                {{ __('Turn on Bookable for a content type in Settings → Content Types, then add your services there.') }}
+                {{ __('Turn on “Take bookings for these records” for a content type in Settings → Content Types, then add your services there.') }}
+            </flux:callout.text>
+        </flux:callout>
+    @elseif (! resolve(\App\Services\BookingService::class)->availabilityIsSet())
+        <flux:callout icon="clock" variant="warning" data-availability-missing>
+            <flux:callout.text>
+                {{ __('Visitors can book once you set your hours and time zone.') }}
+                <flux:callout.link :href="route('admin.settings-bookings')" wire:navigate>
+                    {{ __('Set availability') }}</flux:callout.link>
             </flux:callout.text>
         </flux:callout>
     @endif

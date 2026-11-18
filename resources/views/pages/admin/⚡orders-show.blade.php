@@ -302,6 +302,10 @@ return new class extends Component
                 <flux:error name="refundAmount" />
             </flux:field>
 
+            @if ($order->booking && $order->booking->status === \App\Enums\BookingStatus::CONFIRMED && $order->booking->ends_at->isFuture())
+                <flux:text>{{ __('Refunding the full amount also cancels the booking and frees the time.') }}</flux:text>
+            @endif
+
             @if ($order->restocked_at === null && $this->hasTrackedStock)
                 <flux:checkbox wire:model="restock" :label="__('Put the items back in stock')" />
             @endif

@@ -34,7 +34,13 @@ final class UiStrings
             'Account' => [resource_path('views/pages/⚡account.blade.php'), resource_path('views/components/shared')],
             'Cart' => [resource_path('views/pages/⚡cart.blade.php'), resource_path('views/pages/⚡checkout-success.blade.php')],
             'Sign in' => [resource_path('views/pages/auth')],
-            'Site' => [resource_path('views/components/site'), resource_path('views/pages/⚡booking-manage.blade.php')],
+            'Site' => [
+                resource_path('views/components/site'),
+                resource_path('views/pages/⚡booking-manage.blade.php'),
+                app_path('Actions/CreateBookingAction.php'),
+                app_path('Actions/ClaimBookingTimeAction.php'),
+                app_path('Actions/RescheduleBookingAction.php'),
+            ],
             'Emails' => [
                 resource_path('views/mail/order-confirmation.blade.php'),
                 resource_path('views/mail/submission-auto-reply.blade.php'),

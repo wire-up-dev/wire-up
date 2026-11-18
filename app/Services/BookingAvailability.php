@@ -82,7 +82,7 @@ final readonly class BookingAvailability
      */
     public function slots(int $duration, string $fromDate, string $toDate, ?int $ignoreBookingId = null, int $minimumNotice = 0): array
     {
-        if ($duration <= 0) {
+        if ($duration <= 0 || ! $this->bookings->availabilityIsSet()) {
             return [];
         }
 

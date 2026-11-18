@@ -43,10 +43,16 @@ final readonly class RescheduleBookingAction
         DB::transaction(function () use ($booking, $start): void {
             $locked = Booking::query()->lockForUpdate()->findOrFail($booking->id);
 
+            throw_if(
+                $locked->status !== BookingStatus::CONFIRMED,
+                ValidationException::withMessages(['time' => __('This booking can no longer be moved.')]),
+            );
+
             $locked->claims()->delete();
             $locked->update([
                 'starts_at' => $start->utc(),
                 'ends_at' => $start->utc()->addMinutes($locked->duration_minutes),
+                'clashed' => false,
                 'sequence' => $locked->sequence + 1,
                 'reminded_at' => $this->bookings->reminderHours() === 0 || $start->lessThanOrEqualTo(now()->addHours($this->bookings->reminderHours())) ? now() : null,
             ]);

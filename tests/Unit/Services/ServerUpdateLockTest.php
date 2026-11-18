@@ -36,3 +36,23 @@ it('does not hold updates back when the lock file cannot be created', function (
 
     expect(new ServerUpdateLock()->acquire())->toBeTrue();
 });
+
+it('shares the lock with sites that run as another user', function (): void {
+    $path = $this->directory.'/wireup-update.lock';
+    $first = new ServerUpdateLock();
+
+    expect($first->acquire())->toBeTrue()
+        ->and(decoct(fileperms($path) & 0777))->toBe('666');
+
+    $first->release();
+    chmod($path, 0444);
+
+    $readOnly = new ServerUpdateLock();
+    $other = new ServerUpdateLock();
+
+    expect($readOnly->acquire())->toBeTrue()
+        ->and($other->acquire())->toBeFalse();
+
+    $readOnly->release();
+    chmod($path, 0666);
+});

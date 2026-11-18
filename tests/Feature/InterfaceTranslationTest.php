@@ -51,6 +51,8 @@ it('scans the visitor-facing views into a grouped, de-duplicated catalog', funct
         ->and($emails)->toContain('All rights reserved.')
         ->and($emails)->toContain('Your :brand order :reference')
         ->and($emails)->toContain('Thank you for your order')
+        ->and($strings)->toContain(':count min')
+        ->and(collect($catalog)->firstWhere('group', 'Site')['strings'] ?? [])->toContain('That time was just taken. Please pick another.', 'This booking can no longer be moved.')
         ->and($strings->count())->toBe($strings->unique()->count());
 });
 

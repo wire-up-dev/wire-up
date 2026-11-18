@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 use App\Actions\CancelOrderAction;
 use App\Actions\IssueRefundAction;
+use App\Actions\RefundOrderAction;
 use App\Enums\ActivityEvent;
+use App\Enums\BookingStatus;
 use App\Enums\OrderStatus;
 use App\Models\Activity;
+use App\Models\Booking;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Record;
 use App\Models\Role;
 use App\Models\User;
+use App\Notifications\BookingUpdate;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
@@ -184,4 +189,44 @@ it('marks a paid order fulfilled from the list and shows each customer’s email
 
     expect($order->refresh()->status)->toBe(OrderStatus::FULFILLED)
         ->and(loggedEvents())->toBe([ActivityEvent::ORDER_FULFILLED]);
+});
+
+it('cancels an upcoming booking once its order is refunded in full', function (): void {
+    Notification::fake();
+    $order = refundableOrder();
+    $booking = Booking::factory()->claimed()->create(['order_id' => $order->id]);
+
+    $this->actingAsAdmin()
+        ->get(route('admin.orders-show', $order))
+        ->assertSee('Refunding the full amount also cancels the booking and frees the time.');
+
+    resolve(IssueRefundAction::class)->handle($order, 1000, false);
+
+    expect($booking->refresh()->status)->toBe(BookingStatus::CONFIRMED);
+
+    resolve(IssueRefundAction::class)->handle($order->refresh(), 2000, false);
+
+    expect($booking->refresh()->status)->toBe(BookingStatus::CANCELLED)
+        ->and($booking->claims()->count())->toBe(0);
+
+    Notification::assertSentOnDemand(BookingUpdate::class, fn (BookingUpdate $notification): bool => $notification->kind === BookingUpdate::CANCELLED);
+});
+
+it('cancels the booking when the full refund is made in the Stripe dashboard', function (): void {
+    Notification::fake();
+    $order = refundableOrder();
+    $booking = Booking::factory()->claimed()->create(['order_id' => $order->id]);
+
+    resolve(RefundOrderAction::class)->handle('pi_refund', 3000, true);
+
+    expect($booking->refresh()->status)->toBe(BookingStatus::CANCELLED);
+});
+
+it('leaves a booking that already took place when its order is refunded', function (): void {
+    $order = refundableOrder();
+    $booking = Booking::factory()->create(['order_id' => $order->id, 'starts_at' => now()->subDays(2)]);
+
+    resolve(IssueRefundAction::class)->handle($order, 3000, false);
+
+    expect($booking->refresh()->status)->toBe(BookingStatus::CONFIRMED);
 });

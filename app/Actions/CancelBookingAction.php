@@ -43,6 +43,7 @@ final readonly class CancelBookingAction
                 'status' => BookingStatus::CANCELLED,
                 'cancelled_at' => now(),
                 'cancelled_by' => $by,
+                'clashed' => false,
                 'sequence' => $locked->sequence + 1,
             ]);
 

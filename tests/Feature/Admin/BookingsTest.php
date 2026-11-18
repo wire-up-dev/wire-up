@@ -2,18 +2,23 @@
 
 declare(strict_types=1);
 
+use App\Actions\CancelBookingAction;
+use App\Actions\RescheduleBookingAction;
 use App\Enums\ActivityEvent;
 use App\Enums\BookingActor;
 use App\Enums\BookingStatus;
+use App\Enums\OrderStatus;
 use App\Models\Activity;
 use App\Models\Booking;
 use App\Models\BookingClaim;
 use App\Models\Order;
 use App\Models\Role;
+use App\Models\Settings;
 use App\Models\User;
 use App\Notifications\BookingUpdate;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -248,4 +253,52 @@ it('says when no bookings are coming up on the dashboard', function (): void {
 
 it('leaves the bookings card off the dashboard until bookings are in use', function (): void {
     $this->actingAsAdmin()->get(route('admin.dashboard'))->assertDontSee('Upcoming bookings');
+});
+
+it('keeps an expired booking while its checkout could still be paid', function (): void {
+    $order = Order::factory()->create(['status' => OrderStatus::CANCELLED, 'expires_at' => now()->addMinutes(5)]);
+    $expired = Booking::factory()->create(['status' => BookingStatus::EXPIRED, 'order_id' => $order->id]);
+    $this->actingAsAdmin();
+
+    Livewire::test('pages::admin.bookings-index')->call('delete', $expired->id);
+
+    expect($expired->fresh())->not->toBeNull();
+
+    $this->travel(16)->minutes();
+
+    Livewire::test('pages::admin.bookings-index')->call('delete', $expired->id);
+
+    expect($expired->fresh())->toBeNull();
+});
+
+it('clears the clash once the booking is moved or cancelled', function (): void {
+    Notification::fake();
+    $moved = Booking::factory()->claimed()->create(['clashed' => true]);
+    $cancelled = Booking::factory()->claimed()->create(['clashed' => true, 'starts_at' => CarbonImmutable::parse('2026-11-25 10:00', 'UTC')]);
+
+    resolve(RescheduleBookingAction::class)->handle($moved, CarbonImmutable::parse('2026-11-23 10:00', 'UTC'), BookingActor::OWNER);
+    resolve(CancelBookingAction::class)->handle($cancelled, BookingActor::OWNER);
+
+    expect($moved->refresh()->clashed)->toBeFalse()
+        ->and($cancelled->refresh()->clashed)->toBeFalse();
+});
+
+it('will not move a booking that was cancelled in the meantime', function (): void {
+    $booking = Booking::factory()->claimed()->create();
+    Booking::query()->whereKey($booking->id)->update(['status' => BookingStatus::CANCELLED]);
+
+    expect(fn () => resolve(RescheduleBookingAction::class)->handle($booking, CarbonImmutable::parse('2026-11-23 10:00', 'UTC'), BookingActor::OWNER))
+        ->toThrow(ValidationException::class)
+        ->and($booking->refresh()->starts_at->format('Y-m-d'))->not->toBe('2026-11-23');
+});
+
+it('reminds the owner to set availability before visitors can book', function (): void {
+    Settings::set(['booking_timezone' => null]);
+    $this->actingAsAdmin();
+
+    $this->get(route('admin.bookings-index'))->assertSee('Visitors can book once you set your hours and time zone.');
+
+    openBookingHours();
+
+    $this->get(route('admin.bookings-index'))->assertDontSee('Visitors can book once you set your hours and time zone.');
 });

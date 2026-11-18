@@ -139,7 +139,7 @@ return new class extends Component
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-4 border-t border-current/10 py-4 text-[length:calc(var(--wire-body-size)*0.75)] opacity-70">
                     <span>&copy; {{ $year }} {{ $brand }}. {{ __('All Rights Reserved') }}</span>
-                    <span class="flex flex-wrap items-center gap-4">
+                    <span @if ($consentLink !== '') class="flex flex-wrap items-center gap-4" @endif>
                         @if ($consentLink !== '')
                             <x-site.cookie-settings-link :label="$consentLink" />
                         @endif
@@ -179,7 +179,7 @@ return new class extends Component
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-4 border-t border-current/10 py-4 text-[calc(var(--wire-body-size)*0.85)] opacity-70">
                     <span>&copy; {{ $year }} {{ $brand }}. {{ __('All Rights Reserved') }}</span>
-                    <span class="flex flex-wrap items-center gap-4">
+                    <span @if ($consentLink !== '') class="flex flex-wrap items-center gap-4" @endif>
                         @if ($consentLink !== '')
                             <x-site.cookie-settings-link :label="$consentLink" />
                         @endif

@@ -81,7 +81,7 @@ final readonly class BookingCalendarFile
 
     private function escape(string $text): string
     {
-        return str_replace(['\\', ';', ',', "\r\n", "\n"], ['\\\\', '\;', '\,', '\n', '\n'], $text);
+        return str_replace(['\\', ';', ',', "\r\n", "\r", "\n"], ['\\\\', '\;', '\,', '\n', '\n', '\n'], $text);
     }
 
     private function fold(string $line): string

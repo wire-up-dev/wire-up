@@ -190,6 +190,18 @@ return new class extends Component
 @endphp
 
 <div class="space-y-6">
+    @if (! $bookingService->availabilityIsSet())
+        <flux:callout icon="clock" variant="warning" data-availability-missing>
+            <flux:callout.text>
+                {{ __('Visitors can book once you set your hours and time zone.') }}
+                @can('settings.view')
+                    <flux:callout.link :href="route('admin.settings-bookings')" wire:navigate>
+                        {{ __('Set availability') }}</flux:callout.link>
+                @endcan
+            </flux:callout.text>
+        </flux:callout>
+    @endif
+
     <div class="flex flex-wrap items-center gap-3">
         @can('bookings.edit')
             <flux:button

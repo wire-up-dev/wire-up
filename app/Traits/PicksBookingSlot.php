@@ -36,7 +36,7 @@ trait PicksBookingSlot
 
     public function updatedTimezone(): void
     {
-        if (! in_array($this->timezone, DateTimeZone::listIdentifiers(), true)) {
+        if (! in_array($this->timezone, DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC), true)) {
             $this->timezone = resolve(BookingService::class)->timezone();
         }
 
@@ -152,7 +152,14 @@ trait PicksBookingSlot
      */
     public function timezoneOptions(): array
     {
-        return DateTimeZone::listIdentifiers();
+        $zones = DateTimeZone::listIdentifiers();
+
+        if (! in_array($this->timezone, $zones, true)) {
+            $zones[] = $this->timezone;
+            sort($zones);
+        }
+
+        return $zones;
     }
 
     protected function ignoredBookingId(): ?int

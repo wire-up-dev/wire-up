@@ -263,3 +263,87 @@ it('lines its heading up on the left unless it is set to the center, and keeps t
         ->assertSeeHtml('class="space-y-4 text-center"')
         ->assertSeeHtml('class="mx-auto max-w-2xl space-y-12"');
 });
+
+it('tells the visitor when Stripe cannot start the payment and frees the time', function (): void {
+    connectStripe();
+    stripe()->fail('POST', '/v1/checkout/sessions', 'Stripe is down');
+    bookableService(['current_price' => '80', 'charge_when_booking' => true]);
+
+    filledBooking(bookingWidget())
+        ->call('book')
+        ->assertNoRedirect()
+        ->assertSet('step', 'time')
+        ->assertSee('Payment is not available right now. Please try again later.');
+
+    expect(Booking::query()->sole()->status)->toBe(BookingStatus::EXPIRED);
+});
+
+function respondWithCheckoutPerBooking(): void
+{
+    stripe()->respond('POST', '/v1/checkout/sessions', fn (array $params): array => [
+        'id' => 'cs_'.$params['metadata']['booking_reference'],
+        'object' => 'checkout.session',
+        'url' => 'https://checkout.stripe.com/c/pay/'.$params['metadata']['booking_reference'],
+    ]);
+}
+
+it('lets go of the earlier unpaid time when the visitor books again', function (): void {
+    connectStripe();
+    respondWithCheckoutPerBooking();
+    stripe()->respond('POST', '/v1/checkout/sessions/*/expire', ['object' => 'checkout.session', 'status' => 'expired']);
+    bookableService(['current_price' => '80', 'charge_when_booking' => true]);
+
+    filledBooking(bookingWidget())->call('book');
+    filledBooking(bookingWidget(), '2026-11-17T12:00:00Z')->call('book');
+
+    [$first, $second] = Booking::query()->oldest('id')->get()->all();
+
+    expect($first->status)->toBe(BookingStatus::EXPIRED)
+        ->and($first->claims()->count())->toBe(0)
+        ->and($second->status)->toBe(BookingStatus::PENDING_PAYMENT);
+
+    stripe()->assertSent('POST', '/v1/checkout/sessions/cs_'.$first->reference.'/expire');
+});
+
+it('keeps the new booking going when Stripe cannot let go of the earlier one', function (): void {
+    connectStripe();
+    respondWithCheckoutPerBooking();
+    stripe()->fail('POST', '/v1/checkout/sessions/*/expire', 'Stripe is down');
+    stripe()->fail('GET', '/v1/checkout/sessions/*', 'Stripe is down');
+    bookableService(['current_price' => '80', 'charge_when_booking' => true]);
+
+    filledBooking(bookingWidget())->call('book');
+    filledBooking(bookingWidget(), '2026-11-17T12:00:00Z')->call('book')->assertRedirectContains('https://checkout.stripe.com/c/pay/');
+
+    expect(Booking::query()->where('status', BookingStatus::PENDING_PAYMENT)->count())->toBe(2);
+});
+
+it('limits how many free bookings one email address can make in an hour', function (): void {
+    bookableService();
+
+    foreach (['2026-11-17T09:00:00Z', '2026-11-17T10:00:00Z', '2026-11-17T11:00:00Z'] as $slot) {
+        filledBooking(bookingWidget(), $slot)->call('book')->assertSet('step', 'done');
+    }
+
+    filledBooking(bookingWidget(), '2026-11-17T12:00:00Z')
+        ->call('book')
+        ->assertSee('This email address has made several bookings in the last hour. Please try again later.');
+
+    expect(Booking::query()->count())->toBe(3);
+});
+
+it('offers no times until the availability has been saved', function (): void {
+    Settings::set(['booking_timezone' => null]);
+    bookableService();
+
+    bookingWidget()->assertDontSeeHtml('data-available-day')->assertSee('There are no free times this month.');
+});
+
+it('keeps an older time zone name the browser reports', function (): void {
+    bookableService();
+
+    bookingWidget()
+        ->call('useTimezone', 'Asia/Calcutta')
+        ->assertSet('timezone', 'Asia/Calcutta')
+        ->assertSeeHtml('value="Asia/Calcutta"');
+});

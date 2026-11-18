@@ -35,13 +35,14 @@ it('lists bookings with the visitor details in the owner feed and folds long lin
     $booking = Booking::factory()->make([
         'name' => 'Ada Lovelace',
         'email' => 'ada@example.com',
-        'notes' => "First line\n".str_repeat('é', 60),
+        'notes' => "First line\rSecond line\n".str_repeat('é', 60),
     ]);
 
     $ics = resolve(BookingCalendarFile::class)->feed([$booking]);
     $lines = explode("\r\n", $ics);
 
-    expect($ics)->toContain('X-WR-CALNAME:', 'SUMMARY:Coaching session · Ada Lovelace', 'DESCRIPTION:Ada Lovelace\nada@example.com\nFirst line\n')
+    expect($ics)->toContain('X-WR-CALNAME:', 'SUMMARY:Coaching session · Ada Lovelace', 'DESCRIPTION:Ada Lovelace\nada@example.com\nFirst line\nSecond line\n')
+        ->and(mb_substr_count($ics, "\r"))->toBe(mb_substr_count($ics, "\r\n"))
         ->and(collect($lines)->every(fn (string $line): bool => mb_strlen($line) <= 75))->toBeTrue()
         ->and(collect($lines)->contains(fn (string $line): bool => str_starts_with($line, ' ')))->toBeTrue();
 });

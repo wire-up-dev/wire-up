@@ -8,9 +8,15 @@ use App\Enums\ActivityEvent;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Services\ActivityLog;
+use Stripe\Exception\ApiErrorException;
 
 final readonly class RefundOrderAction
 {
+    public function __construct(private CancelRefundedBookingAction $cancelBooking) {}
+
+    /**
+     * @throws ApiErrorException
+     */
     public function handle(string $paymentIntent, int $amountRefunded, bool $fullyRefunded): ?Order
     {
         $order = Order::query()->where('stripe_payment_intent', $paymentIntent)->first();
@@ -29,6 +35,8 @@ final readonly class RefundOrderAction
         if ($amountRefunded > $previouslyRefunded) {
             ActivityLog::record(ActivityEvent::ORDER_REFUNDED, $order, ['amount' => $amountRefunded - $previouslyRefunded, 'currency' => $order->currency]);
         }
+
+        $this->cancelBooking->handle($order);
 
         return $order;
     }

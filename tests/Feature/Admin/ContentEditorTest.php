@@ -1317,9 +1317,17 @@ it('shows the automatic reply wording once the contact form reply is switched on
 it('edits the booking block and offers the bookable services', function (): void {
     $this->page->updateBlocks([['id' => 'new-a', 'type' => 'booking', 'content' => []]]);
 
-    editor($this->page)->assertSee('Turn on Bookable for a content type');
+    editor($this->page)->assertSee('Take bookings for these records')->assertDontSee('Visitors can book once you set your hours and time zone.');
 
     bookableService(['heading' => ['en' => 'Intro call']]);
 
-    editor($this->page)->assertDontSee('Turn on Bookable for a content type')->assertSee('Coaching call')->assertSee('Leave all unticked to offer every service.');
+    editor($this->page)
+        ->assertDontSee('Take bookings for these records')
+        ->assertSee('Visitors can book once you set your hours and time zone.')
+        ->assertSee('Coaching call')
+        ->assertSee('Leave all unticked to offer every service.');
+
+    openBookingHours();
+
+    editor($this->page)->assertDontSee('Visitors can book once you set your hours and time zone.');
 });

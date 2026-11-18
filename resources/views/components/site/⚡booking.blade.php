@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Actions\CancelOrderAction;
 use App\Actions\CreateBookingAction;
 use App\Actions\StartBookingCheckoutAction;
 use App\Enums\BookingStatus;
+use App\Models\Booking;
+use App\Models\Order;
 use App\Models\Record;
 use App\Models\User;
 use App\Services\BookingService;
@@ -19,6 +22,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Stripe\Exception\ApiErrorException;
 
 return new class extends Component
 {
@@ -27,6 +31,8 @@ return new class extends Component
     private const int MIN_SECONDS = 3;
 
     private const int MAX_ATTEMPTS = 5;
+
+    private const int MAX_BOOKINGS_PER_EMAIL = 3;
 
     /** @var array<string, mixed> */
     #[Locked]
@@ -137,7 +143,7 @@ return new class extends Component
         $this->step = $step;
     }
 
-    public function book(CreateBookingAction $create, StartBookingCheckoutAction $checkout): void
+    public function book(CreateBookingAction $create, StartBookingCheckoutAction $checkout, CancelOrderAction $cancelOrder): void
     {
         if ($this->website !== '' || now()->timestamp - $this->startedAt < self::MIN_SECONDS || Impersonation::active()) {
             $this->addError('form', __('Sorry, your booking could not be made. Please try again.'));
@@ -172,6 +178,19 @@ return new class extends Component
             return;
         }
 
+        $chargesNow = $this->chargesNow();
+        $emailKey = 'booking-email:'.hash('xxh128', mb_strtolower($validated['email']));
+
+        if (! $chargesNow && RateLimiter::tooManyAttempts($emailKey, self::MAX_BOOKINGS_PER_EMAIL)) {
+            $this->addError('form', __('This email address has made several bookings in the last hour. Please try again later.'));
+
+            return;
+        }
+
+        if ($chargesNow) {
+            $this->releasePreviousHold($cancelOrder);
+        }
+
         try {
             $booking = $create->handle($service, $start, [
                 'name' => $validated['name'],
@@ -190,10 +209,20 @@ return new class extends Component
         }
 
         if ($booking->status === BookingStatus::PENDING_PAYMENT) {
-            $this->redirect($checkout->handle($booking));
+            try {
+                $this->redirect($checkout->handle($booking));
+            } catch (ApiErrorException $exception) {
+                report($exception);
+
+                $this->step = 'time';
+                $this->slot = '';
+                $this->addError('form', __('Payment is not available right now. Please try again later.'));
+            }
 
             return;
         }
+
+        RateLimiter::hit($emailKey, 3600);
 
         $this->bookedWhen = $this->chosenLabel();
         $this->manageUrl = resolve(BookingService::class)->manageUrl($booking);
@@ -209,7 +238,7 @@ return new class extends Component
 
     public function durationLabel(Record $service): string
     {
-        return trans_choice(':count minute|:count minutes', resolve(BookingService::class)->duration($service));
+        return __(':count min', ['count' => resolve(BookingService::class)->duration($service)]);
     }
 
     public function chargesNow(): bool
@@ -274,6 +303,21 @@ return new class extends Component
     protected function slotMinimumNotice(): int
     {
         return $this->chargesNow() ? BookingService::HOLD_MINUTES : 0;
+    }
+
+    private function releasePreviousHold(CancelOrderAction $cancelOrder): void
+    {
+        $previous = Booking::query()->where('status', BookingStatus::PENDING_PAYMENT)->find(session()->pull(StartBookingCheckoutAction::SESSION_KEY));
+
+        if (! $previous instanceof Booking || ! $previous->order instanceof Order) {
+            return;
+        }
+
+        try {
+            $cancelOrder->handle($previous->order);
+        } catch (ApiErrorException $exception) {
+            report($exception);
+        }
     }
 };
 ?>

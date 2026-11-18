@@ -149,7 +149,11 @@ return new class extends Component
             <p class="text-sm opacity-70">
                 {{ __('Booking reference: :reference', ['reference' => $booking->reference]) }}
             </p>
-            <p class="text-sm font-medium" data-booking-status>
+            <p
+                class="text-sm font-medium"
+                data-booking-status
+                @if ($booking->status === \App\Enums\BookingStatus::PENDING_PAYMENT) wire:poll.5s @endif
+            >
                 @if ($booking->status === \App\Enums\BookingStatus::PENDING_PAYMENT)
                     {{ __('We are waiting for your payment to go through. This page updates once it does.') }}
                 @elseif ($booking->status === \App\Enums\BookingStatus::EXPIRED)

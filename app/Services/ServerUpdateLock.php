@@ -13,7 +13,14 @@ final class ServerUpdateLock
 
     public function acquire(): bool
     {
-        $handle = rescue(fn (): mixed => fopen((string) config('wireup.server_update_lock'), 'c'), false, report: false);
+        $path = (string) config('wireup.server_update_lock');
+        $handle = rescue(fn (): mixed => fopen($path, 'c'), false, report: false);
+
+        if (is_resource($handle)) {
+            rescue(fn (): bool => chmod($path, 0666), false, report: false);
+        } else {
+            $handle = rescue(fn (): mixed => fopen($path, 'r'), false, report: false);
+        }
 
         if (! is_resource($handle)) {
             return true;

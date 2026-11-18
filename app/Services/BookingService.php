@@ -31,6 +31,11 @@ final readonly class BookingService
         return once(fn (): bool => RecordType::query()->where('bookable', true)->exists());
     }
 
+    public function availabilityIsSet(): bool
+    {
+        return is_string(config('site.booking_timezone'));
+    }
+
     public function timezone(): string
     {
         $timezone = config('site.booking_timezone');

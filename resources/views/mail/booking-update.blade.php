@@ -19,7 +19,7 @@
 
 **{{ $booking->service_name }}**<br>
 {{ $when }} ({{ $booking->timezone }})<br>
-{{ trans_choice(':count minute|:count minutes', $booking->duration_minutes) }}
+{{ __(':count min', ['count' => $booking->duration_minutes]) }}
 @if ($location !== '')
 <br>{{ $location }}
 @endif

@@ -118,7 +118,13 @@ final class Booking extends Model
 
     public function canBeDeleted(): bool
     {
-        return $this->ends_at->isPast() || in_array($this->status, [BookingStatus::CANCELLED, BookingStatus::EXPIRED], true);
+        return ! $this->mayStillBePaid() && ($this->ends_at->isPast() || in_array($this->status, [BookingStatus::CANCELLED, BookingStatus::EXPIRED], true));
+    }
+
+    public function mayStillBePaid(): bool
+    {
+        return $this->status === BookingStatus::PENDING_PAYMENT
+            || ($this->status === BookingStatus::EXPIRED && $this->order?->expires_at?->copy()->addMinutes(10)->isFuture() === true);
     }
 
     public function label(): string
