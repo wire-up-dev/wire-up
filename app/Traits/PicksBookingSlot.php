@@ -152,12 +152,8 @@ trait PicksBookingSlot
      */
     public function timezoneOptions(): array
     {
-        $zones = DateTimeZone::listIdentifiers();
-
-        if (! in_array($this->timezone, $zones, true)) {
-            $zones[] = $this->timezone;
-            sort($zones);
-        }
+        $zones = array_values(array_unique([...DateTimeZone::listIdentifiers(), $this->timezone]));
+        sort($zones);
 
         return $zones;
     }

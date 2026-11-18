@@ -34,6 +34,17 @@ it('books a time in the visitor’s own time zone, then moves it from the manage
 
     assertScriptEventually($browser, "document.querySelector('[data-booking-timezone]').value", 'Asia/Tokyo');
 
+    if ($browser->script("document.querySelectorAll('[data-available-day]').length") < 2) {
+        $browser->click('[aria-label="Next month"]');
+
+        assertScriptEventually($browser, "document.querySelectorAll('[data-available-day]').length > 1", true);
+    }
+
+    $lastDay = $browser->script("[...document.querySelectorAll('[data-available-day]')].at(-1).dataset.availableDay");
+    $browser->click("[data-available-day=\"{$lastDay}\"]");
+
+    assertScriptEventually($browser, "document.querySelector('[data-selected-day]')?.dataset.availableDay", $lastDay);
+
     $slot = $browser->script("document.querySelector('[data-slot]').dataset.slot");
 
     expect($browser->script("document.querySelector('[data-slot]').innerText.trim()"))

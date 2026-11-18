@@ -340,10 +340,16 @@ it('offers no times until the availability has been saved', function (): void {
 });
 
 it('keeps an older time zone name the browser reports', function (): void {
+    $olderName = collect(DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC))->diff(DateTimeZone::listIdentifiers())->first();
+
+    if (! is_string($olderName)) {
+        $this->markTestSkipped('This PHP build lists no older time zone names.');
+    }
+
     bookableService();
 
     bookingWidget()
-        ->call('useTimezone', 'Asia/Calcutta')
-        ->assertSet('timezone', 'Asia/Calcutta')
-        ->assertSeeHtml('value="Asia/Calcutta"');
+        ->call('useTimezone', $olderName)
+        ->assertSet('timezone', $olderName)
+        ->assertSeeHtml('value="'.$olderName.'"');
 });
