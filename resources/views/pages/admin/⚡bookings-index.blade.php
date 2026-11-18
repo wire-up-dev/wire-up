@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\CancelBookingAction;
 use App\Actions\CreateBookingAction;
+use App\Actions\DeleteBookingAction;
 use App\Enums\BookingActor;
 use App\Enums\BookingStatus;
 use App\Models\Booking;
@@ -69,6 +70,18 @@ return new class extends Component
 
         if ($booking instanceof Booking && $cancel->handle($booking, BookingActor::OWNER)) {
             Flux::toast(__('Booking cancelled.'), variant: 'success');
+            unset($this->bookings);
+        }
+    }
+
+    public function delete(int $id, DeleteBookingAction $delete): void
+    {
+        $this->authorize('bookings.delete');
+
+        $booking = Booking::query()->find($id);
+
+        if ($booking instanceof Booking && $delete->handle($booking)) {
+            Flux::toast(__('Booking deleted.'), variant: 'success');
             unset($this->bookings);
         }
     }
@@ -310,14 +323,29 @@ return new class extends Component
                                         >
                                             {{ __('Move…') }}
                                         </flux:menu.item>
+                                        @if ($booking->ends_at->isFuture())
+                                            <flux:menu.separator />
+                                            <flux:menu.item
+                                                icon="x-circle"
+                                                variant="danger"
+                                                wire:click="cancel({{ $booking->id }})"
+                                                wire:confirm="{{ __('Cancel this booking? The time becomes free again.') }}"
+                                            >
+                                                {{ __('Cancel') }}
+                                            </flux:menu.item>
+                                        @endif
+                                    @endif
+                                @endcan
+                                @can('bookings.delete')
+                                    @if ($booking->canBeDeleted())
                                         <flux:menu.separator />
                                         <flux:menu.item
-                                            icon="x-circle"
+                                            icon="trash"
                                             variant="danger"
-                                            wire:click="cancel({{ $booking->id }})"
-                                            wire:confirm="{{ __('Cancel this booking? The time becomes free again.') }}"
+                                            wire:click="delete({{ $booking->id }})"
+                                            wire:confirm="{{ __('Delete this booking? This cannot be undone.') }}"
                                         >
-                                            {{ __('Cancel') }}
+                                            {{ __('Delete') }}
                                         </flux:menu.item>
                                     @endif
                                 @endcan

@@ -72,6 +72,11 @@ final class Order extends Model
         return $reference;
     }
 
+    public function canBeFulfilled(): bool
+    {
+        return $this->status === OrderStatus::PAID && ! $this->booking instanceof Booking;
+    }
+
     public function stripeDashboardUrl(): ?string
     {
         if ($this->stripe_payment_intent === null) {

@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Models\Booking;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\Record;
 use App\Models\RecordType;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\BookingService;
+use Carbon\CarbonImmutable;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -95,6 +98,33 @@ it('hides destinations a role cannot reach', function (): void {
         ->not->toContain('Users')
         ->not->toContain('Design')
         ->not->toContain('Roles');
+});
+
+it('finds bookings by name, email or reference and offers the booking screens', function (): void {
+    openBookingHours();
+    RecordType::factory()->bookable()->create();
+    $booking = Booking::factory()->create(['name' => 'Grace Hopper', 'email' => 'grace@example.com', 'reference' => 'REFABC12', 'starts_at' => CarbonImmutable::parse('2026-11-20 15:00', 'UTC')]);
+
+    foreach (['grace h', 'grace@example', 'refabc'] as $term) {
+        $items = collect(palette()->set('query', $term)->get('groups'))->firstWhere('heading', 'Bookings')['items'];
+
+        expect($items[0])->toBe([
+            'label' => 'Grace Hopper',
+            'description' => resolve(BookingService::class)->formatTime($booking->starts_at, 'UTC', 'en'),
+            'icon' => 'calendar-days',
+            'url' => route('admin.bookings-show', $booking),
+        ]);
+    }
+
+    expect(array_column(palette()->get('groups')[0]['items'], 'label'))->toContain('Bookings')->toContain('Availability');
+});
+
+it('leaves bookings out until they are in use, and away from roles without access', function (): void {
+    expect(array_column(palette()->get('groups')[0]['items'], 'label'))->not->toContain('Bookings')->not->toContain('Availability');
+
+    Booking::factory()->create(['name' => 'Grace Hopper']);
+
+    expect(array_column(palette(limitedTo(['pages.view']))->set('query', 'grace')->get('groups'), 'heading'))->not->toContain('Bookings');
 });
 
 it('puts the palette and its shortcut in the admin header', function (): void {

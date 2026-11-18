@@ -28,7 +28,7 @@ return new class extends Component
 
     public function mount(Order $order): void
     {
-        $this->order = $order->load('items', 'user');
+        $this->order = $order->load('items', 'user', 'booking');
         $this->refundAmount = $this->remainingAmount();
         $this->showRefund = request()->boolean('refund') && $order->status->canBeRefunded();
     }
@@ -220,7 +220,24 @@ return new class extends Component
                 </div>
             @endif
 
-            @if ($order->status === \App\Enums\OrderStatus::PAID)
+            @if ($order->booking)
+                @php
+                    $bookingService = resolve(\App\Services\BookingService::class);
+                @endphp
+                <div class="space-y-1">
+                    <flux:heading>{{ __('Booking') }}</flux:heading>
+                    <flux:text>{{ $order->booking->service_name }}</flux:text>
+                    <flux:text>
+                        {{ $bookingService->formatTime($order->booking->starts_at, $bookingService->timezone(), app()->getLocale()) }}
+                    </flux:text>
+                    @can('bookings.view')
+                        <flux:link :href="route('admin.bookings-show', $order->booking)" wire:navigate>
+                            {{ __('View booking') }}</flux:link>
+                    @endcan
+                </div>
+            @endif
+
+            @if ($order->canBeFulfilled())
                 @can('orders.edit')
                     <flux:button variant="primary" icon="truck" wire:click="markFulfilled" class="w-full">
                         {{ __('Mark as fulfilled') }}</flux:button>

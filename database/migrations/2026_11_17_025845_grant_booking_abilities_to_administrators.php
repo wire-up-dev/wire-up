@@ -22,6 +22,6 @@ return new class extends Migration
             return;
         }
 
-        DB::table('roles')->where('id', $role->id)->update(['abilities' => json_encode([...$abilities, 'bookings.view', 'bookings.edit'])]);
+        DB::table('roles')->where('id', $role->id)->update(['abilities' => json_encode([...$abilities, 'bookings.view', 'bookings.edit', 'bookings.delete'])]);
     }
 };

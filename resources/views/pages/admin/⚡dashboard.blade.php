@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Enums\ActivityArea;
+use App\Enums\BookingStatus;
 use App\Enums\OrderStatus;
 use App\Models\Activity;
+use App\Models\Booking;
 use App\Models\Media;
 use App\Models\Order;
 use App\Models\Page;
@@ -13,6 +15,7 @@ use App\Models\RecordType;
 use App\Models\Role;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\BookingService;
 use App\Services\SettingsService;
 use App\Services\StripeService;
 use App\Services\SystemHealth;
@@ -131,6 +134,21 @@ return new class extends Component
     public function latestOrders(): Collection
     {
         return Order::query()->whereIn('status', [OrderStatus::PAID, OrderStatus::FULFILLED, OrderStatus::REFUNDED])->latest('paid_at')->limit(5)->get();
+    }
+
+    #[Computed]
+    public function showsBookings(): bool
+    {
+        return resolve(BookingService::class)->isOpen() || Booking::hasAny();
+    }
+
+    /**
+     * @return Collection<int, Booking>
+     */
+    #[Computed]
+    public function upcomingBookings(): Collection
+    {
+        return Booking::query()->where('status', BookingStatus::CONFIRMED)->where('ends_at', '>=', now())->oldest('starts_at')->limit(5)->get();
     }
 
     #[Computed]
@@ -605,6 +623,55 @@ return new class extends Component
                             </div>
                         @endif
                     </flux:card>
+                @endcan
+
+                @can('bookings.view')
+                    @if ($this->showsBookings)
+                        @php
+                            $bookingZone = resolve(\App\Services\BookingService::class)->timezone();
+                        @endphp
+                        <flux:card class="space-y-4" data-upcoming-bookings>
+                            <div class="flex items-center justify-between">
+                                <flux:heading size="lg">{{ __('Upcoming bookings') }}</flux:heading>
+                                <flux:button
+                                    size="sm"
+                                    variant="ghost"
+                                    inset
+                                    :href="route('admin.bookings-index')"
+                                    wire:navigate
+                                >{{ __('View all') }}</flux:button>
+                            </div>
+                            @if ($this->upcomingBookings->isEmpty())
+                                <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('No upcoming bookings.') }}</flux:text>
+                            @else
+                                <div class="divide-y divide-zinc-100 dark:divide-white/5">
+                                    @foreach ($this->upcomingBookings as $booking)
+                                        <a
+                                            href="{{ route('admin.bookings-show', $booking) }}"
+                                            wire:navigate
+                                            wire:key="booking-{{ $booking->id }}"
+                                            class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
+                                        >
+                                            <div class="min-w-0 flex-1">
+                                                <flux:heading
+                                                    size="sm"
+                                                    class="truncate"
+                                                >{{ $booking->label() }}</flux:heading>
+                                                <flux:text
+                                                    size="sm"
+                                                    class="truncate"
+                                                >{{ $booking->service_name }}</flux:text>
+                                            </div>
+                                            <flux:text
+                                                size="sm"
+                                                class="shrink-0 tabular-nums"
+                                            >{{ $booking->starts_at->setTimezone($bookingZone)->locale(app()->getLocale())->isoFormat('ddd D MMM, LT') }}</flux:text>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </flux:card>
+                    @endif
                 @endcan
 
                 @can('orders.view')

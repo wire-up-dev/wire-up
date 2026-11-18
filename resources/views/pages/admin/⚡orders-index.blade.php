@@ -292,7 +292,7 @@ return new class extends Component
                                     {{ __('View') }}
                                 </flux:menu.item>
                                 @can('orders.edit')
-                                    @if ($order->status === \App\Enums\OrderStatus::PAID)
+                                    @if ($order->canBeFulfilled())
                                         <flux:menu.item icon="truck" wire:click="markFulfilled({{ $order->id }})">
                                             {{ __('Mark as fulfilled') }}
                                         </flux:menu.item>

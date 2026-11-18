@@ -59,6 +59,7 @@ enum ActivityEvent: string
     case BOOKING_CREATED = 'booking.created';
     case BOOKING_RESCHEDULED = 'booking.rescheduled';
     case BOOKING_CANCELLED = 'booking.cancelled';
+    case BOOKING_DELETED = 'booking.deleted';
     case SUBMISSION_DELETED = 'submission.deleted';
     case SITE_IMPORTED = 'system.site_imported';
     case BACKUP_CREATED = 'system.backup_created';
@@ -128,6 +129,7 @@ enum ActivityEvent: string
             self::BOOKING_CREATED => __('Added booking'),
             self::BOOKING_RESCHEDULED => __('Moved booking'),
             self::BOOKING_CANCELLED => __('Cancelled booking'),
+            self::BOOKING_DELETED => __('Deleted booking'),
             self::SUBMISSION_DELETED => __('Deleted message'),
             self::SITE_IMPORTED => __('Imported site'),
             self::BACKUP_CREATED => __('Created backup'),

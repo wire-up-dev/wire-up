@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\OrderStatus;
+use App\Models\Booking;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Role;
@@ -121,6 +122,25 @@ it('leaves an unpaid order as it is', function (): void {
         ->call('markFulfilled');
 
     expect($order->refresh()->status)->toBe(OrderStatus::PENDING);
+});
+
+it('links a booking payment to its booking instead of offering to ship it', function (): void {
+    $order = Order::factory()->paid()->create(['reference' => 'BOOKPAID']);
+    $booking = Booking::factory()->create(['order_id' => $order->id, 'service_name' => 'Coaching call']);
+
+    $this->actingAsAdmin();
+
+    $this->get(route('admin.orders-index'))
+        ->assertSee('BOOKPAID')
+        ->assertDontSee(__('Mark as fulfilled'));
+
+    Livewire::test('pages::admin.orders-show', ['order' => $order])
+        ->assertSee('Coaching call')
+        ->assertSee(route('admin.bookings-show', $booking), false)
+        ->assertDontSee(__('Mark as fulfilled'))
+        ->call('markFulfilled');
+
+    expect($order->refresh()->status)->toBe(OrderStatus::PAID);
 });
 
 it('needs the orders edit ability to fulfil an order', function (): void {

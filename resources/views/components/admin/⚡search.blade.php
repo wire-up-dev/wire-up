@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Models\Booking;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\Record;
 use App\Models\RecordType;
 use App\Models\User;
+use App\Services\BookingService;
 use App\Services\GoogleAnalyticsDataService;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -30,6 +33,7 @@ return new class extends Component
             ['heading' => __('Pages'), 'items' => $this->pages($term)],
             ...$this->recordGroups($term),
             ['heading' => __('Categories'), 'items' => $this->categories($term)],
+            ['heading' => __('Bookings'), 'items' => $this->bookings($term)],
             ['heading' => __('Users'), 'items' => $this->users($term)],
             ['heading' => __('Go to'), 'items' => $this->destinations($term)],
         ];
@@ -130,6 +134,31 @@ return new class extends Component
     /**
      * @return array<int, array{label: string, description: string, icon: string, url: string}>
      */
+    private function bookings(string $term): array
+    {
+        if ($term === '' || ! auth()->user()?->can('bookings.view')) {
+            return [];
+        }
+
+        $service = resolve(BookingService::class);
+
+        return Booking::query()
+            ->where(fn (Builder $inner): Builder => $inner->whereLike('name', "%{$term}%")->orWhereLike('email', "%{$term}%")->orWhereLike('reference', "%{$term}%"))
+            ->latest('starts_at')
+            ->limit(self::PER_GROUP)
+            ->get()
+            ->map(fn (Booking $booking): array => [
+                'label' => $booking->label(),
+                'description' => $service->formatTime($booking->starts_at, $service->timezone(), app()->getLocale()),
+                'icon' => 'calendar-days',
+                'url' => route('admin.bookings-show', $booking),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{label: string, description: string, icon: string, url: string}>
+     */
     private function users(string $term): array
     {
         if ($term === '' || ! auth()->user()?->can('users.view')) {
@@ -193,6 +222,14 @@ return new class extends Component
             ])
             ->all();
 
+        $bookingService = resolve(BookingService::class);
+        $bookings = $bookingService->isOpen() || Booking::hasAny()
+            ? [['label' => __('Bookings'), 'description' => '', 'icon' => 'calendar-days', 'keywords' => 'appointments sessions calendar schedule clients', 'url' => route('admin.bookings-index'), 'can' => 'bookings.view']]
+            : [];
+        $availability = $bookingService->isOpen()
+            ? [$settings(__('Availability'), 'settings-bookings', 'bookings hours schedule calendar feed time zone notice')]
+            : [];
+
         $analytics = resolve(GoogleAnalyticsDataService::class)->configured()
             ? [['label' => __('Analytics'), 'description' => '', 'icon' => 'chart-pie', 'keywords' => 'stats reports visitors traffic', 'url' => route('admin.analytics'), 'can' => null]]
             : [];
@@ -204,6 +241,7 @@ return new class extends Component
             ...$recordTypes,
             ['label' => __('Categories'), 'description' => __('Content'), 'icon' => 'tag', 'keywords' => 'taxonomy grouping tags', 'url' => route('admin.categories-index'), 'can' => 'categories.view'],
             ['label' => __('Orders'), 'description' => '', 'icon' => 'shopping-bag', 'keywords' => 'shop sales purchases checkout stripe customers', 'url' => route('admin.orders-index'), 'can' => 'orders.view'],
+            ...$bookings,
             ['label' => __('Inbox'), 'description' => '', 'icon' => 'inbox', 'keywords' => 'messages contact form submissions enquiries', 'url' => route('admin.inbox-index'), 'can' => 'inbox.view'],
             ['label' => __('Redirects'), 'description' => '', 'icon' => 'arrow-uturn-right', 'keywords' => 'redirect 301 302 old address moved url broken links not found 404', 'url' => route('admin.redirects-index'), 'can' => 'settings.view'],
             ['label' => __('Users'), 'description' => '', 'icon' => 'user', 'keywords' => 'accounts members staff people', 'url' => route('admin.users-index'), 'can' => 'users.view'],
@@ -219,6 +257,7 @@ return new class extends Component
             $settings(__('Integrations'), 'settings-integrations', 'slack email smtp pexels analytics maps assistant api keys turnstile captcha'),
             $settings(__('Webhooks'), 'settings-webhooks', 'zapier make n8n crm automation integrations hooks'),
             $settings(__('AI Assistant'), 'settings-assistant', 'guides skills house style instructions ai'),
+            ...$availability,
             $settings(__('Shop'), 'settings-shop', 'shipping countries rates tax stripe checkout'),
             $settings(__('Updates'), 'settings-updates', 'version upgrade release changelog'),
             $settings(__('Export and import'), 'settings-export-import', 'bundle migrate transfer move'),

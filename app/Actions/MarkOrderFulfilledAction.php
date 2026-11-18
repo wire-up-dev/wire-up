@@ -13,7 +13,7 @@ final readonly class MarkOrderFulfilledAction
 {
     public function handle(Order $order): bool
     {
-        if ($order->status !== OrderStatus::PAID) {
+        if (! $order->canBeFulfilled()) {
             return false;
         }
 

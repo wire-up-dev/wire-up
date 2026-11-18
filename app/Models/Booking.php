@@ -116,6 +116,11 @@ final class Booking extends Model
         return $this->hasMany(BookingClaim::class);
     }
 
+    public function canBeDeleted(): bool
+    {
+        return $this->ends_at->isPast() || in_array($this->status, [BookingStatus::CANCELLED, BookingStatus::EXPIRED], true);
+    }
+
     public function label(): string
     {
         return $this->name ?: $this->service_name;

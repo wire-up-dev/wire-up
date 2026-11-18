@@ -186,7 +186,7 @@ return new class extends Component
 
     @if ($subscribed)
         <div
-            class="wire-field [&>p]:m-0 [&_a]:text-(--wire-accent) [&_a]:underline rounded-(--wire-radius) bg-(--wire-input-bg) p-4 leading-(--wire-body-leading) text-(--wire-input-text)"
+            class="wire-card [&>p]:m-0 [&_a]:text-(--wire-accent) [&_a]:underline rounded-(--wire-radius) bg-(--wire-card-bg) p-6 leading-(--wire-body-leading) text-(--wire-card-text)"
             data-newsletter-success
         >
             {!! $copy['successMessage'] !!}

@@ -15,7 +15,7 @@ it('lets existing administrators view and manage bookings', function (): void {
 
     bookingAbilitiesBackfill()->up();
 
-    expect($admin->refresh()->abilities)->toBe(['pages.view', 'bookings.view', 'bookings.edit']);
+    expect($admin->refresh()->abilities)->toBe(['pages.view', 'bookings.view', 'bookings.edit', 'bookings.delete']);
 });
 
 it('leaves an administrator role whose booking access was already chosen', function (): void {

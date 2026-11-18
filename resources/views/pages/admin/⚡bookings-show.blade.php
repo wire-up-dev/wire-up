@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\CancelBookingAction;
+use App\Actions\DeleteBookingAction;
 use App\Actions\RescheduleBookingAction;
 use App\Enums\BookingActor;
 use App\Enums\BookingStatus;
@@ -48,6 +49,17 @@ return new class extends Component
 
         Flux::modal('cancel-booking')->close();
         $this->booking->refresh();
+    }
+
+    public function delete(DeleteBookingAction $delete): void
+    {
+        $this->authorize('bookings.delete');
+
+        if ($delete->handle($this->booking)) {
+            Flux::toast(__('Booking deleted.'), variant: 'success');
+
+            $this->redirectRoute('admin.bookings-index', navigate: true);
+        }
     }
 
     public function openReschedule(BookingService $bookings): void
@@ -102,6 +114,7 @@ return new class extends Component
     $siteZone = $bookingService->timezone();
     $order = $booking->order;
     $canChange = $booking->status === \App\Enums\BookingStatus::CONFIRMED;
+    $canCancel = $canChange && $booking->ends_at->isFuture();
 @endphp
 
 <div class="grid items-stretch gap-10 md:grid-cols-5">
@@ -199,10 +212,16 @@ return new class extends Component
                 <flux:button :href="route('admin.bookings-index')" wire:navigate icon="arrow-left">
                     {{ __('Back') }}
                 </flux:button>
-                @if ($canChange)
+                @if ($canCancel)
                     @can('bookings.edit')
                         <flux:modal.trigger name="cancel-booking">
                             <flux:button variant="danger" icon="x-mark" class="w-full">{{ __('Cancel') }}</flux:button>
+                        </flux:modal.trigger>
+                    @endcan
+                @elseif ($booking->canBeDeleted())
+                    @can('bookings.delete')
+                        <flux:modal.trigger name="delete-booking">
+                            <flux:button variant="danger" icon="trash" class="w-full">{{ __('Delete') }}</flux:button>
                         </flux:modal.trigger>
                     @endcan
                 @endif
@@ -218,25 +237,47 @@ return new class extends Component
         </flux:card>
     </div>
 
+    @if ($booking->canBeDeleted())
+        @can('bookings.delete')
+            <flux:modal name="delete-booking" class="min-w-[22rem]">
+                <div class="space-y-6">
+                    <div>
+                        <flux:heading size="lg">{{ __('Delete booking') }}</flux:heading>
+                        <flux:text class="mt-2">{{ __('Are you sure you want to delete this booking? This cannot be undone.') }}</flux:text>
+                    </div>
+                    <div class="flex gap-2">
+                        <flux:spacer />
+                        <flux:modal.close>
+                            <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
+                        </flux:modal.close>
+                        <flux:button variant="danger" wire:click="delete">{{ __('Delete') }}</flux:button>
+                    </div>
+                </div>
+            </flux:modal>
+        @endcan
+    @endif
+
     @can('bookings.edit')
-        <flux:modal name="cancel-booking" class="min-w-[22rem]">
-            <div class="space-y-6">
-                <div>
-                    <flux:heading size="lg">{{ __('Cancel this booking?') }}</flux:heading>
-                    <flux:text class="mt-2">{{ $booking->email ? __('They get an email saying it’s cancelled.') : __('The time becomes free again.') }}</flux:text>
-                    @if ($order && $order->status->canBeRefunded())
-                        <flux:text class="mt-2">{{ __('The payment isn’t refunded automatically. Refund it from the order.') }}</flux:text>
-                    @endif
+        @if ($canCancel)
+            <flux:modal name="cancel-booking" class="min-w-[22rem]">
+                <div class="space-y-6">
+                    <div>
+                        <flux:heading size="lg">{{ __('Cancel this booking?') }}</flux:heading>
+                        <flux:text class="mt-2">{{ $booking->email ? __('They get an email saying it’s cancelled.') : __('The time becomes free again.') }}</flux:text>
+                        @if ($order && $order->status->canBeRefunded())
+                            <flux:text class="mt-2">{{ __('The payment isn’t refunded automatically. Refund it from the order.') }}</flux:text>
+                        @endif
+                    </div>
+                    <div class="flex gap-2">
+                        <flux:spacer />
+                        <flux:modal.close>
+                            <flux:button variant="ghost">{{ __('Keep it') }}</flux:button>
+                        </flux:modal.close>
+                        <flux:button variant="danger" wire:click="cancel">{{ __('Cancel booking') }}</flux:button>
+                    </div>
                 </div>
-                <div class="flex gap-2">
-                    <flux:spacer />
-                    <flux:modal.close>
-                        <flux:button variant="ghost">{{ __('Keep it') }}</flux:button>
-                    </flux:modal.close>
-                    <flux:button variant="danger" wire:click="cancel">{{ __('Cancel booking') }}</flux:button>
-                </div>
-            </div>
-        </flux:modal>
+            </flux:modal>
+        @endif
 
         <flux:modal name="reschedule-booking" wire:model.self="showMove" class="w-full md:max-w-md">
             <form wire:submit="reschedule" class="space-y-6">

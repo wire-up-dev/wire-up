@@ -7,6 +7,7 @@ use App\Enums\BookingActor;
 use App\Enums\BookingStatus;
 use App\Models\Activity;
 use App\Models\Booking;
+use App\Models\BookingClaim;
 use App\Models\Order;
 use App\Models\Role;
 use App\Models\User;
@@ -167,6 +168,8 @@ it('lets viewers look but not change anything', function (): void {
     Livewire::test('pages::admin.bookings-show', ['booking' => $booking])->call('reschedule')->assertForbidden();
     Livewire::test('pages::admin.bookings-index')->call('add')->assertForbidden();
     Livewire::test('pages::admin.bookings-index')->call('cancel', $booking->id)->assertForbidden();
+    Livewire::test('pages::admin.bookings-show', ['booking' => $booking])->call('delete')->assertForbidden();
+    Livewire::test('pages::admin.bookings-index')->call('delete', $booking->id)->assertForbidden();
     Livewire::withQueryParams(['move' => 1])->test('pages::admin.bookings-show', ['booking' => $booking])->assertSet('showMove', false);
 
     expect($booking->refresh()->status)->toBe(BookingStatus::CONFIRMED);
@@ -194,4 +197,55 @@ it('cancels a booking or opens its move form from the row menu', function (): vo
 
     expect($booking->refresh()->status)->toBe(BookingStatus::CANCELLED)
         ->and(Activity::query()->where('event', ActivityEvent::BOOKING_CANCELLED)->count())->toBe(1);
+});
+
+it('deletes past and cancelled bookings, but not ones still to come', function (): void {
+    $past = Booking::factory()->claimed()->create(['starts_at' => CarbonImmutable::parse('2026-11-10 15:00', 'UTC')]);
+    $cancelled = Booking::factory()->cancelled()->create();
+    $upcoming = Booking::factory()->claimed()->create();
+    $this->actingAsAdmin();
+
+    $this->get(route('admin.bookings-show', $upcoming))->assertSee('Cancel booking')->assertDontSee('Delete booking');
+    $this->get(route('admin.bookings-show', $past))->assertSee('Delete booking')->assertDontSee('Cancel booking');
+    Livewire::withQueryParams(['when' => 'past'])->test('pages::admin.bookings-index')->assertSee('Delete this booking? This cannot be undone.');
+
+    Livewire::test('pages::admin.bookings-show', ['booking' => $past])
+        ->call('delete')
+        ->assertRedirect(route('admin.bookings-index'));
+
+    Livewire::test('pages::admin.bookings-show', ['booking' => $upcoming])->call('delete')->assertNoRedirect();
+
+    Livewire::test('pages::admin.bookings-index')
+        ->call('delete', $cancelled->id)
+        ->call('delete', $upcoming->id)
+        ->call('delete', 999999);
+
+    expect(Booking::query()->pluck('id')->all())->toBe([$upcoming->id])
+        ->and(BookingClaim::query()->where('booking_id', $past->id)->exists())->toBeFalse()
+        ->and(Activity::query()->where('event', ActivityEvent::BOOKING_DELETED)->count())->toBe(2);
+});
+
+it('shows the next confirmed bookings on the dashboard', function (): void {
+    $next = Booking::factory()->create(['name' => 'Next Person', 'starts_at' => CarbonImmutable::parse('2026-11-17 15:00', 'UTC')]);
+    Booking::factory()->cancelled()->create(['name' => 'Cancelled Person']);
+    Booking::factory()->create(['name' => 'Past Person', 'starts_at' => CarbonImmutable::parse('2026-11-10 15:00', 'UTC')]);
+
+    $this->actingAsAdmin()->get(route('admin.dashboard'))
+        ->assertSee('Upcoming bookings')
+        ->assertSee('Next Person')
+        ->assertSee(route('admin.bookings-show', $next), false)
+        ->assertDontSee('Cancelled Person')
+        ->assertDontSee('Past Person');
+});
+
+it('says when no bookings are coming up on the dashboard', function (): void {
+    bookableService();
+
+    $this->actingAsAdmin()->get(route('admin.dashboard'))
+        ->assertSee('Upcoming bookings')
+        ->assertSee('No upcoming bookings.');
+});
+
+it('leaves the bookings card off the dashboard until bookings are in use', function (): void {
+    $this->actingAsAdmin()->get(route('admin.dashboard'))->assertDontSee('Upcoming bookings');
 });
