@@ -139,51 +139,6 @@ jobs:
       - name: Static Analysis
         run: composer test:types
 
-  php-next:
-    name: php 8.6 (early warning)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
-        with:
-          php-version: 8.6
-          tools: composer:v2
-          coverage: none
-
-      - name: Setup Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: "22"
-
-      - name: Add Flux license
-        run: composer config http-basic.composer.fluxui.dev "${{ secrets.FLUX_USERNAME }}" "${{ secrets.FLUX_LICENSE_KEY }}"
-
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=php+
-
-      - name: Copy Environment File
-        run: cp .env.example .env
-
-      - name: Generate Application Key
-        run: php artisan key:generate
-
-      - name: Install Node Dependencies
-        run: npm ci
-
-      - name: Build Assets
-        run: npm run build
-
-      - name: Tests on PHP 8.6
-        run: php -d memory_limit=-1 vendor/bin/pest --parallel --exclude-testsuite=Browser --display-deprecations
-
-      - name: Check that a real install accepts PHP 8.6
-        run: composer check-platform-reqs --no-dev
-
   databases:
     runs-on: ubuntu-latest
 
