@@ -35,6 +35,7 @@ it('refuses a host that resolves to a private or internal address', function (st
     'carrier-grade nat' => '100.100.100.200',
     'benchmark range' => '198.18.0.1',
     'nat64 loopback' => '64:ff9b::7f00:1',
+    'local-use nat64 loopback' => '64:ff9b:1::7f00:1',
     'ipv4-mapped loopback' => '::ffff:127.0.0.1',
 ]);
 
@@ -44,9 +45,9 @@ it('refuses a host that does not resolve', function (): void {
     new PublicUrlGuard()->assertPublic('https://nowhere.example/');
 })->throws(InvalidArgumentException::class, 'could not be found');
 
-it('refuses urls that are not http or https', function (string $url): void {
+it('refuses anything but an http or https url with a host', function (string $url): void {
     new PublicUrlGuard()->assertPublic($url);
-})->throws(InvalidArgumentException::class, 'not valid')->with(['file:///etc/passwd', 'ftp://acme.example/x', 'not a url']);
+})->throws(InvalidArgumentException::class, 'not valid')->with(['file:///etc/passwd', 'ftp://acme.example/x', 'not a url', 'https:/no-host']);
 
 it('resolves real hostnames when no resolver is set', function (): void {
     PublicUrlGuard::resolveHostsUsing(null);
@@ -76,11 +77,21 @@ it('stops a redirect to an internal address before calling it', function (): voi
     }
 })->throws(InvalidArgumentException::class, 'only public internet addresses');
 
-it('gives up after too many redirects', function (): void {
+it('gives up after three redirects', function (): void {
     Http::fake(['acme.example/*' => fn (): PromiseInterface => Http::response('', 302, ['Location' => '/again'])]);
 
-    new PublicUrlGuard()->get('https://acme.example/loop', 5, 1024);
+    try {
+        new PublicUrlGuard()->get('https://acme.example/loop', 5, 1024);
+    } finally {
+        Http::assertSentCount(4);
+    }
 })->throws(InvalidArgumentException::class, 'too many times');
+
+it('accepts a response of exactly the size limit', function (): void {
+    Http::fake(['acme.example/*' => Http::response(str_repeat('a', 1024))]);
+
+    expect(new PublicUrlGuard()->get('https://acme.example/file', 5, 1024)->body())->toHaveLength(1024);
+});
 
 it('stops reading a response that grows past the limit', function (): void {
     Http::fake(['acme.example/*' => Http::response(str_repeat('a', 2 * 1024 * 1024 + 1))]);
@@ -90,7 +101,7 @@ it('stops reading a response that grows past the limit', function (): void {
 
 it('aborts a download once it grows past the limit', function (): void {
     Http::fake(['acme.example/*' => function (Request $request, array $options): never {
-        expect($options['progress'](0, 1024, 0, 0))->toBeFalse();
+        expect($options['progress'](0, 2 * 1024 * 1024, 0, 0))->toBeFalse();
 
         $options['progress'](0, 2 * 1024 * 1024 + 1, 0, 0);
 
