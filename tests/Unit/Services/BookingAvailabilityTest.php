@@ -128,3 +128,51 @@ it('lets a working day run until midnight', function (): void {
 
     expect(slotTimes($slots))->toBe(['2026-11-16 23:00']);
 });
+
+it('starts slots at the exact minutes the hours name', function (): void {
+    $slots = BookingAvailability::compute(
+        bookingRules(['interval' => 20, 'hours' => [1 => [['start' => '09:45', 'end' => '10:45'], ['start' => '13:50', 'end' => '14:30']]]]),
+        20,
+        '2026-11-16',
+        '2026-11-16',
+        [],
+        CarbonImmutable::parse('2026-11-10 00:00', 'UTC'),
+    );
+
+    expect(slotTimes($slots))->toBe(['2026-11-16 09:45', '2026-11-16 10:05', '2026-11-16 10:25', '2026-11-16 13:50', '2026-11-16 14:10']);
+});
+
+it('lists slots in time order even when the hours of a day are not', function (): void {
+    $slots = BookingAvailability::compute(
+        bookingRules(['hours' => [1 => [['start' => '14:00', 'end' => '16:00'], ['start' => '09:00', 'end' => '11:00']]]]),
+        60,
+        '2026-11-16',
+        '2026-11-16',
+        [],
+        CarbonImmutable::parse('2026-11-10 00:00', 'UTC'),
+    );
+
+    expect(slotTimes($slots))->toBe(['2026-11-16 09:00', '2026-11-16 10:00', '2026-11-16 14:00', '2026-11-16 15:00']);
+});
+
+it('offers the slot that starts the moment the notice period ends', function (): void {
+    $slots = BookingAvailability::compute(bookingRules(['notice' => 60]), 60, '2026-11-16', '2026-11-16', [], CarbonImmutable::parse('2026-11-16 09:00', 'UTC'));
+
+    expect(slotTimes($slots))->toBe(['2026-11-16 10:00', '2026-11-16 11:00']);
+});
+
+it('stops at the real end of the day when London springs forward', function (string $end, int $duration, array $expected): void {
+    $slots = BookingAvailability::compute(
+        bookingRules(['timezone' => 'Europe/London', 'interval' => 30, 'hours' => [7 => [['start' => '00:00', 'end' => $end]]]]),
+        $duration,
+        '2026-03-29',
+        '2026-03-29',
+        [],
+        CarbonImmutable::parse('2026-03-20 00:00', 'UTC'),
+    );
+
+    expect(slotTimes($slots))->toBe($expected);
+})->with([
+    'hours ending in the skipped hour' => ['01:30', 30, ['2026-03-29 00:00', '2026-03-29 00:30']],
+    'a session that would run past the end' => ['03:00', 120, ['2026-03-29 00:00']],
+]);

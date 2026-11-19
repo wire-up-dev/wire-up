@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Settings;
 use App\Notifications\SystemUpdateCompleted;
 use App\Services\UpdateService;
+use Illuminate\Process\FakeProcessResult;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Exceptions;
@@ -50,7 +51,26 @@ it('refreshes the current version from git', function (): void {
 
     expect($service->refreshCurrentVersionFromGit())->toBe('v1.2.3')
         ->and($service->currentVersion())->toBe('v1.2.3');
+
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['git', 'describe', '--tags', '--abbrev=0']);
 });
+
+it('reads the tag checked out at HEAD', function (): void {
+    Process::fake(['*exact-match*' => Process::result(output: "v1.2.3\n")]);
+
+    expect(new UpdateService()->checkedOutTag())->toBe('v1.2.3');
+
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['git', 'describe', '--tags', '--exact-match', 'HEAD']);
+});
+
+it('finds no checked-out tag when HEAD is not on one', function (FakeProcessResult $result): void {
+    Process::fake(['*exact-match*' => $result]);
+
+    expect(new UpdateService()->checkedOutTag())->toBeNull();
+})->with([
+    'git fails' => fn (): FakeProcessResult => Process::result(exitCode: 128),
+    'nothing printed' => fn (): FakeProcessResult => Process::result(output: "\n"),
+]);
 
 it('returns null when git describe fails', function (): void {
     Process::fake(['*describe*' => Process::result(exitCode: 1)]);
@@ -78,6 +98,7 @@ it('picks the highest semver tag from the remote, ignoring peeled and non-semver
             "ccc\trefs/tags/v0.10.0^{}",
             "ddd\trefs/tags/not-semver",
             "eee\trefs/tags/v1.0.0-beta",
+            "fff\trefs/tags/v0.2.0",
         ])),
         '*describe*' => Process::result(exitCode: 1),
         '*fetch*' => Process::result(),
@@ -88,6 +109,8 @@ it('picks the highest semver tag from the remote, ignoring peeled and non-semver
     expect($service->check())->toBe('v0.10.0')
         ->and($service->latestVersion())->toBe('v0.10.0')
         ->and($service->lastCheckedAt()?->toIso8601String())->toBe(now()->toIso8601String());
+
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['git', 'ls-remote', '--tags', 'origin']);
 });
 
 it('caches a null latest version when the remote has no tags', function (): void {
@@ -205,6 +228,41 @@ it('remembers which release is held back until it is no longer waiting', functio
     expect($service->heldBackRelease())->toBeNull();
 });
 
+it('starts the wait again when a release is held back a second time', function (): void {
+    Exceptions::fake();
+    $service = holdBackUnsignedRelease();
+    $service->check();
+
+    Process::fake(['*ls-remote*' => Process::result(output: "aaa\trefs/tags/v0.9.0")]);
+    $service->check();
+
+    $this->travel(UpdateService::HELD_BACK_ALERT_HOURS + 1)->hours();
+    Process::fake(['*ls-remote*' => Process::result(output: "aaa\trefs/tags/v1.0.0")]);
+    $service->check();
+
+    expect($service->heldBackRelease())->toBe('v1.0.0');
+
+    Exceptions::assertNothingReported();
+});
+
+it('starts the wait again for a newer release that is also held back', function (): void {
+    Exceptions::fake();
+    $service = holdBackUnsignedRelease();
+    $service->check();
+
+    $this->travel(UpdateService::HELD_BACK_ALERT_HOURS + 1)->hours();
+    Process::fake(['*ls-remote*' => Process::result(output: "aaa\trefs/tags/v1.0.0\nbbb\trefs/tags/v1.1.0")]);
+    Http::fake([
+        ReleaseArchive::url('v1.1.0', 'build.tar.gz.sha256') => Http::response(str_repeat('c', 64)),
+        ReleaseArchive::url('v1.1.0', 'build.tar.gz.sha256.sig') => Http::response('Not Found', 404),
+    ]);
+    $service->check();
+
+    expect($service->heldBackRelease())->toBe('v1.1.0');
+
+    Exceptions::assertNothingReported();
+});
+
 it('alerts the developer once a release has waited more than a day for its signed files', function (): void {
     Exceptions::fake();
     $service = holdBackUnsignedRelease();
@@ -253,7 +311,7 @@ it('stamps the current version from git when the version file is missing', funct
 
     $service->check();
 
-    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['git', 'fetch', '--tags', '--force', 'origin']);
+    Process::assertRanTimes(fn (PendingProcess $process): bool => $process->command === ['git', 'fetch', '--tags', '--force', 'origin'], 2);
 
     expect($service->currentVersion())->toBe('v0.9.0')
         ->and($service->updateAvailable())->toBeTrue();
@@ -287,6 +345,8 @@ it('stores release notes from the changelog when an update is available', functi
     expect($service->changelog())->toBe([
         ['version' => 'v1.0.0', 'notes' => ['Added dark mode', 'Fixed the footer']],
     ]);
+
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['git', 'show', 'v1.0.0:CHANGELOG.md']);
 });
 
 it('stores no release notes when the changelog fetch fails', function (): void {
@@ -347,11 +407,15 @@ it('returns an empty changelog when the cached notes are malformed', function ()
     expect(new UpdateService()->changelog())->toBeEmpty();
 });
 
-it('drops non-string note lines from the cached changelog', function (): void {
-    Cache::forever('wireup:update:latest', ['version' => 'v1.0.0', 'notes' => [['version' => 'v1.0.0', 'notes' => ['Real note', 42]]]]);
+it('skips malformed sections and drops non-string note lines from the cached changelog', function (): void {
+    Cache::forever('wireup:update:latest', ['version' => 'v1.0.0', 'notes' => [
+        ['version' => 1, 'notes' => []],
+        ['version' => 'v1.1.0', 'notes' => 'not-a-list'],
+        ['version' => 'v1.0.0', 'notes' => ['Real note', 42, 'Second note']],
+    ]]);
 
     expect(new UpdateService()->changelog())->toBe([
-        ['version' => 'v1.0.0', 'notes' => ['Real note']],
+        ['version' => 'v1.0.0', 'notes' => ['Real note', 'Second note']],
     ]);
 });
 
@@ -438,6 +502,10 @@ it('emails the contact address when an update finishes', function (): void {
     resolve(UpdateService::class)->markFinished('v1.2.0');
 
     Notification::assertSentOnDemandTimes(SystemUpdateCompleted::class, 1);
+    Notification::assertSentOnDemand(
+        SystemUpdateCompleted::class,
+        fn (SystemUpdateCompleted $notification, array $channels, object $notifiable): bool => str_contains((string) $notification->toMail($notifiable)->subject, 'has been updated to v1.2.0'),
+    );
 });
 
 it('emails the contact address when an update fails', function (): void {
@@ -461,6 +529,7 @@ it('sends no outcome mail when no contact email is configured', function (): voi
 });
 
 it('keeps the update state when the outcome mail cannot be sent', function (): void {
+    Exceptions::fake();
     Settings::set(['contact_email' => 'owner@example.com']);
 
     Notification::shouldReceive('sendNow')->once()->andThrow(new RuntimeException('smtp down'));
@@ -469,4 +538,30 @@ it('keeps the update state when the outcome mail cannot be sent', function (): v
     $service->markFailed('v1.2.0', 'Build frontend assets', 'boom');
 
     expect($service->state()['status'])->toBe('failed');
+
+    Exceptions::assertReported(fn (RuntimeException $exception): bool => $exception->getMessage() === 'smtp down');
 });
+
+it('takes the lock over from an update that was killed part way', function (): void {
+    Cache::lock('wireup:update:lock', 3600)->get();
+    Cache::put('wireup:update:lock-holder', ['pid' => 2_147_483_000, 'host' => gethostname()], 3600);
+
+    $lock = resolve(UpdateService::class)->acquireUpdateLock();
+
+    expect($lock)->not->toBeNull()
+        ->and(Cache::lock('wireup:update:lock', 3600)->get())->toBeFalse();
+
+    $lock?->release();
+});
+
+it('leaves the lock alone while its holder may still be running', function (array $holder): void {
+    Cache::lock('wireup:update:lock', 3600)->get();
+    Cache::put('wireup:update:lock-holder', $holder, 3600);
+
+    expect(resolve(UpdateService::class)->updateIsLocked())->toBeTrue();
+
+    Cache::lock('wireup:update:lock')->forceRelease();
+})->with([
+    'a process id that is not a number' => fn (): array => ['pid' => 'abc', 'host' => gethostname()],
+    'a process owned by another user' => fn (): array => ['pid' => 1, 'host' => gethostname()],
+]);

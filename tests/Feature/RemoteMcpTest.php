@@ -195,6 +195,7 @@ it('explains why a token can’t use a tool', function (TokenAccess $access, str
     'edit token replacing text' => [TokenAccess::Edit, 'replace-text', fn (): array => ['find' => 'old', 'replace' => 'new'], 'Publishing, deleting and replace-text need a token with full access.'],
     'edit token publishing a new page' => [TokenAccess::Edit, 'create-page', fn (): array => ['title' => 'Live', 'publish' => true], 'Publishing needs a token with full access. Leave out "publish" to save a draft.'],
     'edit token publishing a record' => [TokenAccess::Edit, 'update-record', fn (Record $record): array => ['record' => $record->id, 'status' => 'published'], 'Publishing needs a token with full access. Leave out "status" to save a draft.'],
+    'edit token publishing a new record' => [TokenAccess::Edit, 'create-record', fn (Record $record): array => ['type' => $record->recordType->key, 'title' => 'Live', 'publish' => true], 'Publishing needs a token with full access. Leave out "publish" to save a draft.'],
 ]);
 
 it('explains which part of the role is missing', function (array $abilities, string $tool, Closure $arguments, string $reason): void {
@@ -223,6 +224,15 @@ it('explains which part of the role is missing', function (array $abilities, str
     'a record id given as true' => [['records.products.view'], 'get-record', fn (): array => ['record' => true], 'Your role doesn’t allow this.'],
     'rendering a page without pages' => [['records.products.view'], 'render-page', fn (): array => ['page' => 1], 'Your role can’t view Pages.'],
     'rendering a record of another type' => [['records.products.view'], 'render-page', fn (array $records): array => ['record' => $records['events']->id], 'Your role can’t view Events.'],
+    'setting up a site without creating pages' => [['pages.edit', 'settings.edit'], 'scaffold-site', fn (): array => [], 'Your role can’t create Pages.'],
+    'setting up a site without editing pages' => [['pages.create', 'settings.edit'], 'scaffold-site', fn (): array => [], 'Your role can’t edit Pages.'],
+    'setting up a site without settings' => [['pages.create', 'pages.edit'], 'scaffold-site', fn (): array => [], 'Your role can’t edit Settings.'],
+    'updating a record of another type' => [['records.products.edit'], 'update-record', fn (array $records): array => ['record' => $records['events']->id, 'title' => 'Gala'], 'Your role can’t edit Events.'],
+    'updating a record with page rights only' => [['pages.edit'], 'update-record', fn (): array => [], 'Your role doesn’t allow this.'],
+    'deleting a record with page rights only' => [['pages.delete'], 'delete-record', fn (): array => ['confirm' => true], 'Your role doesn’t allow this.'],
+    'translating a record with page rights only' => [['pages.view'], 'get-content-strings', fn (): array => ['type' => 'record', 'locale' => 'fr'], 'Your role doesn’t allow this.'],
+    'searching everything without pages' => [['records.products.view', 'records.events.view'], 'search-content', fn (): array => ['find' => 'sale'], 'Your role can’t view Pages.'],
+    'searching pages without pages' => [['records.products.view'], 'search-content', fn (): array => ['find' => 'sale', 'pages' => [1]], 'Your role can’t view Pages.'],
 ]);
 
 it('lets a role search the records it can see', function (): void {
@@ -231,6 +241,23 @@ it('lets a role search the records it can see', function (): void {
     $product = Record::factory()->for($products)->create();
 
     remoteMcpCall(remoteMcpToken(remoteMcpUser(['records.products.view']), TokenAccess::Read), 'search-content', ['find' => 'sale', 'records' => [$product->id]])
+        ->assertOk()
+        ->assertJsonPath('result.isError', false);
+});
+
+it('lets a role search only the pages it can see', function (): void {
+    RecordType::factory()->create(['key' => 'products', 'name' => 'Products']);
+    $page = Page::factory()->create();
+
+    remoteMcpCall(remoteMcpToken(remoteMcpUser(['pages.view']), TokenAccess::Read), 'search-content', ['find' => 'sale', 'pages' => [$page->id]])
+        ->assertOk()
+        ->assertJsonPath('result.isError', false);
+});
+
+it('lets a reading token filter records by status', function (): void {
+    $record = Record::factory()->create();
+
+    remoteMcpCall(remoteMcpToken(remoteMcpOwner(), TokenAccess::Read), 'list-records', ['type' => $record->recordType->key, 'status' => 'draft'])
         ->assertOk()
         ->assertJsonPath('result.isError', false);
 });

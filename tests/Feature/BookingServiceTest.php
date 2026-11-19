@@ -120,6 +120,38 @@ it('leaves taken time out of the free slots, except for the booking being moved'
         ->and($availability->isOffered(60, CarbonImmutable::parse('2026-11-17 08:00', 'UTC'), minimumNotice: 60 * 24 * 7))->toBeFalse();
 });
 
+it('waits for the longer of the saved notice and the notice a caller asks for', function (): void {
+    openBookingHours();
+    $availability = resolve(BookingAvailability::class);
+
+    expect($availability->rules()['notice'])->toBe(0)
+        ->and($availability->rules(35)['notice'])->toBe(35);
+
+    openBookingHours(['booking_notice_hours' => 2]);
+
+    expect(resolve(BookingAvailability::class)->rules(35)['notice'])->toBe(120);
+});
+
+it('offers a slot that starts right now when no notice is needed', function (): void {
+    openBookingHours();
+    $this->travelTo(CarbonImmutable::parse('2026-11-16 09:00', 'UTC'));
+    $availability = resolve(BookingAvailability::class);
+
+    expect($availability->slots(60, '2026-11-16', '2026-11-16')[0]->format('H:i'))->toBe('09:00')
+        ->and($availability->isOffered(60, CarbonImmutable::parse('2026-11-16 09:00', 'UTC')))->toBeTrue();
+});
+
+it('keeps the buffer clear of a booking just after midnight', function (): void {
+    openBookingHours(['booking_buffer' => 15, 'booking_hours' => [2 => [['start' => '23:00', 'end' => '24:00']]]]);
+    $availability = resolve(BookingAvailability::class);
+
+    expect($availability->isOffered(60, CarbonImmutable::parse('2026-11-17 23:00', 'UTC')))->toBeTrue();
+
+    Booking::factory()->claimed()->create(['starts_at' => CarbonImmutable::parse('2026-11-18 00:05', 'UTC')]);
+
+    expect($availability->isOffered(60, CarbonImmutable::parse('2026-11-17 23:00', 'UTC')))->toBeFalse();
+});
+
 it('writes times in the reader\'s zone and language and links to the right language', function (): void {
     Locale::query()->where('code', 'nl')->update(['active' => true]);
     cache()->forget('site-locales');
