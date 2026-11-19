@@ -10,6 +10,7 @@ use App\Services\SiteBundle;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -53,20 +54,33 @@ final class RestoreBackupCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->call('down');
+        $database = $backups->directory().'/.restore.'.$dumper->extension();
+        $safety = $backups->directory().'/db-backup-'.now()->format('Y-m-d-His').'.'.$dumper->extension();
 
-        $error = $this->restoreDatabase($zip, $dumper, $backups->directory());
+        try {
+            $error = $this->extractDatabase($zip, $dumper, $database) ?? $this->safetyCopy($dumper, $safety);
+
+            if ($error !== null) {
+                $this->components->error($error);
+
+                return self::FAILURE;
+            }
+
+            $this->call('down');
+
+            $error = $dumper->restore($database);
+        } finally {
+            File::delete($database);
+        }
 
         if ($error !== null) {
-            $this->components->error($error);
-            $this->components->error('The site is still in maintenance mode. Fix the problem, then run: php artisan up');
-
-            return self::FAILURE;
+            return $this->putBack($dumper, $safety, $error);
         }
 
         $files = $this->restoreFiles($zip);
         $zip->close();
 
+        DB::table('jobs')->delete();
         $this->call('migrate', ['--force' => true]);
         $this->call('cache:clear');
         $this->call('up');
@@ -96,19 +110,48 @@ final class RestoreBackupCommand extends Command
         return null;
     }
 
-    private function restoreDatabase(ZipArchive $zip, DatabaseDumper $dumper, string $directory): ?string
+    private function extractDatabase(ZipArchive $zip, DatabaseDumper $dumper, string $database): ?string
     {
-        $database = $directory.'/.restore.'.$dumper->extension();
+        $entry = 'database.'.$dumper->extension();
+        $expected = $zip->statName($entry)['size'] ?? 0;
+
+        if ($expected === 0) {
+            return 'The database in this backup is empty or cannot be read, so nothing was restored.';
+        }
 
         try {
-            File::put($database, $zip->getStream('database.'.$dumper->extension()) ?: '');
-
-            return $dumper->restore($database);
+            copy('zip://'.$zip->filename.'#'.$entry, $database);
         } catch (Throwable $exception) {
-            return $exception->getMessage();
-        } finally {
-            File::delete($database);
+            return 'The database in this backup could not be unpacked, so nothing was restored: '.$exception->getMessage();
         }
+
+        return File::size($database) === $expected ? null : 'The database in this backup is damaged, so nothing was restored.';
+    }
+
+    private function safetyCopy(DatabaseDumper $dumper, string $safety): ?string
+    {
+        $error = $dumper->dump($safety);
+
+        return $error === null ? null : 'The current database could not be saved first, so nothing was restored: '.$error;
+    }
+
+    private function putBack(DatabaseDumper $dumper, string $safety, string $error): int
+    {
+        $this->components->error($error);
+
+        $putBack = $dumper->restore($safety);
+
+        if ($putBack === null) {
+            $this->call('up');
+            $this->components->error('The backup could not be restored, so the database was put back as it was. The site is live again.');
+
+            return self::FAILURE;
+        }
+
+        $this->components->error('Putting the database back failed too: '.$putBack);
+        $this->components->error('The site is still in maintenance mode. The database from before the restore is in '.basename($safety).'. Fix the problem, then run: php artisan up');
+
+        return self::FAILURE;
     }
 
     private function restoreFiles(ZipArchive $zip): int

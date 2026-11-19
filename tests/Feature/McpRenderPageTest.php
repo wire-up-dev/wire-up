@@ -10,6 +10,7 @@ use App\Models\Record;
 use App\Models\RecordType;
 use App\Services\PageScreenshot;
 use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 
@@ -120,10 +121,14 @@ it('needs exactly one target', function (array $arguments): void {
     'two' => [['page' => 1, 'path' => '/']],
 ]);
 
-it('rejects a path that does not start with a slash', function (): void {
-    WireUpServer::tool(RenderPageTool::class, ['path' => 'about'])
-        ->assertHasErrors(['The path must start with a slash, e.g. "/about".']);
-});
+it('only renders paths on this site', function (string $path, string $message): void {
+    WireUpServer::tool(RenderPageTool::class, ['path' => $path])->assertHasErrors([$message]);
+})->with([
+    'no slash' => ['about', 'The path must start with a single slash, e.g. "/about".'],
+    'another host' => ['//127.0.0.1:8025/', 'The path must start with a single slash, e.g. "/about".'],
+    'a local file' => ['//home/user/site/.env', 'The path must start with a single slash, e.g. "/about".'],
+    'a backslash' => ['/\\evil.example', 'The path cannot contain a backslash.'],
+]);
 
 it('explains how to install the browser when it is missing', function (): void {
     Process::fake(['*' => Process::result(
@@ -210,4 +215,15 @@ it('says plainly when there is no web address to render yet', function (): void 
     WireUpServer::tool(RenderPageTool::class, ['page' => $page->id])
         ->assertHasErrors()
         ->assertSee('has no web address yet');
+});
+
+it('renders one page at a time', function (): void {
+    fakeScreenshotProcess();
+    $page = livePage();
+    $running = Cache::lock('wireup:render-page', 120);
+    $running->get();
+
+    WireUpServer::tool(RenderPageTool::class, ['page' => $page->id])->assertHasErrors(['Another page is being rendered right now.']);
+
+    $running->release();
 });

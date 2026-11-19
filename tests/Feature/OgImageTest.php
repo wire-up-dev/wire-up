@@ -295,3 +295,10 @@ it('reports what it had to skip', function (): void {
         ->expectsOutputToContain('Skipped')
         ->assertSuccessful();
 });
+
+it('has no card for a record without a page of its own', function (): void {
+    $record = sharedRecord();
+    $record->recordType->update(['has_detail_page' => false]);
+
+    $this->get(route('og.show', ['type' => 'record', 'id' => $record->id, 'locale' => 'en']))->assertNotFound();
+});

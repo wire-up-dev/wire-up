@@ -210,12 +210,11 @@ it('deduplicates block anchors with incrementing suffixes on save', function ():
         'b3' => ['id' => 'b3', 'type' => 'rich-text', 'position' => 2, 'content' => ['anchor' => 'intro']],
     ];
 
-    Livewire::test('pages::admin.pages-edit', ['page' => $page])
+    $component = Livewire::test('pages::admin.pages-edit', ['page' => $page])
         ->set('blocks', $blocks)
         ->set('status', ContentStatus::DRAFT)
         ->set('publishedLocales', [])
-        ->call('update')
-        ->assertSet('blocks.b1.content.anchor', 'intro')
-        ->assertSet('blocks.b2.content.anchor', 'intro-2')
-        ->assertSet('blocks.b3.content.anchor', 'intro-3');
+        ->call('update');
+
+    expect(collect($component->get('blocks'))->pluck('content.anchor')->all())->toBe(['intro', 'intro-2', 'intro-3']);
 });

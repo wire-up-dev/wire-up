@@ -283,3 +283,15 @@ it('stops a block srcset at the cropped or original width of the image', functio
 it('has no srcset when there is no image', function (): void {
     expect(Block::factory()->create(['content' => []])->imageSrcset('image', [400]))->toBeNull();
 });
+
+it('drops a cta that would run a script', function (): void {
+    $block = Block::factory()->create([
+        'content' => [
+            'cta' => ['link' => ['type' => 'url', 'value' => "\u{00A0}javascript:alert(1)"]],
+            'other' => ['link' => ['type' => 'url', 'value' => 'https://wire-up.dev']],
+        ],
+    ]);
+
+    expect($block->ctaUrl('cta'))->toBeNull()
+        ->and($block->ctaUrl('other'))->toBe('https://wire-up.dev');
+});

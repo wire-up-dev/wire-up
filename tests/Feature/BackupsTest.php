@@ -17,6 +17,7 @@ use App\Services\SlackWebhookChannel;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Process\PendingProcess;
@@ -46,6 +47,8 @@ function backupSourceDatabase(): string
 
     $pdo->exec('create table samples (name text)');
     $pdo->exec("insert into samples values ('original')");
+    $pdo->exec('create table jobs (id integer primary key autoincrement, queue varchar, payload text)');
+    $pdo->exec("insert into jobs (queue, payload) values ('default', 'queued when the backup was made')");
 
     config()->set('database.connections.sqlite_backup', ['driver' => 'sqlite', 'database' => $database, 'prefix' => '', 'foreign_key_constraints' => false]);
     config()->set('database.default', 'sqlite_backup');
@@ -95,6 +98,16 @@ function archiveEntries(string $path): array
     sort($entries);
 
     return $entries;
+}
+
+function fakeDumpWritingItsFile(): Closure
+{
+    return function (PendingProcess $process): ProcessResult {
+        $target = collect((array) $process->command)->first(fn (string $argument): bool => str_starts_with($argument, '--result-file=') || str_starts_with($argument, '--file='));
+        File::put((string) str($target)->after('='), 'dump');
+
+        return Process::result();
+    };
 }
 
 beforeEach(function (): void {
@@ -422,13 +435,14 @@ it('reports an alert that cannot be delivered instead of failing again', functio
     Exceptions::assertReported(RequestException::class);
 });
 
-it('schedules the automatic backup for three in the morning', function (): void {
+it('schedules the automatic backup during the three o’clock hour, at a minute of its own for each site', function (): void {
     $this->artisan('schedule:list')->assertExitCode(0);
 
     $event = collect(resolve(Schedule::class)->events())
         ->first(fn (Event $event): bool => str_ends_with((string) $event->command, 'wireup:backup:create --scheduled'));
 
-    expect($event?->expression)->toBe('0 3 * * *');
+    expect($event?->expression)->toBe((crc32(base_path()) % 60).' 3 * * *')
+        ->and($event?->expiresAt)->toBe(180);
 });
 
 it('restores the database and uploaded files from a backup', function (): void {
@@ -452,6 +466,8 @@ it('restores the database and uploaded files from a backup', function (): void {
         ->assertExitCode(0);
 
     expect(DB::connection('sqlite_backup')->table('samples')->value('name'))->toBe('original')
+        ->and(DB::connection('sqlite_backup')->table('jobs')->count())->toBe(0)
+        ->and(File::glob(config()->string('wireup.backup_path').'/db-backup-*.sqlite'))->toHaveCount(1)
         ->and($disk->get('media/photo.jpg'))->toBe('before')
         ->and(File::exists(dirname(mb_rtrim($disk->path(''), '/')).'/escape.txt'))->toBeFalse()
         ->and(app()->isDownForMaintenance())->toBeFalse();
@@ -499,9 +515,10 @@ it('refuses a backup from another database, a newer version or without a databas
     'no database' => [['database' => 'sqlite', 'migrations' => 1], [], 'has no database in it'],
 ])->group('sqlite-only');
 
-it('clears a mysql or postgres database before loading the backup, and stays in maintenance mode when loading fails', function (string $driver, string $client): void {
+it('clears a mysql or postgres database before loading the backup, and stays in maintenance mode when loading and putting back both fail', function (string $driver, string $client, string $dumpTool): void {
     config()->set('database.default', $driver);
     Process::fake([
+        "*{$dumpTool}*" => fakeDumpWritingItsFile(),
         '*--version*' => Process::result(),
         '*db:wipe*' => Process::result(),
         "*{$client}*" => Process::result(errorOutput: 'access denied', exitCode: 1),
@@ -510,34 +527,85 @@ it('clears a mysql or postgres database before loading the backup, and stays in 
     handmadeBackup('backup-2026-01-01-000000-manual.zip', ['database' => $driver], ['database.sql' => 'select 1;']);
 
     $this->artisan(RestoreBackupCommand::class, ['file' => 'backup-2026-01-01-000000-manual.zip', '--force' => true])
+        ->expectsOutputToContain('Putting the database back failed too')
         ->expectsOutputToContain('access denied')
         ->expectsOutputToContain('still in maintenance mode')
         ->assertExitCode(1);
 
+    $load = fn (PendingProcess $process): bool => is_array($process->command) && $process->command[0] === $client;
+
     Process::assertRanInOrder([
+        fn (PendingProcess $process): bool => is_array($process->command) && $process->command[0] === $dumpTool,
         [$client, '--version'],
         [PHP_BINARY, 'artisan', 'db:wipe', '--force', '--drop-views'],
-        fn (PendingProcess $process): bool => is_array($process->command) && $process->command[0] === $client,
+        $load,
+        [$client, '--version'],
+        [PHP_BINARY, 'artisan', 'db:wipe', '--force', '--drop-views'],
+        $load,
     ]);
 
     expect(app()->isDownForMaintenance())->toBeTrue();
 
     $this->artisan('up');
-})->with([['mysql', 'mysql'], ['pgsql', 'psql']]);
+})->with([['mysql', 'mysql', 'mysqldump'], ['pgsql', 'psql', 'pg_dump']]);
 
-it('keeps the site in maintenance mode when the database cannot be unpacked', function (): void {
-    backupSourceDatabase();
-    $archive = resolve(BackupService::class)->create(automatic: false);
-    File::ensureDirectoryExists(config()->string('wireup.backup_path').'/.restore.sqlite');
+it('puts the database back as it was and brings the site up when loading the backup fails', function (): void {
+    config()->set('database.default', 'mysql');
+    Process::fake([
+        '*mysqldump*' => fakeDumpWritingItsFile(),
+        '*--version*' => Process::result(),
+        '*db:wipe*' => Process::result(),
+        '*mysql*' => Process::sequence()->push(Process::result(errorOutput: 'syntax error', exitCode: 1))->push(Process::result()),
+    ]);
+    File::ensureDirectoryExists(config()->string('wireup.backup_path'));
+    handmadeBackup('backup-2026-01-01-000000-manual.zip', ['database' => 'mysql'], ['database.sql' => 'select 1;']);
 
-    $this->artisan(RestoreBackupCommand::class, ['file' => basename($archive), '--force' => true])
-        ->expectsOutputToContain('still in maintenance mode')
+    $this->artisan(RestoreBackupCommand::class, ['file' => 'backup-2026-01-01-000000-manual.zip', '--force' => true])
+        ->expectsOutputToContain('syntax error')
+        ->expectsOutputToContain('put back as it was')
         ->assertExitCode(1);
 
-    expect(app()->isDownForMaintenance())->toBeTrue();
-
-    $this->artisan('up');
+    expect(app()->isDownForMaintenance())->toBeFalse();
 });
+
+it('changes nothing when the current database cannot be saved first', function (): void {
+    config()->set('database.default', 'mysql');
+    Process::fake(['*mysqldump*' => Process::result(errorOutput: 'no permission', exitCode: 1)]);
+    File::ensureDirectoryExists(config()->string('wireup.backup_path'));
+    handmadeBackup('backup-2026-01-01-000000-manual.zip', ['database' => 'mysql'], ['database.sql' => 'select 1;']);
+
+    $this->artisan(RestoreBackupCommand::class, ['file' => 'backup-2026-01-01-000000-manual.zip', '--force' => true])
+        ->expectsOutputToContain('could not be saved first')
+        ->assertExitCode(1);
+
+    Process::assertNotRan(fn (PendingProcess $process): bool => is_array($process->command) && in_array('db:wipe', $process->command, true));
+
+    expect(app()->isDownForMaintenance())->toBeFalse();
+});
+
+it('leaves the site alone when the database in the backup is empty or cannot be unpacked', function (Closure $prepare, string $message): void {
+    $file = $prepare();
+
+    $this->artisan(RestoreBackupCommand::class, ['file' => $file, '--force' => true])
+        ->expectsOutputToContain($message)
+        ->assertExitCode(1);
+
+    expect(app()->isDownForMaintenance())->toBeFalse();
+})->with([
+    'empty' => [function (): string {
+        File::ensureDirectoryExists(config()->string('wireup.backup_path'));
+        handmadeBackup('backup-2026-01-01-000000-manual.zip', ['database' => 'sqlite', 'migrations' => 1], ['database.sqlite' => '']);
+
+        return 'backup-2026-01-01-000000-manual.zip';
+    }, 'is empty or cannot be read'],
+    'cannot be unpacked' => [function (): string {
+        backupSourceDatabase();
+        $archive = resolve(BackupService::class)->create(automatic: false);
+        File::ensureDirectoryExists(config()->string('wireup.backup_path').'/.restore.sqlite');
+
+        return basename($archive);
+    }, 'could not be unpacked'],
+])->group('sqlite-only');
 
 it('runs a queued backup through to a finished archive', function (): void {
     backupSourceDatabase();

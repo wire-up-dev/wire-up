@@ -13,6 +13,7 @@ use App\Services\ContentRules;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -30,7 +31,7 @@ final class UpdatePageTool extends Tool
                 'page' => ['required', 'integer'],
                 'title' => ['nullable', ...ContentRules::TITLE],
                 'description' => ContentRules::DESCRIPTION,
-                'slug' => ['nullable', ...ContentRules::SLUG],
+                'slug' => ['nullable', ...ContentRules::SLUG, Rule::notIn(ContentRules::RESERVED_PAGE_SLUGS)],
                 'noindex' => ['boolean'],
                 'og_image' => ['nullable', 'integer', 'exists:media,id'],
                 ...ContentRules::layout(['nullable', 'integer', 'exists:media,id']),
@@ -44,6 +45,7 @@ final class UpdatePageTool extends Tool
                 'description.max' => 'The description may not be longer than 160 characters — it is used as the meta description.',
                 'slug.min' => 'The web address must be at least 3 characters.',
                 'slug.regex' => 'The web address can only use lowercase letters, numbers and hyphens.',
+                'slug.not_in' => 'The site already uses this web address for its own pages, such as the cart or sign-in. Choose a different slug.',
                 'og_image.exists' => 'That media id does not exist. Use list-media or import-media-from-url first.',
                 'layout.backgroundImage.exists' => 'That background media id does not exist. Use list-media, upload-media or import-media-from-url first.',
                 'layout.sidebar.menus.max' => 'A page may show at most 3 sidebar menus.',
@@ -163,7 +165,7 @@ final class UpdatePageTool extends Tool
                 ->description('A new meta description (max 160 characters). Pass an empty string to clear it.'),
 
             'slug' => $schema->string()
-                ->description('A new web address for the page, without slashes: lowercase letters, numbers and hyphens only. A number is appended if it is already taken.'),
+                ->description('A new web address for the page, without slashes: lowercase letters, numbers and hyphens only. It must not already be used by another page, and system addresses such as "cart", "login" or "account" are not allowed.'),
 
             'noindex' => $schema->boolean()
                 ->description('Keep this page out of search engines and the sitemap.'),

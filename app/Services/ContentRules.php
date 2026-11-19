@@ -16,6 +16,11 @@ final class ContentRules
 
     public const array DESCRIPTION = ['nullable', 'string', 'max:160'];
 
+    public const array RESERVED_PAGE_SLUGS = [
+        'admin', 'account', 'booking', 'build', 'cart', 'checkout', 'forgot-password', 'img', 'livewire', 'login',
+        'logout', 'mcp', 'register', 'reset-password', 'storage', 'stripe', 'two-factor-challenge', 'verify-email',
+    ];
+
     /**
      * @param  list<string>  $activeLocales
      * @return array<string, list<mixed>>

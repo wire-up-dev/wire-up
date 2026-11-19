@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Traits;
 
 use App\Enums\BlockType;
+use App\Models\Page;
+use App\Models\Record;
 use App\Services\BlockSources;
 use Flux\Flux;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Renderless;
 
@@ -21,6 +25,24 @@ trait HasBlockBuilder
     public ?string $selectedBlock = null;
 
     public ?int $insertPosition = null;
+
+    /**
+     * @var list<string>
+     */
+    public array $openAfterSave = [];
+
+    #[Locked]
+    public string $loadedVersion = '';
+
+    public bool $changedElsewhere = false;
+
+    abstract protected function contentModel(): Page|Record;
+
+    #[On('assistant-finished')]
+    public function checkForChanges(): void
+    {
+        $this->changedElsewhere = $this->changedSinceLoaded();
+    }
 
     public function updated(string $name): void
     {
@@ -390,6 +412,36 @@ trait HasBlockBuilder
             ->all();
     }
 
+    protected function rememberLoadedVersion(): void
+    {
+        $this->loadedVersion = $this->contentVersion();
+        $this->changedElsewhere = false;
+    }
+
+    protected function stopIfChangedElsewhere(): bool
+    {
+        if (! $this->changedSinceLoaded()) {
+            return false;
+        }
+
+        $this->changedElsewhere = true;
+        Flux::modal('content-changed')->show();
+
+        return true;
+    }
+
+    protected function reloadSavedBlocks(Page|Record $model): void
+    {
+        $before = array_values($this->blocks);
+        $this->blocks = $this->withBlockDefaults($model->refresh()->getBlocksArray());
+
+        $this->openAfterSave = collect(array_values($this->blocks))
+            ->reject(fn (array $block, int $position): bool => is_numeric($before[$position]['id'] ?? null))
+            ->map(fn (array $block): string => $block['id'])
+            ->values()
+            ->all();
+    }
+
     protected function normalizeBlockAnchors(): void
     {
         $seen = [];
@@ -417,6 +469,22 @@ trait HasBlockBuilder
 
             $this->blocks[$id]['content']['anchor'] = $anchor;
         }
+    }
+
+    private function changedSinceLoaded(): bool
+    {
+        return $this->contentVersion() !== $this->loadedVersion;
+    }
+
+    private function contentVersion(): string
+    {
+        $model = $this->contentModel();
+
+        return hash('xxh128', (string) json_encode([
+            Arr::except((array) $model->newQuery()->whereKey($model->getKey())->toBase()->first(), ['stock', 'updated_at']),
+            $model->blocks()->orderBy('id')->toBase()->get(['id', 'type', 'content']),
+            $model->translations()->toBase()->get(['key', 'locale', 'body']),
+        ]));
     }
 
     /**

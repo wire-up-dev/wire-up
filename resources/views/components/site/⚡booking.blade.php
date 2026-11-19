@@ -34,6 +34,8 @@ return new class extends Component
 
     private const int MAX_BOOKINGS_PER_EMAIL = 3;
 
+    private const int MAX_FREE_BOOKINGS_PER_ADDRESS = 10;
+
     /** @var array<string, mixed> */
     #[Locked]
     public array $config = [];
@@ -180,9 +182,16 @@ return new class extends Component
 
         $chargesNow = $this->chargesNow();
         $emailKey = 'booking-email:'.hash('xxh128', mb_strtolower($validated['email']));
+        $addressKey = 'booking-address:'.request()->ip();
 
         if (! $chargesNow && RateLimiter::tooManyAttempts($emailKey, self::MAX_BOOKINGS_PER_EMAIL)) {
             $this->addError('form', __('This email address has made several bookings in the last hour. Please try again later.'));
+
+            return;
+        }
+
+        if (! $chargesNow && RateLimiter::tooManyAttempts($addressKey, self::MAX_FREE_BOOKINGS_PER_ADDRESS)) {
+            $this->addError('form', __('Too many bookings were made from here in the last hour. Please try again later.'));
 
             return;
         }
@@ -223,6 +232,7 @@ return new class extends Component
         }
 
         RateLimiter::hit($emailKey, 3600);
+        RateLimiter::hit($addressKey, 3600);
 
         $this->bookedWhen = $this->chosenLabel();
         $this->manageUrl = resolve(BookingService::class)->manageUrl($booking);

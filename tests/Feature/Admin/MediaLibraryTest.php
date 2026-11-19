@@ -13,6 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -927,7 +928,7 @@ it('imports a pexels photo and returns to the library with it selected', functio
             ]],
             'next_page' => null,
         ]),
-        'images.pexels.com/*' => Http::response('image-bytes', 200),
+        'images.pexels.com/*' => Http::response(tinyJpeg(), 200),
     ]);
 
     Livewire::test('admin.media-library')
@@ -965,7 +966,7 @@ it('keeps the library open and selects the import when picking multiple', functi
             ]],
             'next_page' => null,
         ]),
-        'images.pexels.com/*' => Http::response('image-bytes', 200),
+        'images.pexels.com/*' => Http::response(tinyJpeg(), 200),
     ]);
 
     Livewire::test('admin.media-library')
@@ -1047,4 +1048,9 @@ it('explains how to select files until something is selected', function (): void
         ->dispatch('select-media', target: 'cover', type: 'image', max: 1, media: null)
         ->assertSee(['How to select', 'Select a file'])
         ->assertDontSee('Select a range');
+});
+
+it('does not let the browser supply its own pexels results', function (): void {
+    expect(fn () => Livewire::test('admin.media-library')->set('pexelsResults', [['id' => 1, 'download_url' => 'http://127.0.0.1/', 'extension' => 'html']]))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
 });

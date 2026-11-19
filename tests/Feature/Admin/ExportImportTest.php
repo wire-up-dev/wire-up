@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\ContentStatus;
 use App\Jobs\RunSiteImport;
 use App\Models\Page;
+use App\Models\Role;
 use App\Models\Settings;
 use App\Models\User;
 use App\Services\SiteBundle;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -67,7 +69,7 @@ it('streams a bundle download', function (): void {
 
     $response->assertFileDownloaded();
 
-    expect(File::glob(config()->string('wireup.transfer_path').'/site-*.zip'))->toHaveCount(1);
+    expect(File::glob(config()->string('wireup.transfer_path').'/site-*.zip'))->toBeEmpty();
 });
 
 it('includes secrets in the download when asked', function (): void {
@@ -75,20 +77,43 @@ it('includes secrets in the download when asked', function (): void {
 
     $this->actingAsAdmin();
 
-    Livewire::test('pages::admin.settings-export-import')
+    $component = Livewire::test('pages::admin.settings-export-import')
+        ->assertSee('Include API keys and mail credentials')
         ->set('withSecrets', true)
         ->call('export')
         ->assertFileDownloaded();
 
-    $bundle = File::glob(config()->string('wireup.transfer_path').'/site-*.zip')[0];
+    expect(downloadedBundleSite($component))->toContain('pexels_api_key');
+});
+
+it('leaves secrets out for staff who are not owners, even when asked', function (): void {
+    Settings::set(['pexels_api_key' => 'secret-key']);
+    $role = Role::query()->create(['key' => 'settings-admin', 'name' => 'Settings admin', 'abilities' => ['settings.view', 'settings.edit'], 'bypass' => false, 'is_protected' => false]);
+
+    $this->actingAs(User::factory()->role($role)->create(['active' => true]));
+
+    $component = Livewire::test('pages::admin.settings-export-import')
+        ->assertDontSee('Include API keys and mail credentials')
+        ->set('withSecrets', true)
+        ->call('export')
+        ->assertFileDownloaded();
+
+    expect(downloadedBundleSite($component))->not->toContain('pexels_api_key');
+});
+
+function downloadedBundleSite(Testable $component): string
+{
+    $path = tempnam(sys_get_temp_dir(), 'bundle');
+    file_put_contents($path, base64_decode((string) data_get($component->effects, 'download.content')));
 
     $zip = new ZipArchive;
-    $zip->open($bundle);
+    $zip->open($path);
     $site = (string) $zip->getFromName(SiteBundle::SITE_ENTRY);
     $zip->close();
+    File::delete($path);
 
-    expect($site)->toContain('pexels_api_key');
-});
+    return $site;
+}
 
 it('shows what a bundle at a server path holds', function (): void {
     Page::factory()->create(['status' => ContentStatus::PUBLISHED]);

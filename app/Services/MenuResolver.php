@@ -108,7 +108,7 @@ final readonly class MenuResolver
         }
 
         return Page::query()
-            ->published()
+            ->publishedInLocale()
             ->whereIn('id', $ids)
             ->with('slugs')
             ->get()

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\CreatePageAction;
 use App\Enums\BlockType;
 use App\Enums\ContentStatus;
 use App\Models\Block;
@@ -1330,4 +1331,68 @@ it('edits the booking block and offers the bookable services', function (): void
     openBookingHours();
 
     editor($this->page)->assertDontSee('Visitors can book once you set your hours and time zone.');
+});
+
+it('escapes block item ids inside the editor scripts', function (): void {
+    $this->page->updateBlocks([['id' => 'new-a', 'type' => 'buttons', 'content' => ['items' => [['id' => "x') || alert(1) || ('", 'text' => ['en' => 'Go']]]]]]);
+
+    editor($this->page)
+        ->assertSeeHtml('\\u0027) || alert(1) || (\\u0027')
+        ->assertDontSeeHtml("claimsOpenBlockItem('x')");
+});
+
+it('keeps a new block under the same id across later saves and leaves it open', function (): void {
+    $component = editor($this->page)
+        ->set('title.en', 'Sample')
+        ->set('slugs.en', 'sample')
+        ->call('addBlock', 'rich-text')
+        ->call('update')
+        ->assertHasNoErrors();
+
+    $id = (string) $this->page->blocks()->sole()->id;
+
+    $component->assertSet('openAfterSave', [$id])
+        ->assertSet("blocks.{$id}.type", 'rich-text')
+        ->call('update');
+
+    expect($this->page->blocks()->pluck('id')->map(fn (int $blockId): string => (string) $blockId)->all())->toBe([$id]);
+});
+
+it('offers a reload instead of saving over changes made since the page was opened', function (): void {
+    $this->page->updateBlocks([['id' => 'new-a', 'type' => 'rich-text', 'content' => ['body' => ['en' => '<p>Mine</p>']]]]);
+
+    $component = editor($this->page)
+        ->set('title.en', 'Sample')
+        ->set('slugs.en', 'sample')
+        ->call('checkForChanges')
+        ->assertSet('changedElsewhere', false)
+        ->assertDontSeeHtml('data-content-changed');
+
+    $this->travel(2)->seconds();
+    $this->page->blocks()->sole()->update(['content' => ['body' => ['en' => '<p>From the assistant</p>']]]);
+
+    $component->dispatch('assistant-finished')
+        ->assertSet('changedElsewhere', true)
+        ->assertSeeHtml('data-content-changed')
+        ->assertSee(route('admin.pages-edit', $this->page), false)
+        ->set('title.en', 'Overwritten')
+        ->call('update');
+
+    expect($this->page->refresh()->title)->toBe('Sample')
+        ->and($this->page->blocks()->sole()->content['body']['en'])->toBe('<p>From the assistant</p>');
+});
+
+it('keeps page addresses clear of the ones the site uses itself', function (): void {
+    editor($this->page)
+        ->set('title.en', 'Sample')
+        ->set('slugs.en', 'cart')
+        ->call('update')
+        ->assertHasErrors(['slugs.en' => 'not_in'])
+        ->assertSee('The site already uses this web address.');
+
+    $administration = resolve(CreatePageAction::class)->handle(['title' => 'Administration']);
+    $cart = resolve(CreatePageAction::class)->handle(['title' => 'Cart']);
+
+    expect($administration->getSlug())->toBe('administration')
+        ->and($cart->getSlug())->toBe('cart-1');
 });

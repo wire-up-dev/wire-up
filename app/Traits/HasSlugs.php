@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Traits;
 
 use App\Models\Slug;
+use App\Services\ContentRules;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -136,7 +137,8 @@ trait HasSlugs
         $counter = 1;
 
         while (
-            Slug::query()
+            ($this->slugBasePath() === '' && in_array($slug, ContentRules::RESERVED_PAGE_SLUGS, true))
+            || Slug::query()
                 ->where('locale', $locale)
                 ->where('slug', $slug)
                 ->where('base_path', $this->slugBasePath())

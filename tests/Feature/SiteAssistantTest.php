@@ -17,7 +17,9 @@ use App\Mcp\Tools\GetPageTool;
 use App\Mcp\Tools\PublishPageTool;
 use App\Mcp\Tools\PublishRecordTool;
 use App\Mcp\Tools\UpdatePageTool;
+use App\Mcp\Tools\UpdateRecordTool;
 use App\Models\Page;
+use App\Models\Record;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -89,6 +91,7 @@ it('wraps tools for the SDK by their assistant policy', function (): void {
     expect($tools->first(fn (object $t): bool => $t->name() === 'get-page'))->toBeInstanceOf(AssistantTool::class)
         ->and($tools->first(fn (object $t): bool => $t->name() === 'create-page'))->toBeInstanceOf(DraftOnlyTool::class)
         ->and($tools->first(fn (object $t): bool => $t->name() === 'create-record'))->toBeInstanceOf(DraftOnlyTool::class)
+        ->and($tools->first(fn (object $t): bool => $t->name() === 'update-record'))->toBeInstanceOf(DraftOnlyTool::class)
         ->and($tools->first(fn (object $t): bool => $t->name() === 'publish-page'))->toBeInstanceOf(ConfirmationTool::class)
         ->and($tools->first(fn (object $t): bool => $t->name() === 'publish-record'))->toBeInstanceOf(ConfirmationTool::class)
         ->and($tools->first(fn (object $t): bool => $t->name() === 'block-types'))->toBeInstanceOf(McpResourceTool::class);
@@ -96,7 +99,7 @@ it('wraps tools for the SDK by their assistant policy', function (): void {
 
 it('marks publishing and deleting as requiring confirmation', function (): void {
     expect(SiteAssistant::confirmableToolNames())
-        ->toEqualCanonicalizing(['publish-page', 'delete-page', 'publish-record', 'delete-record', 'delete-media', 'delete-redirect', 'replace-text'])
+        ->toEqualCanonicalizing(['publish-page', 'delete-page', 'publish-record', 'delete-record', 'delete-media', 'delete-redirect', 'replace-text', 'scaffold-site'])
         ->and(SiteAssistant::confirmableToolClass('publish-page'))->toBe(PublishPageTool::class)
         ->and(SiteAssistant::confirmableToolClass('publish-record'))->toBe(PublishRecordTool::class)
         ->and(SiteAssistant::confirmableToolClass('create-page'))->toBeNull();
@@ -207,4 +210,17 @@ it('keeps accounts, roles and integration credentials away from the assistant', 
         ->all();
 
     expect($exposed)->toBeEmpty();
+});
+
+it('keeps the assistant from publishing a record while it edits it', function (): void {
+    $this->actingAsAdmin();
+    $record = Record::factory()->create(['title' => 'Draft product', 'status' => ContentStatus::DRAFT]);
+    $tool = new DraftOnlyTool(new UpdateRecordTool);
+
+    expect($tool->schema(new JsonSchemaTypeFactory))->not->toHaveKey('status');
+
+    $tool->handle(new ToolRequest(['record' => $record->id, 'title' => 'Renamed product', 'status' => 'published']));
+
+    expect($record->refresh()->title)->toBe('Renamed product')
+        ->and($record->status)->toBe(ContentStatus::DRAFT);
 });

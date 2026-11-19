@@ -78,6 +78,7 @@ return new class extends Component
         $this->page = $page;
         $this->categories = $page->categories->pluck('id')->map(fn (int $id): string => (string) $id)->all();
         $this->blocks = $this->withBlockDefaults($page->getBlocksArray());
+        $this->rememberLoadedVersion();
         $this->status = $page->computed_status;
         $this->published_at = $page->published_at;
         $this->title = $page->translationsFor('title');
@@ -108,6 +109,10 @@ return new class extends Component
     public function update(UpdatePageAction $action): void
     {
         $this->authorize('pages.edit');
+
+        if ($this->stopIfChangedElsewhere()) {
+            return;
+        }
 
         $this->og_image = $this->normalizeMediaInput($this->og_image);
         $this->normalizeBlockAnchors();
@@ -140,6 +145,8 @@ return new class extends Component
             ],
         ]);
 
+        $this->reloadSavedBlocks($this->page);
+        $this->rememberLoadedVersion();
         $this->forgetRestoredRevision();
 
         Flux::toast(__('Page content has been updated.'), variant: 'success');
@@ -172,6 +179,11 @@ return new class extends Component
         return $this->view()
             ->title(__('Edit').' '.$this->page->title)
             ->layout('layouts::admin');
+    }
+
+    protected function contentModel(): Page
+    {
+        return $this->page;
     }
 
     /**
@@ -270,6 +282,8 @@ return new class extends Component
         class="grid grid-cols-1 items-stretch gap-10 md:grid-cols-5"
     >
         <div class="min-w-0 md:col-span-3">
+            <x-admin.content-changed :changed="$changedElsewhere" :reload-url="route('admin.pages-edit', $page)" />
+
             @if ($restoredFrom)
                 <div class="mb-6">
                     <x-admin.restored-revision :from="$restoredFrom" :discard-url="route('admin.pages-edit', $page)" />
@@ -297,7 +311,7 @@ return new class extends Component
                                     class="overflow-hidden p-0!"
                                     wire:key="block-{{ $block['id'] }}"
                                     wire:sort:item="{{ $block['id'] }}"
-                                    x-data="{ open: {{ str_starts_with((string) $block['id'], 'new-') ? 'true' : 'false' }} }"
+                                    x-data="{ open: {{ str_starts_with((string) $block['id'], 'new-') || in_array((string) $block['id'], $openAfterSave, true) ? 'true' : 'false' }} }"
                                     x-on:blocks-toggle-all.window="open = $event.detail"
                                 >
                                     <div class="flex items-center justify-between gap-3 bg-zinc-100 px-3 py-2 dark:bg-white/10">
@@ -791,11 +805,11 @@ return new class extends Component
             }
 
             const content = block.content || {};
-            const raw = ((content.heading || {})[locale] || '').replace(/<\/(?:p|div|li|h[1-6])>|<br\s*\/?>/gi, ' ');
-
-            const div = document.createElement('div');
-            div.innerHTML = raw;
-            const text = (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim();
+            const parsed = new DOMParser().parseFromString((content.heading || {})[locale] || '', 'text/html');
+            parsed.body
+                .querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6, br')
+                .forEach((element) => element.after(' '));
+            const text = (parsed.body.textContent || '').replace(/\s+/g, ' ').trim();
 
             if (!text) {
                 return fallback;

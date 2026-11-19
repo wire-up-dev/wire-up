@@ -35,15 +35,15 @@ final class SiteImporter
     /**
      * @return array{manifest: array<string, mixed>, problems: array<int, string>, tables: array<string, int>, media: array{expected: int, present: int, missing: array<int, string>}, imported: bool}
      */
-    public function import(string $path, ?int $ownerId): array
+    public function import(string $path, ?int $ownerId, bool $keepPrivateSettings = false): array
     {
-        return $this->run($path, $ownerId, dryRun: false);
+        return $this->run($path, $ownerId, dryRun: false, keepPrivateSettings: $keepPrivateSettings);
     }
 
     /**
      * @return array{manifest: array<string, mixed>, problems: array<int, string>, tables: array<string, int>, media: array{expected: int, present: int, missing: array<int, string>}, imported: bool}
      */
-    private function run(string $path, ?int $ownerId, bool $dryRun): array
+    private function run(string $path, ?int $ownerId, bool $dryRun, bool $keepPrivateSettings = false): array
     {
         $zip = new ZipArchive;
 
@@ -79,7 +79,7 @@ final class SiteImporter
                 return ['manifest' => $manifest, 'problems' => $problems, 'tables' => $tables, 'media' => $media, 'imported' => false];
             }
 
-            $this->replace($site, $ownerId);
+            $this->replace($site, $ownerId, $keepPrivateSettings);
             $this->restoreMedia($zip, $audit['sources']);
             $this->grantRecordTypeAbilities();
             $this->flushCaches();
@@ -154,9 +154,13 @@ final class SiteImporter
     /**
      * @param  array<string, mixed>  $site
      */
-    private function replace(array $site, ?int $ownerId): void
+    private function replace(array $site, ?int $ownerId, bool $keepPrivateSettings): void
     {
-        DB::transaction(function () use ($site, $ownerId): void {
+        DB::transaction(function () use ($site, $ownerId, $keepPrivateSettings): void {
+            $kept = $keepPrivateSettings
+                ? DB::table('settings')->whereIn('key', IntegrationRegistry::unexportedKeys())->get()->map(fn (object $row): array => (array) $row)->all()
+                : [];
+
             DB::table('revisions')->delete();
 
             foreach (array_reverse(SiteBundle::TABLES) as $table) {
@@ -166,14 +170,14 @@ final class SiteImporter
             foreach (SiteBundle::TABLES as $table) {
                 $rows = is_array($site[$table] ?? null) ? $site[$table] : [];
 
-                if ($rows === []) {
-                    continue;
-                }
-
                 $prepared = array_map(
                     fn (mixed $row): array => $this->prepareRow($table, is_array($row) ? $row : [], $ownerId),
                     $rows,
                 );
+
+                if ($table === 'settings' && $keepPrivateSettings) {
+                    $prepared = $this->withKeptSettings($prepared, $kept);
+                }
 
                 foreach (array_chunk($prepared, 200) as $chunk) {
                     DB::table($table)->insert($chunk);
@@ -182,6 +186,24 @@ final class SiteImporter
 
             new DatabaseSequences()->reset(DB::connection(), SiteBundle::TABLES);
         });
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @param  list<array<string, mixed>>  $kept
+     * @return list<array<string, mixed>>
+     */
+    private function withKeptSettings(array $rows, array $kept): array
+    {
+        $private = IntegrationRegistry::unexportedKeys();
+        $rows = array_values(array_filter($rows, fn (array $row): bool => ! in_array($row['key'] ?? null, $private, true)));
+        $next = max([0, ...array_map(fn (array $row): int => is_numeric($row['id'] ?? null) ? (int) $row['id'] : 0, $rows)]) + 1;
+
+        foreach ($kept as $row) {
+            $rows[] = [...$row, 'id' => $next++];
+        }
+
+        return $rows;
     }
 
     /**

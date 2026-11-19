@@ -230,3 +230,12 @@ it('leaves a booking that already took place when its order is refunded', functi
 
     expect($booking->refresh()->status)->toBe(BookingStatus::CONFIRMED);
 });
+
+it('never lowers the refunded amount when refund notices arrive out of order', function (): void {
+    $order = refundableOrder();
+
+    resolve(RefundOrderAction::class)->handle('pi_refund', 2000, false);
+    resolve(RefundOrderAction::class)->handle('pi_refund', 1000, false);
+
+    expect($order->refresh()->refunded_amount)->toBe(2000);
+});

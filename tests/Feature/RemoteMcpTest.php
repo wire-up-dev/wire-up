@@ -217,6 +217,9 @@ it('explains which part of the role is missing', function (array $abilities, str
     'an unknown content type' => [['pages.view'], 'list-records', fn (): array => ['type' => 'unknown'], 'Your role doesn’t allow this.'],
     'menus without settings' => [['pages.view'], 'get-menus', fn (): array => [], 'Your role can’t view Settings.'],
     'categories' => [['pages.view'], 'create-category', fn (): array => ['name' => 'News'], 'Your role can’t create Categories.'],
+    'a record id given as true' => [['records.products.view'], 'get-record', fn (): array => ['record' => true], 'Your role doesn’t allow this.'],
+    'rendering a page without pages' => [['records.products.view'], 'render-page', fn (): array => ['page' => 1], 'Your role can’t view Pages.'],
+    'rendering a record of another type' => [['records.products.view'], 'render-page', fn (array $records): array => ['record' => $records['events']->id], 'Your role can’t view Events.'],
 ]);
 
 it('lets a role search the records it can see', function (): void {

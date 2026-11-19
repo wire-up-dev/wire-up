@@ -28,7 +28,7 @@ final readonly class RefundOrderAction
         $previouslyRefunded = $order->refunded_amount;
 
         $order->update([
-            'refunded_amount' => $amountRefunded,
+            'refunded_amount' => max($previouslyRefunded, $amountRefunded),
             'status' => $fullyRefunded ? OrderStatus::REFUNDED : $order->status,
         ]);
 

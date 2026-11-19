@@ -282,7 +282,35 @@ it('shows the failure details of a failed update', function (): void {
     Livewire::test('pages::admin.settings-updates')
         ->assertSee('Update to v1.0.0 failed at: Run database migrations')
         ->assertSee('migration exploded')
-        ->assertSee('php artisan up');
+        ->assertSee('Bring the site back online');
+});
+
+it('brings the site back online from the admin after a failed update left it down', function (): void {
+    config()->set('app.maintenance.driver', 'cache');
+    config()->set('app.maintenance.store', 'array');
+    $this->artisan('down')->assertExitCode(0);
+    $this->actingAsAdmin();
+    resolve(UpdateService::class)->markFailed('v1.0.0', 'Run database migrations', 'migration exploded');
+
+    Livewire::test('pages::admin.settings-updates')
+        ->call('bringOnline')
+        ->assertDontSee('Bring the site back online');
+
+    expect(app()->isDownForMaintenance())->toBeFalse()
+        ->and(resolve(UpdateService::class)->state())->toMatchArray(['status' => 'failed', 'site_down' => false, 'output' => 'migration exploded']);
+
+    resolve(UpdateService::class)->clearState();
+
+    Livewire::test('pages::admin.settings-updates')->call('bringOnline');
+
+    expect(resolve(UpdateService::class)->state()['status'])->toBe('idle');
+});
+
+it('needs the settings edit ability to bring the site back online', function (): void {
+    $role = Role::query()->create(['key' => 'settings-viewer', 'name' => 'Viewer', 'abilities' => ['settings.view'], 'bypass' => false, 'is_protected' => false]);
+    $this->actingAs(User::factory()->role($role)->create(['active' => true]));
+
+    Livewire::test('pages::admin.settings-updates')->call('bringOnline')->assertForbidden();
 });
 
 it('shows that the site stayed live when an update failed before maintenance mode', function (): void {

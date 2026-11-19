@@ -157,3 +157,21 @@ it('validates what to edit', function (array $arguments, string $message): void 
     'unknown action' => [['page' => 1, 'changes' => [['action' => 'replace']]], 'Unknown action. Use one of: update, add, remove, move'],
     'no changes' => [['page' => 1], 'Pass "changes": a list such as'],
 ]);
+
+it('swaps an image whole instead of keeping the old one’s alt text and crop', function (): void {
+    $page = Page::factory()->create(['title' => 'Photo page']);
+    $page->updateBlocks([['type' => 'photo', 'content' => ['image' => ['id' => 1, 'source' => 'media/old.jpg', 'alt_text' => 'An old photo', 'crop' => ['x' => 10]]]]]);
+    $block = $page->blocks()->sole();
+
+    WireUpServer::tool(EditBlocksTool::class, ['page' => $page->id, 'changes' => [
+        ['action' => 'update', 'block' => $block->id, 'content' => ['image' => ['id' => 2, 'source' => 'media/new.jpg']]],
+    ]])->assertOk();
+
+    expect($block->refresh()->content['image'])->toBe(['id' => 2, 'source' => 'media/new.jpg']);
+
+    WireUpServer::tool(EditBlocksTool::class, ['page' => $page->id, 'changes' => [
+        ['action' => 'update', 'block' => $block->id, 'content' => ['image' => ['alt_text' => 'A new photo']]],
+    ]])->assertOk();
+
+    expect($block->refresh()->content['image'])->toBe(['id' => 2, 'source' => 'media/new.jpg', 'alt_text' => 'A new photo']);
+});

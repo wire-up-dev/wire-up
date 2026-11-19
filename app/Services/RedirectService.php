@@ -19,7 +19,11 @@ final class RedirectService
     /**
      * @var array<int, string>
      */
-    private const array SYSTEM_SEGMENTS = ['admin', 'livewire', 'img', 'og', 'stripe', 'build', 'storage'];
+    private const array SYSTEM_SEGMENTS = [
+        'admin', 'livewire', 'img', 'og', 'stripe', 'build', 'storage', 'mcp', 'booking',
+        'login', 'register', 'logout', 'forgot-password', 'reset-password', 'two-factor-challenge', 'verify-email',
+        'account', 'cart', 'checkout',
+    ];
 
     public static function flush(): void
     {
@@ -67,7 +71,8 @@ final class RedirectService
 
     public static function isPublicPath(string $path): bool
     {
-        $first = explode('/', mb_ltrim($path, '/'))[0];
+        $segments = explode('/', mb_ltrim($path, '/'));
+        $first = resolve('localization')->isActiveLocale($segments[0]) ? ($segments[1] ?? '') : $segments[0];
 
         return ! in_array($first, self::SYSTEM_SEGMENTS, true) && ! str_starts_with($first, 'livewire-');
     }

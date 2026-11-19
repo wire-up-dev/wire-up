@@ -15,6 +15,7 @@ use Closure;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Number;
 use RuntimeException;
@@ -31,17 +32,20 @@ final class UpdateCommand extends Command
 
     public function handle(UpdateService $updates, ReleaseAssets $assets, ReleaseSignature $signature, DatabaseDumper $dumper, BackupService $backups, ServerUpdateLock $serverLock): int
     {
-        $lock = $updates->updateLock();
+        $lock = $updates->acquireUpdateLock();
 
-        if (! $lock->get()) {
+        if (! $lock instanceof Lock) {
             $this->components->error('Another update is already running.');
 
             return self::FAILURE;
         }
 
+        $updates->rememberLockHolder();
+
         try {
             return $this->update($updates, $assets, $signature, $dumper, $backups, $serverLock);
         } finally {
+            $updates->forgetLockHolder();
             $lock->release();
         }
     }
@@ -90,7 +94,14 @@ final class UpdateCommand extends Command
             return self::FAILURE;
         }
 
-        $prebuilt = $assets->published($tag);
+        try {
+            $prebuilt = $assets->published($tag);
+        } catch (RuntimeException $exception) {
+            $this->components->error($exception->getMessage());
+            $updates->markFailed($tag, 'Check the release files', $exception->getMessage(), siteIsDown: false);
+
+            return self::FAILURE;
+        }
         $backup = 'db-backup-'.now()->format('Y-m-d-His').'-before-'.$tag.'.'.$dumper->extension();
 
         $preparation = [
@@ -123,7 +134,7 @@ final class UpdateCommand extends Command
             ...($prebuilt
                 ? ['Install frontend assets' => $assets->install(...)]
                 : ['Install frontend dependencies' => ['npm', 'ci'], 'Build frontend assets' => ['npm', 'run', 'build']]),
-            'Cache configuration' => [PHP_BINARY, 'artisan', 'optimize'],
+            'Cache configuration' => [PHP_BINARY, 'artisan', 'optimize', '--except=routes'],
             'Restart queue workers' => [PHP_BINARY, 'artisan', 'queue:restart'],
             'Record the new version' => fn () => $updates->writeCurrentVersion($tag),
         ];
@@ -149,7 +160,7 @@ final class UpdateCommand extends Command
                     ] : []),
                     'Restore frontend assets' => $assets->restoreSnapshot(...),
                     ...($cachesCleared ? [
-                        'Cache configuration' => [PHP_BINARY, 'artisan', 'optimize'],
+                        'Cache configuration' => [PHP_BINARY, 'artisan', 'optimize', '--except=routes'],
                     ] : []),
                     ...($codeChanged ? [
                         'Restart queue workers' => [PHP_BINARY, 'artisan', 'queue:restart'],

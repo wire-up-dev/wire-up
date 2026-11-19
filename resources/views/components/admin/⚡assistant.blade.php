@@ -5,7 +5,10 @@ declare(strict_types=1);
 use App\Ai\Agents\SiteAssistant;
 use App\Ai\Tools\RoleCheckedTool;
 use App\Enums\RevisionSource;
+use App\Models\Media;
 use App\Models\Page;
+use App\Models\Record;
+use App\Models\Redirect;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -13,8 +16,7 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall as ToolCallEvent;
 use Laravel\Ai\Streaming\Events\ToolResult as ToolResultEvent;
-use Laravel\Ai\Tools\McpServerTool;
-use Laravel\Ai\Tools\Request as ToolRequest;
+use Laravel\Mcp\Request as McpRequest;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -153,6 +155,8 @@ return new class extends Component
             'pending' => $pending,
             'animate' => true,
         ];
+
+        $this->dispatch('assistant-finished');
     }
 
     public function confirmAction(int $message, int $action): void
@@ -180,9 +184,24 @@ return new class extends Component
             return;
         }
 
-        new McpServerTool(resolve($class))->handle(new ToolRequest([...$pending['args'], 'confirm' => true]));
+        Context::add(RevisionSource::CONTEXT_KEY, RevisionSource::ASSISTANT->value);
+
+        try {
+            $response = resolve($class)->handle(new McpRequest([...$pending['args'], 'confirm' => true]));
+        } finally {
+            Context::forget(RevisionSource::CONTEXT_KEY);
+        }
+
+        if ($response->isError()) {
+            $this->messages[$message]['pending'][$action]['status'] = 'failed';
+            $this->messages[] = ['role' => 'assistant', 'content' => (string) $response->content(), 'error' => true];
+
+            return;
+        }
 
         $this->messages[$message]['pending'][$action]['status'] = 'confirmed';
+
+        $this->dispatch('assistant-finished');
     }
 
     public function rejectAction(int $message, int $action): void
@@ -199,19 +218,26 @@ return new class extends Component
      */
     public function confirmLabel(array $action): string
     {
-        if ($action['name'] === 'publish-page') {
-            $title = Page::query()->whereKey($action['args']['page'] ?? null)->first()?->title;
-            $draft = ($action['args']['status'] ?? 'published') === 'draft';
+        $args = $action['args'];
 
-            return match (true) {
-                $draft && $title !== null => __('Set “:title” back to draft?', ['title' => $title]),
-                $draft => __('Set this page back to draft?'),
-                $title !== null => __('Publish “:title”?', ['title' => $title]),
-                default => __('Publish this page?'),
-            };
-        }
+        return match ($action['name']) {
+            'publish-page', 'publish-record' => $this->publishLabel($action),
+            'delete-page' => $this->deleteLabel(Page::query()->whereKey($args['page'] ?? null)->first()?->title, __('Delete the page “:name”? This cannot be undone.'), __('Delete this page? This cannot be undone.')),
+            'delete-record' => $this->deleteLabel(Record::query()->whereKey($args['record'] ?? null)->first()?->title, __('Delete “:name”? This cannot be undone.'), __('Delete this record? This cannot be undone.')),
+            'delete-media' => $this->deleteLabel(Media::query()->whereKey($args['media'] ?? null)->first()?->filename, __('Delete the file “:name”? This cannot be undone.'), __('Delete this file? This cannot be undone.')),
+            'delete-redirect' => $this->deleteLabel(Redirect::query()->whereKey($args['redirect'] ?? null)->first()?->from, __('Delete the redirect from :name?'), __('Delete this redirect?')),
+            'replace-text' => $this->replaceLabel($args),
+            'scaffold-site' => trans_choice('Set up :count page and replace the header and footer menus?|Set up :count pages and replace the header and footer menus?', count((array) ($args['pages'] ?? [])), ['count' => count((array) ($args['pages'] ?? []))]),
+            default => __('Approve this action?'),
+        };
+    }
 
-        return __('Approve this action?');
+    /**
+     * @param  array{name: string, args: array<string, mixed>, status: string}  $action
+     */
+    public function isDestructive(array $action): bool
+    {
+        return str_starts_with($action['name'], 'delete-') || in_array($action['name'], ['replace-text', 'scaffold-site'], true);
     }
 
     public function startNewConversation(): void
@@ -242,6 +268,47 @@ return new class extends Component
             return '<span class="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-2 py-1 text-xs text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">'
                 .$marker.'<span>'.e($this->toolLabel($tool['name'], $tool['status'])).'</span></span>';
         })->implode('');
+    }
+
+    /**
+     * @param  array{name: string, args: array<string, mixed>, status: string}  $action
+     */
+    private function publishLabel(array $action): string
+    {
+        $isPage = $action['name'] === 'publish-page';
+        $title = $isPage
+            ? Page::query()->whereKey($action['args']['page'] ?? null)->first()?->title
+            : Record::query()->whereKey($action['args']['record'] ?? null)->first()?->title;
+        $draft = ($action['args']['status'] ?? 'published') === 'draft';
+
+        return match (true) {
+            $draft && $title !== null => __('Set “:title” back to draft?', ['title' => $title]),
+            $draft => $isPage ? __('Set this page back to draft?') : __('Set this record back to draft?'),
+            $title !== null => __('Publish “:title”?', ['title' => $title]),
+            default => $isPage ? __('Publish this page?') : __('Publish this record?'),
+        };
+    }
+
+    private function deleteLabel(?string $name, string $named, string $unnamed): string
+    {
+        return $name !== null && $name !== '' ? str_replace(':name', $name, $named) : $unnamed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     */
+    private function replaceLabel(array $args): string
+    {
+        $find = (string) ($args['find'] ?? '');
+        $replace = (string) ($args['replace'] ?? '');
+        $limited = ($args['pages'] ?? []) !== [] || ($args['records'] ?? []) !== [];
+
+        return match (true) {
+            $replace === '' && $limited => __('Remove “:find” from the chosen pages and records?', ['find' => $find]),
+            $replace === '' => __('Remove “:find” everywhere it appears?', ['find' => $find]),
+            $limited => __('Replace “:find” with “:replace” in the chosen pages and records?', ['find' => $find, 'replace' => $replace]),
+            default => __('Replace “:find” with “:replace” everywhere it appears?', ['find' => $find, 'replace' => $replace]),
+        };
     }
 
     private function toolLabel(string $name, string $status): string
@@ -427,7 +494,7 @@ return new class extends Component
                                         <div class="mt-3 flex gap-2">
                                             <flux:button
                                                 size="xs"
-                                                variant="primary"
+                                                :variant="$this->isDestructive($action) ? 'danger' : 'primary'"
                                                 wire:click="confirmAction({{ $index }}, {{ $pendingIndex }})"
                                             >
                                                 {{ __('Confirm') }}
@@ -443,6 +510,10 @@ return new class extends Component
                                     @elseif ($action['status'] === 'confirmed')
                                         <div class="mt-2 flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
                                             <flux:icon icon="check" variant="micro" />{{ __('Done') }}
+                                        </div>
+                                    @elseif ($action['status'] === 'failed')
+                                        <div class="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                            <flux:icon icon="x-mark" variant="micro" />{{ __('Did not go through') }}
                                         </div>
                                     @else
                                         <div class="mt-2 text-xs text-zinc-500">{{ __('Cancelled') }}</div>

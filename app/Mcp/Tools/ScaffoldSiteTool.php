@@ -6,6 +6,7 @@ namespace App\Mcp\Tools;
 
 use App\Actions\CreatePageAction;
 use App\Actions\UpdateSettingsAction;
+use App\Ai\Contracts\RequiresConfirmation;
 use App\Mcp\Support\Pages;
 use App\Models\Page;
 use App\Services\ContentRules;
@@ -21,7 +22,7 @@ use Laravel\Mcp\Server\Tool;
 
 #[Name('scaffold-site')]
 #[Description('Scaffold a site skeleton in one call: create (or reuse, by title) the given pages as blank drafts, wire them into the header and footer navigation, and set the homepage. Fill each page with update-page-blocks afterwards, then publish-page. Sets (replaces) the header and footer menus for the default locale. A page that already exists with the given title is reused: its description is overwritten when you pass one, and its blocks, layout and publication status are left untouched.')]
-final class ScaffoldSiteTool extends Tool
+final class ScaffoldSiteTool extends Tool implements RequiresConfirmation
 {
     public function handle(Request $request): Response
     {
@@ -32,6 +33,7 @@ final class ScaffoldSiteTool extends Tool
                 'pages.*.description' => ContentRules::DESCRIPTION,
                 'pages.*.homepage' => ['boolean'],
                 'pages.*.nav' => ['sometimes', 'string', 'in:header,footer,both,none'],
+                'confirm' => ['sometimes', 'boolean'],
             ],
             [
                 'pages.required' => 'Pass at least one page to scaffold.',
@@ -135,6 +137,8 @@ final class ScaffoldSiteTool extends Tool
                 ->items($schema->object())
                 ->description('The pages to scaffold, in order: [{"title": "About", "description": "optional meta description (max 160)", "homepage": false, "nav": "header"|"footer"|"both"|"none"}]. Each page is created as a blank draft; "nav" adds it to the header and/or footer menu (default "header"). Set "homepage": true on exactly one page. A page whose title already exists is reused rather than duplicated, and a "description" you pass replaces the one it already has.')
                 ->required(),
+            'confirm' => $schema->boolean()
+                ->description('Optional. Scaffolding replaces the header and footer menus and can change the home page.'),
         ];
     }
 

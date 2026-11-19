@@ -19,6 +19,7 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Mail\Markdown;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -56,6 +57,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureUrl();
         $this->configureVite();
         $this->configureDates();
+        $this->configureMail();
         $this->configurePasswordValidation();
         $this->configureSettings();
         $this->configureGates();
@@ -117,6 +119,11 @@ final class AppServiceProvider extends ServiceProvider
     private function configureDates(): void
     {
         Date::use(CarbonImmutable::class);
+    }
+
+    private function configureMail(): void
+    {
+        Markdown::withSecuredEncoding();
     }
 
     private function configureVite(): void

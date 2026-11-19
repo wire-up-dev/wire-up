@@ -119,7 +119,7 @@ return new class extends Component
     {
         $recordType = $this->recordType();
 
-        if (! $recordType instanceof RecordType) {
+        if (! $recordType instanceof RecordType || ! $this->maySee($recordType)) {
             return;
         }
 
@@ -148,6 +148,13 @@ return new class extends Component
     public function loadMore(): void
     {
         $this->loadRecords(true);
+    }
+
+    private function maySee(RecordType $recordType): bool
+    {
+        $user = auth()->user();
+
+        return (bool) $user?->can("records.{$recordType->key}.view") || (! $recordType->admin_only && (bool) $user?->can('pages.edit'));
     }
 
     /**

@@ -38,6 +38,12 @@ it('removes markup that can execute', function (string $value, string $expected)
     'named entity colon' => ['<a href="&#x6A;avascript&colon;alert(1)">x</a>', '<a>x</a>'],
     'tab inside the scheme' => ["<a href=\"java\tscript:alert(1)\">x</a>", '<a>x</a>'],
     'newline before the scheme' => ["<a href=\" \n javascript:alert(1)\">x</a>", '<a>x</a>'],
+    'non-breaking space before the scheme' => ['<a href="&nbsp;javascript:alert(1)">x</a>', '<a>x</a>'],
+    'declarative shadow root' => ['<div><template shadowrootmode="open"><img src=x onerror=alert(1)></template></div>', '<div></div>'],
+    'consent template' => ['<template data-consent="body"><script>bad()</script></template><p>a</p>', '<p>a</p>'],
+    'alpine directives' => ['<p x-data x-init="fetch(1)">a</p>', '<p>a</p>'],
+    'alpine shorthand' => ['<p @click="bad()" :class="bad()">a</p>', '<p>a</p>'],
+    'livewire directive' => ['<button wire:click="delete">x</button>', '<button>x</button>'],
     'svg xlink href' => ['<svg><a xlink:href="javascript:alert(1)"><text>x</text></a></svg>', '<svg><a><text>x</text></a></svg>'],
     'svg animate rewriting an href' => ['<svg><a><animate attributeName="href" values="javascript:alert(1)"/><text>x</text></a></svg>', '<svg><a><text>x</text></a></svg>'],
     'svg set rewriting an href' => ['<svg><set attributeName="xlink:href" to="0;javascript:alert(1)"/></svg>', '<svg></svg>'],
@@ -126,4 +132,10 @@ it('still sanitizes the heading and intro of a code block, which render raw', fu
 it('sanitizes every field of a block type with nothing held verbatim', function (): void {
     expect(BlockHtmlSanitizer::forBlock('rich-text', ['body' => '<p>a</p><script>bad()</script>']))
         ->toBe(['body' => '<p>a</p>']);
+});
+
+it('treats a link padded with a non-breaking space as a script link', function (): void {
+    expect(BlockHtmlSanitizer::value("\u{00A0}javascript:alert(1)"))->toBeEmpty()
+        ->and(BlockHtmlSanitizer::safeUrl("\u{FEFF}javascript:alert(1)"))->toBeEmpty()
+        ->and(BlockHtmlSanitizer::safeUrl('https://wire-up.dev'))->toBe('https://wire-up.dev');
 });

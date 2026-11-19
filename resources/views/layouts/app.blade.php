@@ -39,7 +39,7 @@
     >
         @if ($siteLayout['customCss'] !== '')
             <style>
-                {!! $siteLayout['customCss'] !!}
+                {!! \App\Services\ThemeCss::forStyleTag($siteLayout['customCss']) !!}
             </style>
         @endif
 
@@ -47,7 +47,7 @@
             <x-site.impersonation-banner />
 
             @unless ($siteLayout['hideHeader'])
-                <livewire:site.header />
+                <livewire:site.header :language-urls="\App\Services\SeoService::current()->hreflangAlternates($page ?? null)" />
             @endunless
 
             <main @class(['flex-1 flex flex-col', 'overflow-y-auto' => ! $hasSidebar])>

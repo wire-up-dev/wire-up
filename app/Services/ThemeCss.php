@@ -8,6 +8,11 @@ final readonly class ThemeCss
 {
     public function __construct(private SettingsService $settings) {}
 
+    public static function forStyleTag(string $css): string
+    {
+        return str_replace('<', '\3C ', $css);
+    }
+
     public function css(): string
     {
         $source = $this->settings->themeColors() ?: config()->array('theme.presets.default.colors');

@@ -10,6 +10,7 @@ use App\Models\Record;
 use App\Models\RecordType;
 use App\Models\Settings;
 use App\Models\User;
+use App\Services\PageCache;
 use App\Services\RecordTypePresets;
 
 function seoFeaturePage(string $slug, array $attributes = [], array $blocks = []): Page
@@ -381,4 +382,34 @@ it('skips published records with no slug in the llms index', function (): void {
     ]);
 
     $this->get('/llms.txt')->assertOk()->assertDontSee('Slugless Record');
+});
+
+it('leaves pages that are only published in another language out of llms.txt', function (): void {
+    Locale::query()->where('code', 'nl')->update(['active' => true]);
+    cache()->forget('site-locales');
+
+    seoFeaturePage('english-story', ['title' => ['en' => 'English Story', 'nl' => 'Engels verhaal'], 'metadata' => ['published_locales' => ['en', 'nl']]]);
+    seoFeaturePage('dutch-only', ['title' => ['en' => 'Dutch Only', 'nl' => 'Alleen Nederlands'], 'metadata' => ['published_locales' => ['nl']]]);
+
+    $this->get('/llms.txt')
+        ->assertOk()
+        ->assertSee('English Story')
+        ->assertDontSee('Dutch Only');
+});
+
+it('rebuilds the sitemap and llms.txt only after the content changes', function (): void {
+    seoFeaturePage('first-story', ['title' => ['en' => 'First Story']]);
+
+    $this->get('/llms.txt')->assertSee('First Story');
+
+    seoFeaturePage('second-story', ['title' => ['en' => 'Second Story']]);
+    resolve(PageCache::class)->flush();
+
+    $this->get('/llms.txt')->assertSee('Second Story');
+});
+
+it('serves a page whose address only starts with admin', function (): void {
+    seoFeaturePage('administration', ['title' => ['en' => 'Administration']]);
+
+    $this->get('/administration')->assertOk()->assertSee('Administration');
 });

@@ -14,6 +14,7 @@ use App\Notifications\BookingUpdate;
 use Carbon\CarbonImmutable;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -352,4 +353,15 @@ it('keeps an older time zone name the browser reports', function (): void {
         ->call('useTimezone', $olderName)
         ->assertSet('timezone', $olderName)
         ->assertSeeHtml('value="'.$olderName.'"');
+});
+
+it('limits how many free bookings can be made from one address in an hour', function (): void {
+    bookableService();
+    RateLimiter::increment('booking-address:127.0.0.1', amount: 10);
+
+    filledBooking(bookingWidget())
+        ->call('book')
+        ->assertSee('Too many bookings were made from here in the last hour.');
+
+    expect(Booking::query()->count())->toBe(0);
 });

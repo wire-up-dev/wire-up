@@ -23,6 +23,8 @@ final class CompleteUpdateCommand extends Command
     {
         $tag = (string) $this->argument('tag');
 
+        File::delete($this->laravel->getCachedRoutesPath());
+
         try {
             $this->laravel->maintenanceMode()->deactivate();
             File::delete(storage_path('framework/maintenance.php'));
@@ -37,10 +39,11 @@ final class CompleteUpdateCommand extends Command
 
         $updates->markFinished($tag);
 
-        ActivityLog::record(ActivityEvent::SYSTEM_UPDATED, $tag);
-
-        $assets->discardSnapshot();
-        $updates->check();
+        rescue(function () use ($tag, $assets, $updates): void {
+            ActivityLog::record(ActivityEvent::SYSTEM_UPDATED, $tag);
+            $assets->discardSnapshot();
+            $updates->check();
+        });
 
         $this->components->info("Wire Up is now on {$tag}.");
 

@@ -19,7 +19,7 @@
             'logoSrcset' => $block->imageSrcset("items.{$i}.logo", [200, 400], ['w' => 400]),
             'name' => $block->text("items.{$i}.name"),
             'alt' => $block->text("items.{$i}.name") ?: $block->imageAlt("items.{$i}.logo"),
-            'link' => mb_trim($block->plain("items.{$i}.link")),
+            'link' => \App\Services\BlockHtmlSanitizer::safeUrl(mb_trim($block->plain("items.{$i}.link"))),
             'tier' => mb_trim($block->plain("items.{$i}.tier")),
         ])
         ->filter(fn (array $item): bool => $item['logo'] !== null)

@@ -53,12 +53,21 @@ final class BlockChanges
     {
         foreach ($changes as $key => $value) {
             $existing = $current[$key] ?? null;
-            $current[$key] = is_array($value) && ! array_is_list($value) && is_array($existing) && ! array_is_list($existing)
+            $current[$key] = is_array($value) && ! array_is_list($value) && is_array($existing) && ! array_is_list($existing) && ! self::isOtherMedia($existing, $value)
                 ? self::merge($existing, $value)
                 : $value;
         }
 
         return $current;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $existing
+     * @param  array<array-key, mixed>  $value
+     */
+    private static function isOtherMedia(array $existing, array $value): bool
+    {
+        return array_any(['id', 'source'], fn (string $identity): bool => array_key_exists($identity, $value) && ($existing[$identity] ?? null) !== $value[$identity]);
     }
 
     /**

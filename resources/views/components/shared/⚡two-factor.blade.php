@@ -7,10 +7,12 @@ use App\Actions\DisableTwoFactorAction;
 use App\Actions\EnableTwoFactorAction;
 use App\Actions\RegenerateRecoveryCodesAction;
 use App\Models\User;
+use App\Services\Impersonation;
 use Flux\Flux;
 use Illuminate\Container\Attributes\CurrentUser;
 use Laravel\Fortify\Fortify;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 return new class extends Component
@@ -21,6 +23,9 @@ return new class extends Component
 
     public string $disable_password = '';
 
+    public string $recovery_password = '';
+
+    #[Locked]
     public bool $showingRecoveryCodes = false;
 
     public function mount(#[CurrentUser] User $user): void
@@ -30,6 +35,10 @@ return new class extends Component
 
     public function enable(EnableTwoFactorAction $action): void
     {
+        if ($this->refusedWhileImpersonating()) {
+            return;
+        }
+
         $action->handle($this->user);
         $this->forgetState();
 
@@ -39,6 +48,10 @@ return new class extends Component
 
     public function confirm(ConfirmTwoFactorAction $action): void
     {
+        if ($this->refusedWhileImpersonating()) {
+            return;
+        }
+
         $this->validate([
             'code' => ['required', 'string'],
         ], attributes: [
@@ -56,6 +69,10 @@ return new class extends Component
 
     public function disable(DisableTwoFactorAction $action): void
     {
+        if ($this->refusedWhileImpersonating()) {
+            return;
+        }
+
         $this->validate([
             'disable_password' => ['required', 'current_password'],
         ], attributes: [
@@ -73,6 +90,10 @@ return new class extends Component
 
     public function cancelSetup(DisableTwoFactorAction $action): void
     {
+        if ($this->confirmed() || $this->refusedWhileImpersonating()) {
+            return;
+        }
+
         $action->handle($this->user);
         $this->forgetState();
 
@@ -81,6 +102,10 @@ return new class extends Component
 
     public function regenerateRecoveryCodes(RegenerateRecoveryCodesAction $action): void
     {
+        if (! $this->showingRecoveryCodes || $this->refusedWhileImpersonating()) {
+            return;
+        }
+
         $action->handle($this->user);
         $this->forgetState();
 
@@ -91,7 +116,20 @@ return new class extends Component
 
     public function showRecoveryCodes(): void
     {
+        if ($this->refusedWhileImpersonating()) {
+            return;
+        }
+
+        $this->validate([
+            'recovery_password' => ['required', 'current_password'],
+        ], attributes: [
+            'recovery_password' => __('password'),
+        ]);
+
+        $this->reset('recovery_password');
         $this->showingRecoveryCodes = true;
+
+        Flux::modal('show-recovery-codes')->close();
     }
 
     #[Computed]
@@ -130,6 +168,15 @@ return new class extends Component
         return $codes;
     }
 
+    private function refusedWhileImpersonating(): bool
+    {
+        if (Impersonation::active()) {
+            Flux::toast(__('This is not available while you view the site as someone else.'), variant: 'warning');
+        }
+
+        return Impersonation::active();
+    }
+
     private function forgetState(): void
     {
         unset($this->confirmed, $this->awaitingConfirmation, $this->qrCode, $this->setupKey, $this->recoveryCodes);
@@ -148,9 +195,9 @@ return new class extends Component
 
         <div class="flex flex-wrap gap-3">
             @unless ($this->showingRecoveryCodes)
-                <flux:button wire:click="showRecoveryCodes" variant="subtle" icon="key">
-                    {{ __('Show recovery codes') }}
-                </flux:button>
+                <flux:modal.trigger name="show-recovery-codes">
+                    <flux:button variant="subtle" icon="key">{{ __('Show recovery codes') }}</flux:button>
+                </flux:modal.trigger>
             @endunless
 
             <flux:modal.trigger name="disable-two-factor">
@@ -215,6 +262,32 @@ return new class extends Component
             >{{ __('Generate new codes') }}</flux:button>
         </flux:callout>
     @endif
+
+    <flux:modal name="show-recovery-codes" class="min-w-[22rem]">
+        <form wire:submit="showRecoveryCodes" class="space-y-6">
+            <div>
+                <flux:heading size="lg">{{ __('Show recovery codes') }}</flux:heading>
+                <flux:text class="mt-2">{{ __('Enter your password to see your recovery codes.') }}</flux:text>
+            </div>
+
+            <flux:input
+                wire:model="recovery_password"
+                :label="__('Password')"
+                type="password"
+                required
+                autocomplete="current-password"
+                viewable
+            />
+
+            <div class="flex gap-3">
+                <flux:spacer />
+                <flux:modal.close>
+                    <flux:button variant="ghost" type="button">{{ __('Cancel') }}</flux:button>
+                </flux:modal.close>
+                <flux:button type="submit" variant="primary">{{ __('Show codes') }}</flux:button>
+            </div>
+        </form>
+    </flux:modal>
 
     <flux:modal name="disable-two-factor" class="min-w-[22rem]">
         <form wire:submit="disable" class="space-y-6">

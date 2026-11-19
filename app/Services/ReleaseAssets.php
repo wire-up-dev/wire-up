@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -30,7 +31,7 @@ final readonly class ReleaseAssets
 
     public function stillBuilding(string $tag, string $current): bool
     {
-        return ! $this->published($tag) && $this->published($current);
+        return rescue(fn (): bool => ! $this->published($tag) && $this->published($current), true, report: false);
     }
 
     public function download(string $tag): string
@@ -125,7 +126,15 @@ final readonly class ReleaseAssets
     {
         $url = $this->url($tag, $file);
 
-        return $url === null ? '' : rescue(fn (): string => Http::timeout(15)->get($url)->throw()->body(), '', report: false);
+        if ($url === null) {
+            return '';
+        }
+
+        $response = rescue(fn (): Response => Http::timeout(15)->get($url), report: false);
+
+        throw_if(! $response instanceof Response || $response->serverError(), RuntimeException::class, 'GitHub could not be reached to check the release files. Try again in a few minutes.');
+
+        return $response->successful() ? $response->body() : '';
     }
 
     private function repository(): ?string

@@ -7,6 +7,7 @@ use App\Services\RecordCollectionQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -14,27 +15,39 @@ return new class extends Component
 {
     use WithPagination;
 
+    private const int MAX_VISIBLE_PAGES = 20;
+
+    #[Locked]
     public string $blockId = '';
 
+    #[Locked]
     public string $mode = 'paged';
 
+    #[Locked]
     public string $pad = 'py-16';
 
     /**
      * @var array<string, mixed>
      */
+    #[Locked]
     public array $content = [];
 
+    #[Locked]
     public ?int $currentRecordId = null;
 
+    #[Locked]
     public string $heading = '';
 
+    #[Locked]
     public ?string $buttonUrl = null;
 
+    #[Locked]
     public string $buttonText = '';
 
+    #[Locked]
     public bool $buttonNewTab = false;
 
+    #[Locked]
     public int $visiblePages = 1;
 
     /**
@@ -55,7 +68,7 @@ return new class extends Component
 
     public function loadMore(): void
     {
-        $this->visiblePages++;
+        $this->visiblePages = min($this->visiblePages + 1, self::MAX_VISIBLE_PAGES);
     }
 
     public function render(): View

@@ -32,8 +32,8 @@
                     class="overflow-hidden p-0!"
                     wire:key="pricing-item-{{ $item['id'] ?? $i }}"
                     wire:sort:item="{{ $item['id'] ?? $i }}"
-                    x-data="{ open: window.claimsOpenBlockItem('{{ $item['id'] ?? $i }}') }"
-                    x-on:open-block-item.window="$event.detail.id === '{{ $item['id'] ?? $i }}' && (open = true)"
+                    x-data="{ open: window.claimsOpenBlockItem({{ \Illuminate\Support\Js::from((string) ($item['id'] ?? $i)) }}) }"
+                    x-on:open-block-item.window="$event.detail.id === {{ \Illuminate\Support\Js::from((string) ($item['id'] ?? $i)) }} && (open = true)"
                 >
                     <div class="flex items-center justify-between gap-3 bg-zinc-100 px-3 py-2 dark:bg-white/10">
                         <div wire:sort:handle class="cursor-grab text-zinc-400" title="{{ __('Drag to reorder') }}">

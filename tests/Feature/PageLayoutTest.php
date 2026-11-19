@@ -56,6 +56,17 @@ it('injects custom css and neutralizes style-tag breakout', function (): void {
         ->assertDontSee('</style><script>', false);
 });
 
+it('keeps custom css inside its style tag even when the closing tag is split', function (): void {
+    publishPageWithLayout('split', [
+        'customCss' => '.a { background: url("data:image/svg+xml,<svg></svg>"); } </sty</stylele><script>alert(1)</script>',
+    ]);
+
+    $this->get(route('page', 'split'))
+        ->assertOk()
+        ->assertSee('url("data:image/svg+xml,\\3C svg>\\3C /svg>")', false)
+        ->assertDontSee('<script>alert(1)', false);
+});
+
 it('applies a fixed background image', function (): void {
     publishPageWithLayout('bg-image', [
         'backgroundImage' => ['source' => 'media/bg.jpg', 'crop' => []],

@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 use App\Ai\Agents\SiteAssistant;
 use App\Enums\ContentStatus;
+use App\Enums\RevisionSource;
+use App\Models\Activity;
+use App\Models\Media;
 use App\Models\Page;
+use App\Models\Record;
+use App\Models\Redirect;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -329,3 +334,55 @@ it('does not let the browser plant a pending action', function (): void {
     Livewire::test('admin.assistant')
         ->set('messages', [['role' => 'assistant', 'content' => '', 'pending' => [['name' => 'delete-page', 'args' => ['page' => 1], 'status' => 'awaiting']]]]);
 })->throws(CannotUpdateLockedPropertyException::class);
+
+it('says exactly what each approval will do', function (string $tool, Closure $arguments, string $label, bool $destructive): void {
+    $this->actingAsAdmin();
+
+    SiteAssistant::fake([new ToolCall('c1', $tool, $arguments()), 'Ready.']);
+
+    $component = Livewire::test('admin.assistant')->call('send', 'Go ahead')->assertSee($label);
+
+    expect($component->instance()->isDestructive($component->get('messages.1.pending.0')))->toBe($destructive);
+})->with([
+    'delete page' => ['delete-page', fn (): array => ['page' => Page::factory()->create(['title' => 'Old news'])->id], 'Delete the page “Old news”? This cannot be undone.', true],
+    'delete missing page' => ['delete-page', fn (): array => ['page' => 999999], 'Delete this page? This cannot be undone.', true],
+    'delete record' => ['delete-record', fn (): array => ['record' => Record::factory()->create(['title' => 'Old shoe'])->id], 'Delete “Old shoe”? This cannot be undone.', true],
+    'delete media' => ['delete-media', fn (): array => ['media' => Media::factory()->create(['filename' => 'cat.jpg'])->id], 'Delete the file “cat.jpg”? This cannot be undone.', true],
+    'delete redirect' => ['delete-redirect', fn (): array => ['redirect' => Redirect::factory()->create(['from' => '/old', 'to' => '/new'])->id], 'Delete the redirect from /old?', true],
+    'replace everywhere' => ['replace-text', fn (): array => ['find' => 'Acme', 'replace' => 'Apex'], 'Replace “Acme” with “Apex” everywhere it appears?', true],
+    'replace in some pages' => ['replace-text', fn (): array => ['find' => 'Acme', 'replace' => 'Apex', 'pages' => [1]], 'Replace “Acme” with “Apex” in the chosen pages and records?', true],
+    'remove everywhere' => ['replace-text', fn (): array => ['find' => 'Acme', 'replace' => ''], 'Remove “Acme” everywhere it appears?', true],
+    'remove in some records' => ['replace-text', fn (): array => ['find' => 'Acme', 'replace' => '', 'records' => [1]], 'Remove “Acme” from the chosen pages and records?', true],
+    'scaffold site' => ['scaffold-site', fn (): array => ['pages' => [['title' => 'Home'], ['title' => 'About']]], 'Set up 2 pages and replace the header and footer menus?', true],
+    'publish record' => ['publish-record', fn (): array => ['record' => Record::factory()->create(['title' => 'New shoe'])->id], 'Publish “New shoe”?', false],
+    'unpublish record' => ['publish-record', fn (): array => ['record' => Record::factory()->create(['title' => 'New shoe'])->id, 'status' => 'draft'], 'Set “New shoe” back to draft?', false],
+    'publish missing record' => ['publish-record', fn (): array => ['record' => 999999], 'Publish this record?', false],
+    'unpublish missing record' => ['publish-record', fn (): array => ['record' => 999999, 'status' => 'draft'], 'Set this record back to draft?', false],
+]);
+
+it('says so when an approved action does not go through', function (): void {
+    $this->actingAsAdmin();
+    $page = Page::factory()->create();
+
+    SiteAssistant::fake([new ToolCall('c1', 'delete-page', ['page' => $page->id]), 'Ready to delete.']);
+
+    $component = Livewire::test('admin.assistant')->call('send', 'Delete it');
+
+    $page->delete();
+
+    $component->call('confirmAction', 1, 0)
+        ->assertSet('messages.1.pending.0.status', 'failed')
+        ->assertSet('messages.2.error', true)
+        ->assertSee('Did not go through');
+});
+
+it('marks an approved change as made by the assistant', function (): void {
+    $this->actingAsAdmin();
+    $page = Page::factory()->create(['status' => ContentStatus::DRAFT]);
+
+    SiteAssistant::fake([new ToolCall('c1', 'publish-page', ['page' => $page->id]), 'Ready to publish.']);
+
+    Livewire::test('admin.assistant')->call('send', 'Publish it')->call('confirmAction', 1, 0);
+
+    expect(Activity::query()->sole()->source)->toBe(RevisionSource::ASSISTANT);
+});

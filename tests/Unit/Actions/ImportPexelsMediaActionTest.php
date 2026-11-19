@@ -35,7 +35,7 @@ function pexelsPhotoItem(array $overrides = []): array
 
 it('downloads a pexels photo and stores it as a media record with attribution', function (): void {
     Http::fake([
-        'images.pexels.com/*' => Http::response('binary-image-bytes', 200),
+        'images.pexels.com/*' => Http::response(tinyJpeg(), 200),
     ]);
 
     $media = resolve(ImportPexelsMediaAction::class)->handle(pexelsPhotoItem());
@@ -55,7 +55,7 @@ it('downloads a pexels photo and stores it as a media record with attribution', 
 });
 
 it('does not re-download a pexels photo that was already imported', function (): void {
-    Http::fake(['images.pexels.com/*' => Http::response('binary-image-bytes', 200)]);
+    Http::fake(['images.pexels.com/*' => Http::response(tinyJpeg(), 200)]);
 
     $first = resolve(ImportPexelsMediaAction::class)->handle(pexelsPhotoItem());
     $second = resolve(ImportPexelsMediaAction::class)->handle(pexelsPhotoItem());
@@ -65,9 +65,9 @@ it('does not re-download a pexels photo that was already imported', function ():
 });
 
 it('reuses an existing media record when the downloaded bytes match an etag', function (): void {
-    Http::fake(['images.pexels.com/*' => Http::response('shared-bytes', 200)]);
+    Http::fake(['images.pexels.com/*' => Http::response(tinyJpeg(), 200)]);
 
-    $existing = Media::factory()->create(['etag' => md5('shared-bytes')]);
+    $existing = Media::factory()->create(['etag' => md5(tinyJpeg())]);
 
     $media = resolve(ImportPexelsMediaAction::class)->handle(pexelsPhotoItem(['id' => 999]));
 
@@ -77,8 +77,8 @@ it('reuses an existing media record when the downloaded bytes match an etag', fu
 
 it('downloads a pexels video together with its thumbnail', function (): void {
     Http::fake([
-        'videos.pexels.com/*' => Http::response('binary-video-bytes', 200),
-        'images.pexels.com/*' => Http::response('binary-thumb-bytes', 200),
+        'videos.pexels.com/*' => Http::response(tinyMp4(), 200),
+        'images.pexels.com/*' => Http::response(tinyJpeg(), 200),
     ]);
 
     $media = resolve(ImportPexelsMediaAction::class)->handle(pexelsPhotoItem([
@@ -101,4 +101,49 @@ it('downloads a pexels video together with its thumbnail', function (): void {
     $disk = Storage::disk(config('filesystems.media'));
     $disk->assertExists($media->source);
     $disk->assertExists($media->thumbnail);
+});
+
+it('only downloads files from Pexels itself, over https', function (string $url): void {
+    Http::fake();
+
+    expect(fn () => resolve(ImportPexelsMediaAction::class)->handle(pexelsPhotoItem(['download_url' => $url])))
+        ->toThrow(InvalidArgumentException::class, 'Only files from Pexels can be imported this way.');
+
+    Http::assertNothingSent();
+})->with([
+    'another host' => 'https://127.0.0.1/internal',
+    'plain http' => 'http://images.pexels.com/photos/123/pexels-photo-123.jpeg',
+]);
+
+it('stores what the file really is, not the extension it was given', function (): void {
+    Http::fake(['images.pexels.com/*' => Http::response(tinyJpeg(), 200)]);
+
+    $media = resolve(ImportPexelsMediaAction::class)->handle(pexelsPhotoItem(['extension' => 'html', 'mime_type' => 'text/html']));
+
+    expect($media->source)->toEndWith('.jpg')
+        ->and($media->mime_type)->toBe('image/jpeg');
+});
+
+it('refuses a download that is not an image or video', function (): void {
+    Http::fake(['images.pexels.com/*' => Http::response('<script>alert(1)</script>', 200)]);
+
+    expect(fn () => resolve(ImportPexelsMediaAction::class)->handle(pexelsPhotoItem()))
+        ->toThrow(InvalidArgumentException::class, 'Pexels sent an unexpected file type')
+        ->and(Media::query()->count())->toBe(0);
+});
+
+it('skips a video thumbnail that is not an image', function (): void {
+    Http::fake([
+        'videos.pexels.com/*' => Http::response(tinyMp4(), 200),
+        'images.pexels.com/*' => Http::response('not an image', 200),
+    ]);
+
+    $media = resolve(ImportPexelsMediaAction::class)->handle(pexelsPhotoItem([
+        'id' => 556,
+        'type' => MediaType::VIDEO->value,
+        'preview' => 'https://images.pexels.com/videos/556/thumb.jpg',
+        'download_url' => 'https://videos.pexels.com/556/hd.mp4',
+    ]));
+
+    expect($media->thumbnail)->toBeNull();
 });

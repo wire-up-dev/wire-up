@@ -322,3 +322,28 @@ it('skips anything in a menu that is not a menu item', function (): void {
 it('does not report a refused update to a locked property', function (): void {
     expect(resolve(ExceptionHandler::class)->shouldReport(new CannotUpdateLockedPropertyException('items')))->toBeFalse();
 });
+
+it('points the language switcher at each language’s own address for the page', function (): void {
+    Locale::query()->where('code', 'ro')->update(['active' => true]);
+    cache()->forget('site-locales');
+
+    Livewire::test('site.header', ['languageUrls' => ['en' => 'https://site.test/about', 'ro' => 'https://site.test/ro/despre']])
+        ->assertSee('https://site.test/ro/despre', false)
+        ->assertSee('https://site.test/about', false);
+
+    Livewire::test('site.header', ['languageUrls' => ['en' => 'https://site.test/about']])
+        ->assertSee(resolve('localization')->getLocalizedURL(route('home'), 'ro'), false);
+});
+
+it('leaves menu pages out of a language they are not published in', function (): void {
+    Locale::query()->where('code', 'ro')->update(['active' => true]);
+    cache()->forget('site-locales');
+    $page = Page::factory()->create(['status' => ContentStatus::PUBLISHED, 'published_at' => now()->subDay(), 'metadata' => ['published_locales' => ['ro']]]);
+    $page->slugs()->create(['locale' => 'en', 'slug' => 'romanian-only']);
+
+    setSiteMetadata(['menus' => menusPayload(['header' => ['en' => [
+        ['type' => 'page', 'appearance' => 'link', 'target' => '_self', 'label' => 'Romanian only', 'page_id' => $page->id, 'url' => ''],
+    ]]])]);
+
+    Livewire::test('site.header')->assertDontSee('Romanian only');
+});

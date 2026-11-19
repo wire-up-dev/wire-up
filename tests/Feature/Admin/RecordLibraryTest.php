@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Enums\ContentStatus;
 use App\Models\Record;
 use App\Models\RecordType;
+use App\Models\Role;
+use App\Models\User;
 use Livewire\Livewire;
 
 function libraryType(): RecordType
@@ -119,3 +121,21 @@ it('pre-selects the ids it was opened with', function (): void {
         ->call('handleSelectRecords', 'target-a', $type->id, 30, [(string) $one->id])
         ->assertSet('selectedIds', [$one->id]);
 });
+
+it('only lists records a person may see', function (array $abilities, bool $adminOnly, bool $sees): void {
+    $type = libraryType();
+    $type->update(['admin_only' => $adminOnly]);
+    libraryRecord($type, 'Secret ledger');
+
+    $role = Role::query()->create(['key' => 'picker', 'name' => 'Picker', 'abilities' => $abilities, 'bypass' => false, 'is_protected' => false]);
+    $this->actingAs(User::factory()->role($role)->create(['active' => true]));
+
+    $component = Livewire::test('admin.record-library')->call('handleSelectRecords', 'target-a', $type->id, 30, []);
+
+    $sees ? $component->assertSee('Secret ledger') : $component->assertDontSee('Secret ledger');
+})->with([
+    'can view the type' => [['records.book.view'], true, true],
+    'page editor, public type' => [['pages.edit'], false, true],
+    'page editor, internal type' => [['pages.edit'], true, false],
+    'neither' => [['inbox.view'], false, false],
+]);

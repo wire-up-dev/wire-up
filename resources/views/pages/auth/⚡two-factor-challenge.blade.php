@@ -129,7 +129,7 @@ return new class extends Component
 
     private function throttleKey(User $user): string
     {
-        return 'two-factor|'.$user->id.'|'.request()->ip();
+        return 'two-factor|'.$user->id;
     }
 };
 ?>

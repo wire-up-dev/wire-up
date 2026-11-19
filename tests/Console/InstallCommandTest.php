@@ -43,7 +43,7 @@ it('runs every install step in order', function (): void {
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'storage:link', '--force']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['npm', 'ci']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['npm', 'run', 'build']);
-    Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize']);
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize', '--except=routes']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['git', 'describe', '--tags', '--abbrev=0']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['git', 'ls-remote', '--tags', 'origin']);
 
@@ -226,3 +226,21 @@ it('creates the sqlite database file when it is missing', function (): void {
 
     expect(File::exists($dir.'/database.sqlite'))->toBeTrue();
 })->group('sqlite-only');
+
+it('builds the frontend assets itself when GitHub cannot be reached during an install', function (): void {
+    Process::fake([
+        '*get-url*' => Process::result(output: ReleaseArchive::REMOTE),
+        '*describe*' => Process::result(output: "v1.0.0\n"),
+        '*' => Process::result(),
+    ]);
+    Http::fake(['*' => Http::failedConnection()]);
+    User::factory()->create();
+
+    $this->artisan(InstallCommand::class)
+        ->expectsConfirmation('The application environment is not production. Continue anyway?', 'yes')
+        ->expectsQuestion('Default site language (BCP 47 code, e.g. en, de, fr)', 'en')
+        ->expectsOutputToContain('Wire Up is installed.')
+        ->assertExitCode(0);
+
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['npm', 'run', 'build']);
+});

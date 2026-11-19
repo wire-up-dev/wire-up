@@ -6,6 +6,7 @@ namespace App\Ai\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Support\Arr;
 use Laravel\Ai\Tools\Request;
 
 final class DraftOnlyTool extends RoleCheckedTool
@@ -17,13 +18,13 @@ final class DraftOnlyTool extends RoleCheckedTool
     {
         $properties = parent::schema($schema);
 
-        unset($properties['publish']);
+        unset($properties['publish'], $properties['status']);
 
         return $properties;
     }
 
     protected function run(Request $request): string
     {
-        return parent::run(new Request([...$request->toArray(), 'publish' => false]));
+        return parent::run(new Request(Arr::except($request->toArray(), ['publish', 'status'])));
     }
 }

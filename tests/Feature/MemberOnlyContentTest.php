@@ -7,6 +7,7 @@ use App\Models\Page;
 use App\Models\Record;
 use App\Models\RecordType;
 use App\Models\User;
+use App\Services\SiteSearchQuery;
 use Livewire\Livewire;
 
 /**
@@ -181,4 +182,21 @@ it('persists the members-only flag from the record editor', function (): void {
         ->assertHasNoErrors();
 
     expect($record->refresh()->isMembersOnly())->toBeTrue();
+});
+
+it('leaves members-only content out of search results and share images for guests', function (): void {
+    $page = memberOnlyPage('secret-area', attributes: ['title' => 'Hidden handbook']);
+    $record = memberOnlyRecord('secret-guide');
+    $record->recordType->update(['has_detail_page' => true]);
+
+    $search = fn (): array => resolve(SiteSearchQuery::class)->search('secret', [(string) $record->record_type_id], 10);
+    $pages = fn (): array => resolve(SiteSearchQuery::class)->search('handbook', ['pages'], 10);
+
+    expect($search())->toBeEmpty()->and($pages())->toBeEmpty();
+
+    $this->get(route('og.show', ['type' => 'page', 'id' => $page->id, 'locale' => 'en']))->assertNotFound();
+
+    $this->actingAs(User::factory()->member()->create());
+
+    expect($search()[0]['total'])->toBe(1)->and($pages()[0]['total'])->toBe(1);
 });

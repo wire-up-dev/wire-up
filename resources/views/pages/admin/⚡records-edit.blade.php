@@ -105,6 +105,7 @@ return new class extends Component
         $this->categories = $record->categories->pluck('id')->map(fn (int $id): string => (string) $id)->all();
         $this->defaultLocale = resolve('localization')->getDefaultLocale();
         $this->blocks = $this->withBlockDefaults($record->getBlocksArray());
+        $this->rememberLoadedVersion();
         $this->status = $record->computed_status;
         $this->published_at = $record->published_at;
         $this->title = $record->translationsFor('title');
@@ -159,6 +160,10 @@ return new class extends Component
     {
         $this->authorize('records.'.$this->recordType->key.'.edit');
 
+        if ($this->stopIfChangedElsewhere()) {
+            return;
+        }
+
         foreach ($this->media as $role => $localized) {
             $this->media[$role] = $this->normalizeMediaInput($localized);
         }
@@ -199,7 +204,9 @@ return new class extends Component
             ],
         ]);
 
-        $this->record->refresh()->load('translations', 'media', 'blocks', 'slugs');
+        $this->reloadSavedBlocks($this->record);
+        $this->rememberLoadedVersion();
+        $this->record->load('translations', 'media', 'blocks', 'slugs');
         $this->loadedStock = $this->record->stock;
         $this->forgetRestoredRevision();
 
@@ -238,6 +245,11 @@ return new class extends Component
         return $this->view()
             ->title(__('Edit').' '.($this->record->title !== '' ? $this->record->title : $this->recordType->name))
             ->layout('layouts::admin');
+    }
+
+    protected function contentModel(): Record
+    {
+        return $this->record;
     }
 
     /**
@@ -555,6 +567,11 @@ return new class extends Component
         class="grid grid-cols-1 items-stretch gap-10 md:grid-cols-5"
     >
         <div class="min-w-0 md:col-span-3">
+            <x-admin.content-changed
+                :changed="$changedElsewhere"
+                :reload-url="route('admin.records-edit', [$recordType, $record])"
+            />
+
             @if ($restoredFrom)
                 <div class="mb-6">
                     <x-admin.restored-revision
@@ -612,7 +629,7 @@ return new class extends Component
                                         class="overflow-hidden p-0!"
                                         wire:key="block-{{ $block['id'] }}"
                                         wire:sort:item="{{ $block['id'] }}"
-                                        x-data="{ open: {{ str_starts_with((string) $block['id'], 'new-') ? 'true' : 'false' }} }"
+                                        x-data="{ open: {{ str_starts_with((string) $block['id'], 'new-') || in_array((string) $block['id'], $openAfterSave, true) ? 'true' : 'false' }} }"
                                         x-on:blocks-toggle-all.window="open = $event.detail"
                                     >
                                         <div class="flex items-center justify-between gap-3 bg-zinc-100 px-3 py-2 dark:bg-white/10">
@@ -1132,11 +1149,11 @@ return new class extends Component
             }
 
             const content = block.content || {};
-            const raw = ((content.heading || {})[locale] || '').replace(/<\/(?:p|div|li|h[1-6])>|<br\s*\/?>/gi, ' ');
-
-            const div = document.createElement('div');
-            div.innerHTML = raw;
-            const text = (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim();
+            const parsed = new DOMParser().parseFromString((content.heading || {})[locale] || '', 'text/html');
+            parsed.body
+                .querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6, br')
+                .forEach((element) => element.after(' '));
+            const text = (parsed.body.textContent || '').replace(/\s+/g, ' ').trim();
 
             if (!text) {
                 return fallback;

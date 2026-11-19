@@ -46,7 +46,7 @@ final class InstallCommand extends Command
             'Run database migrations' => [PHP_BINARY, 'artisan', 'migrate', '--force'],
             'Link public storage' => [PHP_BINARY, 'artisan', 'storage:link', '--force'],
             ...$frontend,
-            'Cache configuration' => [PHP_BINARY, 'artisan', 'optimize'],
+            'Cache configuration' => [PHP_BINARY, 'artisan', 'optimize', '--except=routes'],
         ];
 
         foreach ($steps as $label => $step) {
@@ -74,7 +74,7 @@ final class InstallCommand extends Command
     {
         $tag = $updates->checkedOutTag();
 
-        return $tag !== null && $assets->published($tag) ? $tag : null;
+        return $tag !== null && rescue(fn (): bool => $assets->published($tag), false, report: false) ? $tag : null;
     }
 
     private function ensureSqliteDatabaseExists(): void

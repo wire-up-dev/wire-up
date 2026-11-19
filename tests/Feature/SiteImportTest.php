@@ -398,3 +398,21 @@ it('grants the preset roles access to imported content types', function (): void
 
     expect(Role::query()->where('key', 'editor')->firstOrFail()->hasAbility('records.course.edit'))->toBeTrue();
 });
+
+it('keeps the private and secret settings when the importer may not change them', function (): void {
+    Settings::set(['mail_password' => 'current-secret', 'remote_mcp_enabled' => false, 'currency' => 'GBP']);
+
+    $bundle = makeBundle([
+        'settings' => [
+            ['id' => 1, 'key' => 'mail_password', 'value' => '"bundle-secret"', 'created_at' => null, 'updated_at' => null],
+            ['id' => 2, 'key' => 'remote_mcp_enabled', 'value' => 'true', 'created_at' => null, 'updated_at' => null],
+            ['id' => 3, 'key' => 'currency', 'value' => '"JPY"', 'created_at' => null, 'updated_at' => null],
+        ],
+    ]);
+
+    SiteImporter::current()->import($bundle, null, keepPrivateSettings: true);
+
+    expect(Settings::get('mail_password'))->toBe('current-secret')
+        ->and(Settings::get('remote_mcp_enabled'))->toBeFalse()
+        ->and(Settings::get('currency'))->toBe('JPY');
+});

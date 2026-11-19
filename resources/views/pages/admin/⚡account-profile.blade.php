@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -133,9 +134,7 @@ return new class extends Component
 
     private function uploadPhoto(): string
     {
-        $extension = $this->photo->getClientOriginalExtension();
-        $originalName = pathinfo($this->photo->getClientOriginalName(), PATHINFO_FILENAME);
-        $filename = "{$this->user->id}_{$originalName}.{$extension}";
+        $filename = $this->user->id.'_'.Str::random(16).'.'.($this->photo->extension() ?: 'jpg');
 
         return $this->photo->storeAs('users', $filename, config('filesystems.media'));
     }

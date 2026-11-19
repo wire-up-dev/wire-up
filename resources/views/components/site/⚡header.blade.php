@@ -28,6 +28,12 @@ return new class extends Component
     #[Locked]
     public string $brand;
 
+    /**
+     * @var array<string, string>
+     */
+    #[Locked]
+    public array $languageUrls = [];
+
     #[Locked]
     public ?string $logo = null;
 
@@ -104,7 +110,7 @@ return new class extends Component
             ->map(fn (mixed $meta, string $code): array => [
                 'code' => $code,
                 'label' => (string) (data_get($meta, 'endonym') ?: data_get($meta, 'name') ?: $code),
-                'url' => $localization->getLocalizedURL($url, $code),
+                'url' => $this->languageUrls[$code] ?? $localization->getLocalizedURL($this->languageUrls === [] ? $url : route('home'), $code),
                 'current' => $code === $current,
             ])
             ->values();

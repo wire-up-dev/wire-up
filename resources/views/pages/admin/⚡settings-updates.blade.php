@@ -7,6 +7,7 @@ use App\Services\UpdateService;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Artisan;
 use Livewire\Component;
 
 return new class extends Component
@@ -97,6 +98,21 @@ return new class extends Component
         resolve(UpdateService::class)->clearState();
 
         $this->dispatch('updates-checked');
+    }
+
+    public function bringOnline(UpdateService $updates): void
+    {
+        $this->authorize('settings.edit');
+
+        Artisan::call('up');
+
+        $state = $updates->state();
+
+        if ($state['status'] === 'failed') {
+            $updates->markFailed((string) $state['tag'], (string) $state['step'], (string) $state['output'], siteIsDown: false);
+        }
+
+        Flux::toast(__('The site is back online.'), variant: 'success');
     }
 
     public function refreshState(): void
@@ -204,7 +220,7 @@ return new class extends Component
                         {{ __('Update to :tag failed at: :step', ['tag' => (string) $state['tag'], 'step' => (string) $state['step']]) }}</flux:callout.heading>
                     <flux:callout.text>
                         @if ($state['site_down'])
-                            {{ __('The public site is in maintenance mode. Fix the issue on the server, then run: php artisan up') }}
+                            {{ __('The public site is in maintenance mode. Bring it back online once the problem is fixed.') }}
                         @elseif ($state['rolled_back_to'] !== null)
                             {{ __('The site was put back on :version and is live again.', ['version' => $state['rolled_back_to']]) }}
                         @else
@@ -214,11 +230,13 @@ return new class extends Component
                             <pre class="mt-3 max-h-64 overflow-auto rounded-lg bg-zinc-900 p-3 text-xs text-zinc-100">{{ $state['output'] }}</pre>
                         @endif
                         @can('settings.edit')
-                            <flux:button
-                                wire:click="dismissState"
-                                size="sm"
-                                class="mt-3"
-                            >{{ __('Dismiss') }}</flux:button>
+                            <div class="mt-3 flex gap-2">
+                                @if ($state['site_down'])
+                                    <flux:button wire:click="bringOnline" size="sm" variant="primary">
+                                        {{ __('Bring the site back online') }}</flux:button>
+                                @endif
+                                <flux:button wire:click="dismissState" size="sm">{{ __('Dismiss') }}</flux:button>
+                            </div>
                         @endcan
                     </flux:callout.text>
                 </flux:callout>

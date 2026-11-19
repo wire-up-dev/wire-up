@@ -80,6 +80,17 @@ it('sets locale from request segment', function (): void {
         ->and(app()->getLocale())->toBe('nl');
 });
 
+it('takes the locale from the page a Livewire request came from', function (): void {
+    Locale::query()->where('code', 'nl')->update(['active' => true]);
+    Cache::forget('site-locales');
+
+    $update = Request::create('/livewire/update', 'POST', server: ['HTTP_X_LIVEWIRE' => '1', 'HTTP_REFERER' => 'https://site.test/nl/over-ons']);
+    $page = Request::create('/over-ons', server: ['HTTP_X_LIVEWIRE' => '1', 'HTTP_REFERER' => 'https://site.test/nl/over-ons']);
+
+    expect(new LocalizationService(app(), resolve(Repository::class), $update, resolve(Translator::class))->setLocale())->toBe('nl')
+        ->and(new LocalizationService(app(), resolve(Repository::class), $page, resolve(Translator::class))->setLocale())->toBeNull();
+});
+
 it('sets default locale when segment is not active', function (): void {
     $request = Request::create('/fr/');
     $app = app();

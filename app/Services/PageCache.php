@@ -78,6 +78,14 @@ final class PageCache
         ], $this->ttl());
     }
 
+    /**
+     * @param  Closure(): string  $build
+     */
+    public function rememberForContent(string $key, Closure $build): string
+    {
+        return (string) Cache::remember("{$key}:{$this->version()}", 3600, $build);
+    }
+
     public function flush(): void
     {
         Cache::add(self::VERSION_KEY, 1);

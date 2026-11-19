@@ -70,3 +70,11 @@ it('prunes expired holds a week after they lapse', function (): void {
 
     expect(Booking::query()->pluck('id')->all())->toEqualCanonicalizing([$recent->id, $confirmed->id]);
 });
+
+it('sends no reminder for a booking that clashes with another one', function (): void {
+    Booking::factory()->create(['starts_at' => CarbonImmutable::parse('2026-11-16 12:00', 'UTC'), 'clashed' => true]);
+
+    Artisan::call('wireup:send-booking-reminders');
+
+    Notification::assertNothingSent();
+});

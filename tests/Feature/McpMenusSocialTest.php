@@ -177,3 +177,22 @@ it('rejects an icon appearance on an account menu item', function (): void {
         'items' => [['type' => 'account', 'appearance' => 'icon']],
     ])->assertHasErrors(['appearance must be link or button']);
 });
+
+it('keeps the icons set in the admin when an agent rewrites the menu', function (): void {
+    $menus = SettingsService::current()->allMenus();
+    $index = array_search('header', array_column($menus, 'key'), true);
+    $menus[$index]['items']['en'] = [
+        ['type' => 'link', 'appearance' => 'link', 'target' => '_self', 'label' => 'Docs', 'page_id' => null, 'url' => 'https://docs.example.com', 'icon' => 'book-open', 'icon_name' => 'book-open', 'icon_svg' => '<svg></svg>', 'badge' => '', 'badgeColor' => 'zinc'],
+    ];
+    Settings::set(['menus' => $menus]);
+
+    WireUpServer::tool(UpdateMenuTool::class, ['menu' => 'header', 'items' => [
+        ['type' => 'link', 'label' => 'Docs', 'url' => 'https://docs.example.com/v2'],
+        ['type' => 'link', 'label' => 'Blog', 'url' => 'https://blog.example.com'],
+    ]])->assertOk();
+
+    $items = SettingsService::current()->allMenus()[$index]['items']['en'];
+
+    expect($items[0])->toMatchArray(['url' => 'https://docs.example.com/v2', 'icon' => 'book-open', 'icon_name' => 'book-open', 'icon_svg' => '<svg></svg>'])
+        ->and($items[1]['icon'])->toBe('');
+});

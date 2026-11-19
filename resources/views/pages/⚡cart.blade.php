@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\CancelOrderAction;
 use App\Actions\CreateCheckoutAction;
+use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Record;
 use App\Models\User;
@@ -11,26 +12,18 @@ use App\Services\CartService;
 use App\Services\Impersonation;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Stripe\Exception\ApiErrorException;
 
 return new class extends Component
 {
+    private const int MAX_CHECKOUTS = 10;
+
     public function mount(CancelOrderAction $cancel): void
     {
-        $reference = request()->string('cancelled')->value();
-        $order = $reference === '' ? null : Order::query()->where('reference', $reference)->first();
-
-        if (! $order instanceof Order || session(CreateCheckoutAction::LAST_ORDER_KEY) !== $order->id) {
-            return;
-        }
-
-        try {
-            $cancel->handle($order);
-        } catch (ApiErrorException $exception) {
-            report($exception);
-        }
+        $this->releaseUnpaidOrder($cancel);
     }
 
     /**
@@ -56,13 +49,25 @@ return new class extends Component
         $this->refreshCart();
     }
 
-    public function checkout(CreateCheckoutAction $checkout): void
+    public function checkout(CreateCheckoutAction $checkout, CancelOrderAction $cancel): void
     {
         if (Impersonation::active()) {
             Flux::toast(__('This is not available while you view the site as someone else.'), variant: 'warning');
 
             return;
         }
+
+        $throttleKey = 'checkout:'.request()->ip();
+
+        if (RateLimiter::tooManyAttempts($throttleKey, self::MAX_CHECKOUTS)) {
+            $this->addError('checkout', __('Too many checkout attempts. Please wait a few minutes and try again.'));
+
+            return;
+        }
+
+        RateLimiter::hit($throttleKey, 600);
+
+        $this->releaseUnpaidOrder($cancel);
 
         $user = auth()->user();
 
@@ -84,6 +89,21 @@ return new class extends Component
         return $this->view()
             ->title(__('Cart'))
             ->layoutData(['description' => __('Review the items in your cart.')]);
+    }
+
+    private function releaseUnpaidOrder(CancelOrderAction $cancel): void
+    {
+        $order = Order::query()->whereKey(session(CreateCheckoutAction::LAST_ORDER_KEY))->where('status', OrderStatus::PENDING)->first();
+
+        if (! $order instanceof Order) {
+            return;
+        }
+
+        try {
+            $cancel->handle($order);
+        } catch (ApiErrorException $exception) {
+            report($exception);
+        }
     }
 
     private function refreshCart(): void

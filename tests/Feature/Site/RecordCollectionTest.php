@@ -11,6 +11,7 @@ use App\Models\RecordType;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 function paginatedType(): RecordType
@@ -137,4 +138,19 @@ it('delegates to the record-collection livewire component when paginated', funct
         ->assertOk()
         ->assertSeeLivewire('site.record-collection')
         ->assertSee('Paged Widget');
+});
+
+it('keeps its settings out of the visitor’s reach and stops loading more after twenty pages', function (): void {
+    $type = paginatedType();
+    $block = paginatedBlock($type, ['pagination' => 'infinite', 'perPage' => 2]);
+    $component = Livewire::test('site.record-collection', ['blockId' => (string) $block->id, 'mode' => 'infinite', 'content' => $block->content]);
+
+    expect(fn () => $component->set('content.recordTypeId', 999))->toThrow(CannotUpdateLockedPropertyException::class)
+        ->and(fn () => $component->set('visiblePages', 500))->toThrow(CannotUpdateLockedPropertyException::class);
+
+    foreach (range(1, 25) as $page) {
+        $component->call('loadMore');
+    }
+
+    $component->assertSet('visiblePages', 20);
 });

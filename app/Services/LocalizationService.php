@@ -29,7 +29,7 @@ final class LocalizationService
 
     public function setLocale(): ?string
     {
-        $locale = $this->request->segment(1);
+        $locale = $this->localeSegment();
 
         if (is_string($locale) && $this->isActiveLocale($locale)) {
             $this->currentLocale = $locale;
@@ -148,5 +148,16 @@ final class LocalizationService
         $code = $locale ?? $this->currentLocale;
 
         return empty($locales[$code]['rtl']) ? 'ltr' : 'rtl';
+    }
+
+    private function localeSegment(): ?string
+    {
+        if (! $this->request->hasHeader('X-Livewire') || ! $this->request->isMethod('POST')) {
+            return $this->request->segment(1);
+        }
+
+        $path = (string) parse_url((string) $this->request->headers->get('referer'), PHP_URL_PATH);
+
+        return explode('/', mb_trim($path, '/'))[0];
     }
 }

@@ -53,6 +53,8 @@ final class UpdateMenuTool extends Tool
             return Response::error("No menu with key \"{$validated['menu']}\". Available menus: ".implode(', ', $keys).'.');
         }
 
+        $locale = $validated['locale'] ?? $localization->getDefaultLocale();
+        $current = is_array($menus[$index]['items'][$locale] ?? null) ? $menus[$index]['items'][$locale] : [];
         $items = [];
 
         foreach (array_values($validated['items']) as $i => $item) {
@@ -63,10 +65,9 @@ final class UpdateMenuTool extends Tool
                 return Response::error($normalized);
             }
 
-            $items[] = $normalized;
+            $items[] = $this->withKeptIcon($normalized, $current);
         }
 
-        $locale = $validated['locale'] ?? $localization->getDefaultLocale();
         $menus[$index]['items'][$locale] = $items;
 
         if (isset($validated['display'])) {
@@ -99,6 +100,22 @@ final class UpdateMenuTool extends Tool
             'display' => $schema->object()
                 ->description('Display settings: {"background": bool, "position": "left"|"right", "sticky": bool, "mobile": "collapse"|"hide"|"toggle"}.'),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  array<array-key, mixed>  $current
+     * @return array<string, mixed>
+     */
+    private function withKeptIcon(array $item, array $current): array
+    {
+        $existing = array_find($current, fn (mixed $entry): bool => is_array($entry) && ($entry['type'] ?? null) === $item['type'] && ($entry['label'] ?? null) === $item['label']);
+
+        if (! is_array($existing)) {
+            return $item;
+        }
+
+        return [...$item, 'icon' => (string) ($existing['icon'] ?? ''), 'icon_name' => (string) ($existing['icon_name'] ?? ''), 'icon_svg' => (string) ($existing['icon_svg'] ?? '')];
     }
 
     /**

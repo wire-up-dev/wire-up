@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Page;
 use App\Models\Record;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 final class SeoService
@@ -225,7 +226,7 @@ final class SeoService
             $lines[] = '## Pages';
             $lines[] = '';
 
-            foreach ($this->publishedPages(withBlocks: true) as $page) {
+            foreach ($this->publishedPages(withBlocks: true, inDefaultLocale: true) as $page) {
                 $url = $this->primaryUrl($page);
 
                 if ($url === '') {
@@ -238,7 +239,7 @@ final class SeoService
                 $lines[] = '- ['.$title.']('.$url.')'.($description !== '' ? ': '.$description : '');
             }
 
-            foreach ($this->publishedRecords(withBlocks: true)->groupBy(fn (Record $record): string => $record->recordType->name) as $group => $records) {
+            foreach ($this->publishedRecords(withBlocks: true, inDefaultLocale: true)->groupBy(fn (Record $record): string => $record->recordType->name) as $group => $records) {
                 $lines[] = '';
                 $lines[] = '## '.$group;
                 $lines[] = '';
@@ -268,7 +269,7 @@ final class SeoService
         if (! $settings->noindex()) {
             $fallbackTitle = $settings->title() ?: config()->string('app.name');
 
-            foreach ([...$this->publishedPages(withBlocks: true), ...$this->publishedRecords(withBlocks: true)] as $content) {
+            foreach ([...$this->publishedPages(withBlocks: true, inDefaultLocale: true), ...$this->publishedRecords(withBlocks: true, inDefaultLocale: true)] as $content) {
                 $url = $this->primaryUrl($content);
 
                 if ($url === '') {
@@ -346,7 +347,7 @@ final class SeoService
     /**
      * @return Collection<int, Page>
      */
-    private function publishedPages(bool $withBlocks = false): Collection
+    private function publishedPages(bool $withBlocks = false, bool $inDefaultLocale = false): Collection
     {
         $with = ['slugs', 'translations'];
         if ($withBlocks) {
@@ -354,7 +355,7 @@ final class SeoService
         }
 
         return Page::query()
-            ->published()
+            ->when($inDefaultLocale, fn (Builder $query): Builder => $query->publishedInLocale(resolve('localization')->getDefaultLocale()), fn (Builder $query): Builder => $query->published())
             ->with($with)
             ->get()
             ->reject(fn (Page $page): bool => $page->isNoindex() || $page->isMembersOnly())
@@ -364,7 +365,7 @@ final class SeoService
     /**
      * @return Collection<int, Record>
      */
-    private function publishedRecords(bool $withBlocks = false): Collection
+    private function publishedRecords(bool $withBlocks = false, bool $inDefaultLocale = false): Collection
     {
         $with = ['recordType', 'slugs', 'translations'];
         if ($withBlocks) {
@@ -372,7 +373,7 @@ final class SeoService
         }
 
         return Record::query()
-            ->published()
+            ->when($inDefaultLocale, fn (Builder $query): Builder => $query->publishedInLocale(resolve('localization')->getDefaultLocale()), fn (Builder $query): Builder => $query->published())
             ->with($with)
             ->get()
             ->reject(fn (Record $record): bool => $record->isNoindex() || $record->isMembersOnly() || ! $record->hasDetailPage())

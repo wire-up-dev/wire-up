@@ -9,6 +9,7 @@ use App\Models\Record;
 use App\Services\PageScreenshot;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -27,27 +28,28 @@ final class RenderPageTool extends Tool
             [
                 'page' => ['sometimes', 'integer'],
                 'record' => ['sometimes', 'integer'],
-                'path' => ['sometimes', 'string', 'max:255', 'regex:#^/#'],
+                'path' => ['sometimes', 'string', 'max:255', 'regex:#^/(?![/\\\\])#', 'not_regex:#\\\\#'],
                 'viewport' => ['sometimes', 'string', 'in:desktop,tablet,mobile'],
                 'full_page' => ['sometimes', 'boolean'],
             ],
             [
-                'path.regex' => 'The path must start with a slash, e.g. "/about".',
+                'path.regex' => 'The path must start with a single slash, e.g. "/about".',
+                'path.not_regex' => 'The path cannot contain a backslash.',
                 'viewport.in' => 'Viewport must be "desktop", "tablet" or "mobile".',
             ],
         );
 
         try {
-            $png = resolve(PageScreenshot::class)->capture(
+            $png = Cache::lock('wireup:render-page', 120)->get(fn (): string => resolve(PageScreenshot::class)->capture(
                 $this->resolveUrl($validated),
                 $validated['viewport'] ?? 'desktop',
                 (bool) ($validated['full_page'] ?? false),
-            );
+            ));
         } catch (InvalidArgumentException|RuntimeException $exception) {
             return Response::error($exception->getMessage());
         }
 
-        return Response::image($png);
+        return is_string($png) ? Response::image($png) : Response::error('Another page is being rendered right now. Try again in a minute.');
     }
 
     /**

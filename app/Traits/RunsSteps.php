@@ -31,9 +31,25 @@ trait RunsSteps
             }
         }
 
-        $result = Process::path(base_path())->env(['PATH' => $this->searchPath()])->timeout(in_array($step[0], self::SLOW_TOOLS, true) ? 1200 : 600)->run($step);
+        try {
+            $result = Process::path(base_path())->env(['PATH' => $this->searchPath()])->timeout($this->stepTimeout($step))->run($step);
+        } catch (Throwable $throwable) {
+            return [false, $throwable->getMessage()];
+        }
 
         return [$result->successful(), mb_trim($result->output()."\n".$result->errorOutput())];
+    }
+
+    /**
+     * @param  list<string>  $step
+     */
+    private function stepTimeout(array $step): int
+    {
+        return match (true) {
+            in_array($step[0], self::SLOW_TOOLS, true) => 1200,
+            array_intersect($step, ['wireup:backup', 'wireup:backup:restore-database']) !== [] => 2400,
+            default => 600,
+        };
     }
 
     private function searchPath(): string

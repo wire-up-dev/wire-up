@@ -197,7 +197,8 @@ final readonly class Records
                 FieldType::TAGS => Record::normalizeList($value),
                 FieldType::MULTI_SELECT => Record::normalizeList($value, is_array($field['options'] ?? null) ? $field['options'] : []),
                 FieldType::RELATIONSHIP => self::linkedIds($field, $value),
-                default => $value === '' ? null : $value,
+                FieldType::SELECT => in_array($value, is_array($field['options'] ?? null) ? $field['options'] : [], true) ? $value : null,
+                default => (is_string($value) || is_int($value) || is_float($value)) && $value !== '' ? $value : null,
             };
         }
 
@@ -219,7 +220,7 @@ final readonly class Records
             return [
                 'key' => (string) ($field['key'] ?? ''),
                 'type' => $type->value,
-                'label' => [$locale => (string) ($field['label'] ?? '')],
+                'label' => [...(is_array($current['label'] ?? null) ? $current['label'] : []), $locale => (string) ($field['label'] ?? '')],
                 'required' => (bool) ($field['required'] ?? false),
                 'translatable' => (bool) ($field['translatable'] ?? $type->isTranslatableByDefault()) && $type->canBeTranslated(),
                 'column' => (bool) ($field['column'] ?? false),

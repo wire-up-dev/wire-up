@@ -14,49 +14,53 @@ use App\Models\Activity;
 use App\Models\Booking;
 use App\Models\ErrorLog;
 use App\Models\NotFoundPath;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
+$minute = sprintf('%02d', crc32(base_path()) % 60);
+
 Schedule::command(CleanTempUploadsCommand::class)
-    ->daily()
-    ->withoutOverlapping();
+    ->dailyAt("00:{$minute}")
+    ->withoutOverlapping(120);
 
 Schedule::command(PruneImageCacheCommand::class)
-    ->daily()
-    ->withoutOverlapping();
+    ->dailyAt("00:{$minute}")
+    ->withoutOverlapping(120);
 
 Schedule::command(CheckForUpdatesCommand::class)
-    ->daily()
-    ->withoutOverlapping();
+    ->dailyAt("00:{$minute}")
+    ->withoutOverlapping(120);
 
 Schedule::command('queue:work --queue=system --stop-when-empty --tries=1')
     ->everyMinute()
+    ->when(fn (): bool => config('queue.default') !== 'database' || DB::table('jobs')->where('queue', 'system')->exists())
     ->withoutOverlapping(70)
     ->runInBackground();
 
 Schedule::command(ReconcileOrdersCommand::class)
     ->everyFiveMinutes()
-    ->withoutOverlapping();
+    ->withoutOverlapping(10);
 
 Schedule::command(SendBookingRemindersCommand::class)
     ->everyFiveMinutes()
-    ->withoutOverlapping();
+    ->withoutOverlapping(10);
 
 Schedule::command(PruneAbandonedOrdersCommand::class)
-    ->daily()
-    ->withoutOverlapping();
+    ->dailyAt("00:{$minute}")
+    ->withoutOverlapping(120);
 
 Schedule::command('model:prune', ['--model' => [NotFoundPath::class, Activity::class, ErrorLog::class, Booking::class]])
-    ->daily()
-    ->withoutOverlapping();
+    ->dailyAt("00:{$minute}")
+    ->withoutOverlapping(120);
 
 Schedule::command(PruneStaleDataCommand::class)
-    ->daily()
-    ->withoutOverlapping();
+    ->dailyAt("00:{$minute}")
+    ->withoutOverlapping(120);
 
 Schedule::command('queue:prune-failed', ['--hours' => 720])
-    ->daily()
-    ->withoutOverlapping();
+    ->dailyAt("00:{$minute}")
+    ->withoutOverlapping(120);
 
 Schedule::command(CreateBackupCommand::class, ['--scheduled'])
-    ->dailyAt('03:00')
-    ->withoutOverlapping();
+    ->dailyAt("03:{$minute}")
+    ->withoutOverlapping(180);

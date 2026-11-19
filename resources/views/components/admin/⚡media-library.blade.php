@@ -17,6 +17,7 @@ use Flux\Flux;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Renderless;
 use Livewire\Component;
@@ -90,9 +91,11 @@ return new class extends Component
     public bool $pexelsLoaded = false;
 
     /** @var array<int, array<string, mixed>> */
+    #[Locked]
     public array $pexelsResults = [];
 
     /** @var array<string, mixed>|null */
+    #[Locked]
     public ?array $pexelsPreview = null;
 
     public function mount(): void

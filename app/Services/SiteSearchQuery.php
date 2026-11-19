@@ -67,6 +67,7 @@ final class SiteSearchQuery
         $base = Record::query()
             ->where('record_type_id', $type->id)
             ->publishedInLocale()
+            ->visibleToVisitor()
             ->matchingSearch($query, $type);
 
         $total = (clone $base)->count();
@@ -98,6 +99,7 @@ final class SiteSearchQuery
     {
         $base = Page::query()
             ->publishedInLocale()
+            ->visibleToVisitor()
             ->where(function (Builder $inner) use ($query): void {
                 $inner->whereTranslationLike('title', $query)
                     ->orWhereTranslationLike('description', $query);

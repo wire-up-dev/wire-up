@@ -132,3 +132,33 @@ it('will not open checkout for an empty cart', function (): void {
 
     stripe()->assertNothingSent();
 });
+
+it('gives the stock of an unpaid checkout back when the shopper returns to the cart', function (): void {
+    fakeCheckoutSession();
+    stripe()->respond('POST', '/v1/checkout/sessions/cs_test_new/expire', ['id' => 'cs_test_new', 'object' => 'checkout.session', 'status' => 'expired']);
+    $record = sellableRecord(['current_price' => '12.50'], ['stock' => 1]);
+    resolve(CartService::class)->add($record, 1);
+
+    Livewire::test('pages::cart')->call('checkout');
+
+    expect($record->refresh()->stock)->toBe(0);
+
+    Livewire::test('pages::cart')->assertSee($record->displayHeading());
+
+    expect($record->refresh()->stock)->toBe(1)
+        ->and(Order::query()->sole()->status)->toBe(OrderStatus::CANCELLED);
+
+    stripe()->assertSent('POST', '/v1/checkout/sessions/cs_test_new/expire');
+});
+
+it('slows down someone opening checkout over and over', function (): void {
+    stripe()->respond('POST', '/v1/checkout/sessions', fn (array $params): array => ['id' => 'cs_'.$params['metadata']['order_id'], 'object' => 'checkout.session', 'url' => 'https://checkout.stripe.com/c/pay/x']);
+    stripe()->respond('POST', '/v1/checkout/sessions/*/expire', ['object' => 'checkout.session', 'status' => 'expired']);
+    resolve(CartService::class)->add(sellableRecord(['current_price' => '5']), 1);
+
+    foreach (range(1, 10) as $attempt) {
+        Livewire::test('pages::cart')->call('checkout')->assertHasNoErrors();
+    }
+
+    Livewire::test('pages::cart')->call('checkout')->assertHasErrors('checkout');
+});

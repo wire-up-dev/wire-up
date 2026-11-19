@@ -13,6 +13,7 @@ use App\Ai\Tools\McpResourceTool;
 use App\Mcp\Servers\WireUpServer;
 use App\Mcp\Tools\CreatePageTool;
 use App\Mcp\Tools\CreateRecordTool;
+use App\Mcp\Tools\UpdateRecordTool;
 use App\Services\SettingsService;
 use Closure;
 use Illuminate\Support\Collection;
@@ -122,7 +123,7 @@ final class SiteAssistant implements Agent, Conversational, HasSkills, HasTools
         $tools = self::visible(WireUpServer::toolClasses())
             ->map(fn (string $class): object => match (true) {
                 is_a($class, RequiresConfirmation::class, true) => new ConfirmationTool(resolve($class)),
-                in_array($class, [CreatePageTool::class, CreateRecordTool::class], true) => new DraftOnlyTool(resolve($class)),
+                in_array($class, [CreatePageTool::class, CreateRecordTool::class, UpdateRecordTool::class], true) => new DraftOnlyTool(resolve($class)),
                 default => new AssistantTool(resolve($class)),
             });
 

@@ -183,9 +183,26 @@ it('can upload a profile photo', function (): void {
 
     expect($user->photo)
         ->not->toBeNull()
-        ->toStartWith('users/'.$user->id.'_profile');
+        ->toStartWith('users/'.$user->id.'_')
+        ->toEndWith('.jpg');
 
     Storage::disk(config('filesystems.media'))->assertExists($user->photo);
+});
+
+it('stores a profile photo under its real image type, whatever it was named', function (): void {
+    Storage::fake(config('filesystems.media'));
+    $user = User::factory()->create(['role' => 'owner', 'active' => true, 'photo' => null, 'email' => 'owner@example.com']);
+    $this->actingAs($user);
+
+    $file = UploadedFile::fake()->create('page.html', 10, 'image/png');
+
+    Livewire::test('pages::admin.account-profile')
+        ->set('photo', $file)
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect($user->refresh()->photo)->toEndWith('.png')
+        ->not->toContain('page');
 });
 
 it('can replace an existing profile photo', function (): void {
@@ -214,7 +231,7 @@ it('can replace an existing profile photo', function (): void {
     Storage::disk(config('filesystems.media'))->assertMissing('users/1_old-photo.jpg');
 
     expect($user->photo)
-        ->toStartWith('users/'.$user->id.'_new-profile')
+        ->toStartWith('users/'.$user->id.'_')
         ->toEndWith('.png');
 
     Storage::disk(config('filesystems.media'))->assertExists($user->photo);

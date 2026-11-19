@@ -27,6 +27,7 @@ final class SendBookingRemindersCommand extends Command
         if ($hours > 0) {
             Booking::query()
                 ->where('status', BookingStatus::CONFIRMED)
+                ->where('clashed', false)
                 ->whereNull('reminded_at')
                 ->whereNotNull('email')
                 ->whereBetween('starts_at', [now(), now()->addHours($hours)])

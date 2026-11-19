@@ -26,6 +26,8 @@ final readonly class UpdateService
 
     private const string LOCK = 'wireup:update:lock';
 
+    private const string LOCK_HOLDER = 'wireup:update:lock-holder';
+
     private const string CACHE_HELD_BACK = 'wireup:update:held-back';
 
     public function __construct(private ReleaseAssets $assets = new ReleaseAssets()) {}
@@ -57,6 +59,19 @@ final readonly class UpdateService
         return Cache::lock(self::LOCK, self::TIME_LIMIT);
     }
 
+    public function acquireUpdateLock(): ?Lock
+    {
+        $lock = $this->updateLock();
+
+        if ($lock->get()) {
+            return $lock;
+        }
+
+        $retry = $this->updateLock();
+
+        return ! $this->updateIsLocked() && $retry->get() ? $retry : null;
+    }
+
     public function updateIsLocked(): bool
     {
         $probe = Cache::lock(self::LOCK, 1);
@@ -67,7 +82,24 @@ final readonly class UpdateService
             return false;
         }
 
+        if ($this->lockHolderIsGone()) {
+            Cache::lock(self::LOCK)->forceRelease();
+            $this->forgetLockHolder();
+
+            return false;
+        }
+
         return true;
+    }
+
+    public function rememberLockHolder(): void
+    {
+        Cache::put(self::LOCK_HOLDER, ['pid' => getmypid(), 'host' => gethostname()], self::TIME_LIMIT);
+    }
+
+    public function forgetLockHolder(): void
+    {
+        Cache::forget(self::LOCK_HOLDER);
     }
 
     public function lastCheckFailed(): bool
@@ -271,6 +303,17 @@ final readonly class UpdateService
     public function clearState(): void
     {
         Cache::forget(self::CACHE_STATE);
+    }
+
+    private function lockHolderIsGone(): bool
+    {
+        $holder = Cache::get(self::LOCK_HOLDER);
+
+        if (! is_array($holder) || ! is_int($holder['pid'] ?? null) || ($holder['host'] ?? null) !== gethostname()) {
+            return false;
+        }
+
+        return function_exists('posix_kill') && (! posix_kill($holder['pid'], 0) && posix_get_last_error() !== 1);
     }
 
     private function notifyOutcome(SystemUpdateCompleted $notification): void

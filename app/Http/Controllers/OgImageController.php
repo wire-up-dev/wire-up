@@ -18,7 +18,8 @@ final class OgImageController
             : Record::query()->find($id);
 
         abort_unless($content instanceof Page || $content instanceof Record, 404, 'File not found');
-        abort_unless($content->isLiveInLocale($locale), 404, 'File not found');
+        abort_unless($content->isLiveInLocale($locale) && ! $content->isMembersOnly(), 404, 'File not found');
+        abort_if($content instanceof Record && ! $content->hasDetailPage(), 404, 'File not found');
 
         $file = $images->file($content, $locale);
 

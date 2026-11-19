@@ -7,6 +7,7 @@ use App\Enums\ContentStatus;
 use App\Jobs\RunSiteImport;
 use App\Models\Activity;
 use App\Models\Page;
+use App\Models\Settings;
 use App\Models\User;
 use App\Services\SiteBundle;
 use App\Services\SiteExporter;
@@ -181,3 +182,16 @@ it('runs alone, once, with a long timeout', function (): void {
         ->and($reflection->getAttributes(Tries::class))->toHaveCount(1)
         ->and($reflection->getAttributes(Timeout::class)[0]->newInstance()->timeout)->toBe(3600);
 });
+
+it('only lets an owner replace the private settings through an import', function (string $role, ?string $expected): void {
+    Settings::set(['mail_password' => 'current-secret']);
+    $bundle = jobBundle();
+    resolve(TransferService::class)->markPending('job.zip');
+
+    runImportJob($bundle, User::factory()->create(['role' => $role])->id);
+
+    expect(Settings::get('mail_password'))->toBe($expected);
+})->with([
+    'an owner' => ['owner', null],
+    'an administrator' => ['admin', 'current-secret'],
+]);

@@ -11,11 +11,13 @@ use App\Enums\ActivityEvent;
 use App\Models\Activity;
 use App\Models\Settings;
 use App\Models\User;
+use App\Services\Impersonation;
 use App\Services\SettingsService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Fortify;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -328,9 +330,44 @@ it('reveals recovery codes on request', function (): void {
 
     Livewire::test('shared.two-factor')
         ->assertSet('showingRecoveryCodes', false)
+        ->set('recovery_password', 'wrong-password')
+        ->call('showRecoveryCodes')
+        ->assertHasErrors('recovery_password')
+        ->assertSet('showingRecoveryCodes', false)
+        ->set('recovery_password', 'password')
         ->call('showRecoveryCodes')
         ->assertSet('showingRecoveryCodes', true)
         ->assertSee($user->recoveryCodes()[0]);
+});
+
+it('keeps two-factor on and the codes hidden without the password', function (): void {
+    $user = userWithTwoFactor('member');
+    $codes = $user->recoveryCodes();
+    $this->actingAs($user);
+
+    $component = Livewire::test('shared.two-factor')
+        ->call('cancelSetup')
+        ->call('regenerateRecoveryCodes');
+
+    expect($user->refresh()->hasEnabledTwoFactorAuthentication())->toBeTrue()
+        ->and($user->recoveryCodes())->toBe($codes)
+        ->and(fn () => $component->set('showingRecoveryCodes', true))->toThrow(CannotUpdateLockedPropertyException::class);
+});
+
+it('refuses two-factor changes while viewing the site as someone else', function (): void {
+    $staff = User::factory()->admin()->create(['active' => true]);
+    $member = userWithTwoFactor('member');
+    $this->actingAs($member);
+    session()->put(Impersonation::SESSION_KEY, $staff->id);
+
+    Livewire::test('shared.two-factor')
+        ->set('disable_password', 'password')
+        ->call('disable')
+        ->set('recovery_password', 'password')
+        ->call('showRecoveryCodes')
+        ->assertSet('showingRecoveryCodes', false);
+
+    expect($member->refresh()->hasEnabledTwoFactorAuthentication())->toBeTrue();
 });
 
 it('shows the admin security screen', function (): void {

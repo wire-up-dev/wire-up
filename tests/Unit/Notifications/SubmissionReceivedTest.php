@@ -177,3 +177,19 @@ it('falls back to the brand name in the mail for an svg logo', function (): void
         ->and($html)->not->toContain(asset('images/wire-up-mail-logo.png'))
         ->and($html)->toContain('Acme Studio');
 });
+
+it('shows a link the visitor typed as plain text, not a working link', function (): void {
+    $submission = Submission::factory()->create([
+        'name' => 'Ada [Log in](https://evil.example)',
+        'email' => 'ada@example.com',
+        'message' => '**Your site is suspended** [Restore it](https://evil.example) ![](https://evil.example/pixel.png)',
+        'metadata' => [],
+    ]);
+
+    $mail = new SubmissionReceived($submission)->toMail(new AnonymousNotifiable);
+    $html = (string) resolve(Markdown::class)->render($mail->markdown, $mail->viewData);
+
+    expect($html)->not->toContain('href="https://evil.example"')
+        ->not->toContain('src="https://evil.example/pixel.png"')
+        ->toContain('[Restore it](https://evil.example)');
+});

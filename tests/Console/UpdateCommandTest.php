@@ -71,7 +71,7 @@ it('updates to the latest release', function (): void {
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['npm', '--version']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['npm', 'ci']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === ['npm', 'run', 'build']);
-    Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize']);
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize', '--except=routes']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'queue:restart']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'wireup:update:complete', 'v1.0.0']);
     Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'up']);
@@ -106,7 +106,7 @@ it('clears the cached configuration before the new files arrive, so the admin ne
     expect($cached[0])->toStartWith(dirname((string) config('wireup.version_file')))
         ->and($presentAtCheckout)->toBe([]);
 
-    Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize']);
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize', '--except=routes']);
 });
 
 it('updates to a pinned tag', function (): void {
@@ -224,7 +224,7 @@ it('brings the site back up without touching the code when the database backup f
 
     Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'migrate', '--force']);
     Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === ['git', '-c', 'advice.detachedHead=false', 'checkout', '--force', 'abc1234def']);
-    Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize']);
+    Process::assertDidntRun(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'optimize', '--except=routes']);
     Process::assertRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'up']);
 
     $state = resolve(UpdateService::class)->state();
@@ -264,7 +264,7 @@ it('rolls back to the previous version when a migration fails', function (): voi
         ['git', '-c', 'advice.detachedHead=false', 'checkout', '--force', 'abc1234def'],
         ['composer', 'install', '--no-dev', '--no-interaction', '--prefer-dist'],
         [PHP_BINARY, 'artisan', 'wireup:backup:restore-database', preUpdateBackup('v1.0.0'), '--force'],
-        [PHP_BINARY, 'artisan', 'optimize'],
+        [PHP_BINARY, 'artisan', 'optimize', '--except=routes'],
         [PHP_BINARY, 'artisan', 'queue:restart'],
         [PHP_BINARY, 'artisan', 'up'],
     ]);
@@ -555,4 +555,62 @@ it('rolls back when the new version cannot be recorded, instead of offering the 
         ->assertExitCode(1);
 
     expect(resolve(UpdateService::class)->state())->toMatchArray(['status' => 'failed', 'step' => 'Record the new version', 'site_down' => false]);
+});
+
+it('rolls back when a step runs out of time instead of stopping half way', function (): void {
+    Process::fake([
+        '*composer*' => fn (): never => throw new RuntimeException('The process exceeded the timeout of 1200 seconds.'),
+        '*' => Process::result(),
+    ]);
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])
+        ->expectsOutputToContain('Rolling back')
+        ->assertExitCode(1);
+
+    expect(resolve(UpdateService::class)->state())->toMatchArray(['status' => 'failed', 'step' => 'Install PHP dependencies', 'site_down' => true]);
+});
+
+it('gives backing up and restoring the database long enough to finish', function (): void {
+    Process::fake(['*migrate*' => Process::result(exitCode: 1), '*' => Process::result()]);
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])->assertExitCode(1);
+
+    Process::assertRan(fn (PendingProcess $process): bool => in_array('wireup:backup', (array) $process->command, true) && $process->timeout === 2400);
+    Process::assertRan(fn (PendingProcess $process): bool => in_array('wireup:backup:restore-database', (array) $process->command, true) && $process->timeout === 2400);
+});
+
+it('takes over the lock from an update that was killed part way', function (): void {
+    $stale = Cache::lock('wireup:update:lock', 3600);
+    $stale->get();
+    Cache::put('wireup:update:lock-holder', ['pid' => 2_147_483_000, 'host' => gethostname()], 3600);
+
+    expect(resolve(UpdateService::class)->updateIsLocked())->toBeFalse()
+        ->and(Cache::has('wireup:update:lock-holder'))->toBeFalse();
+
+    Cache::lock('wireup:update:lock', 3600)->get();
+    Cache::put('wireup:update:lock-holder', ['pid' => getmypid(), 'host' => gethostname()], 3600);
+
+    expect(resolve(UpdateService::class)->updateIsLocked())->toBeTrue();
+
+    Cache::put('wireup:update:lock-holder', ['pid' => 2_147_483_000, 'host' => 'another-server'], 3600);
+
+    expect(resolve(UpdateService::class)->updateIsLocked())->toBeTrue();
+
+    Cache::lock('wireup:update:lock')->forceRelease();
+});
+
+it('stops before maintenance mode when GitHub cannot be reached to check the release files', function (): void {
+    Process::fake(['*rev-parse*' => Process::result(output: "abc1234def\n"), '*get-url*' => Process::result(output: ReleaseArchive::REMOTE), '*' => Process::result()]);
+    Http::fake(['*' => Http::failedConnection()]);
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+
+    $this->artisan(UpdateCommand::class, ['--tag' => 'v1.0.0'])
+        ->expectsOutputToContain('GitHub could not be reached')
+        ->assertExitCode(1);
+
+    Process::assertNotRan(fn (PendingProcess $process): bool => $process->command === [PHP_BINARY, 'artisan', 'down']);
+
+    expect(resolve(UpdateService::class)->state())->toMatchArray(['status' => 'failed', 'step' => 'Check the release files', 'site_down' => false]);
 });

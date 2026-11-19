@@ -15,7 +15,7 @@ final class BlockHtmlSanitizer
      */
     private const array FORBIDDEN_ELEMENTS = [
         'script', 'style', 'iframe', 'object', 'embed', 'form',
-        'link', 'meta', 'base', 'applet', 'frame', 'frameset', 'noscript',
+        'link', 'meta', 'base', 'applet', 'frame', 'frameset', 'noscript', 'template',
     ];
 
     /**
@@ -74,6 +74,11 @@ final class BlockHtmlSanitizer
         return self::withoutDangerousMarkup($value);
     }
 
+    public static function safeUrl(string $value): string
+    {
+        return self::isDangerousUrl($value) ? '' : $value;
+    }
+
     private static function sanitized(mixed $value): mixed
     {
         return match (true) {
@@ -85,7 +90,7 @@ final class BlockHtmlSanitizer
 
     private static function isDangerousUrl(string $value): bool
     {
-        $normalized = mb_strtolower((string) preg_replace(['/^[\x00-\x20]+/', '/[\t\n\r]/'], '', $value));
+        $normalized = mb_strtolower((string) preg_replace(['/^[\x00-\x20\p{Z}\x{FEFF}]+/u', '/[\t\n\r]/'], '', $value));
 
         if (preg_match('/^(?:javascript|vbscript|data):/', $normalized) !== 1) {
             return false;
@@ -149,12 +154,22 @@ final class BlockHtmlSanitizer
         $removed = false;
 
         foreach (iterator_to_array($element->attributes) as $attribute) {
-            if (str_starts_with(mb_strtolower($attribute->localName), 'on') || self::isDangerousUrl($attribute->value)) {
+            if (self::isScriptAttribute(mb_strtolower($attribute->name)) || self::isDangerousUrl($attribute->value)) {
                 $element->removeAttributeNode($attribute);
                 $removed = true;
             }
         }
 
         return $removed;
+    }
+
+    private static function isScriptAttribute(string $name): bool
+    {
+        return str_starts_with($name, 'on')
+            || str_starts_with($name, 'x-')
+            || str_starts_with($name, 'wire:')
+            || str_starts_with($name, '@')
+            || str_starts_with($name, ':')
+            || $name === 'shadowrootmode';
     }
 }

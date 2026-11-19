@@ -296,6 +296,10 @@ it('returns the trimmed site-wide custom css', function (): void {
 
     expect((new SettingsService)->customCss())->toBe('body { color: red; }');
 
+    Settings::set(['custom_css' => 'body { color: red; } </style><script>alert(1)</script>']);
+
+    expect((new SettingsService)->customCss())->toBe('body { color: red; } \\3C /style>\\3C script>alert(1)\\3C /script>');
+
     config()->set('site.custom_css');
 
     expect((new SettingsService)->customCss())->toBeEmpty();

@@ -200,9 +200,11 @@ trait HasContentEditor
 
             $rules["title.$locale"] = $isLive ? ['required', ...ContentRules::TITLE] : ['nullable', 'string', 'max:255'];
             $rules["description.$locale"] = ContentRules::DESCRIPTION;
+            $reserved = $basePath === '' ? [Rule::notIn(ContentRules::RESERVED_PAGE_SLUGS)] : [];
+
             $rules["slugs.$locale"] = $isLive
-                ? ['required', ...ContentRules::SLUG, $slugUnique]
-                : ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9-]+$/', $slugUnique];
+                ? ['required', ...ContentRules::SLUG, $slugUnique, ...$reserved]
+                : ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9-]+$/', $slugUnique, ...$reserved];
 
             $attributes["title.$locale"] = (string) __('title');
             $attributes["description.$locale"] = (string) __('description');
@@ -214,6 +216,7 @@ trait HasContentEditor
             'published_at.required' => $scheduleMessage,
             'published_at.after' => (string) __('The scheduled date must be in the future.'),
             'slugs.*.regex' => (string) __('Web addresses can only use lowercase letters, numbers and hyphens.'),
+            'slugs.*.not_in' => (string) __('The site already uses this web address. Choose a different one.'),
         ];
 
         return [$rules, $messages, $attributes];

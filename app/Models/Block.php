@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\BlockType;
+use App\Services\BlockHtmlSanitizer;
 use App\Services\ImageService;
 use App\Services\SettingsService;
 use Carbon\CarbonInterface;
@@ -288,7 +289,7 @@ final class Block extends Model
             'page' => str_starts_with($value, SettingsService::AUTH_LINK_PREFIX)
                 ? resolve(SettingsService::class)->resolveAuthLink($value)
                 : Page::query()->whereKey($value)->first()?->getUrl(),
-            default => $value,
+            default => BlockHtmlSanitizer::safeUrl($value) ?: null,
         };
     }
 

@@ -38,7 +38,22 @@ it('tells public addresses from the admin and system ones', function (string $pa
     ['/livewire-3f2a/update', false],
     ['/img/w=200/photo.jpg', false],
     ['/storage/media/file.pdf', false],
+    ['/login', false],
+    ['/account', false],
+    ['/cart', false],
+    ['/checkout/success', false],
+    ['/mcp', false],
+    ['/booking/manage/abc', false],
 ]);
+
+it('keeps the system addresses out of redirects under a language prefix too', function (): void {
+    Locale::query()->where('code', 'nl')->update(['active' => true]);
+    cache()->forget('site-locales');
+
+    expect(RedirectService::isPublicPath('/nl/login'))->toBeFalse()
+        ->and(RedirectService::isPublicPath('/nl/over-ons'))->toBeTrue()
+        ->and(RedirectService::isPublicPath('/nl'))->toBeTrue();
+});
 
 it('builds localized paths with the locale only outside the default language', function (): void {
     expect(RedirectService::localizedPath('en', 'guides', 'First-Steps'))->toBe('/guides/first-steps')

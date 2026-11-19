@@ -11,6 +11,7 @@ use App\Http\Controllers\StopImpersonationController;
 use App\Http\Middleware\CachePublicPages;
 use App\Http\Middleware\MarkdownForAgents;
 use App\Http\Middleware\RedirectHomepageSlug;
+use App\Services\PageCache;
 use App\Services\SeoService;
 use App\Services\SettingsService;
 use Illuminate\Http\Response;
@@ -59,6 +60,7 @@ Route::get('booking/feed/{token}.ics', BookingFeedController::class)
 Route::get('og/{type}/{id}/{locale}.png', [OgImageController::class, 'show'])
     ->where(['type' => 'page|record', 'id' => '[0-9]+', 'locale' => '[A-Za-z_-]+'])
     ->withoutMiddleware('web')
+    ->middleware('throttle:60,1')
     ->name('og.show');
 
 Route::get('robots.txt', function (): Response {
@@ -70,22 +72,22 @@ Route::get('robots.txt', function (): Response {
 })->name('robots');
 
 Route::get('sitemap.xml', fn (): Response => response(
-    SeoService::current()->sitemapXml(),
+    resolve(PageCache::class)->rememberForContent('seo:sitemap:'.app()->getLocale(), fn (): string => SeoService::current()->sitemapXml()),
     200,
     ['Content-Type' => 'application/xml; charset=UTF-8'],
-))->name('sitemap');
+))->middleware('throttle:30,1')->name('sitemap');
 
 Route::get('llms.txt', fn (): Response => response(
-    SeoService::current()->llmsTxt(),
+    resolve(PageCache::class)->rememberForContent('seo:llms', fn (): string => SeoService::current()->llmsTxt()),
     200,
     ['Content-Type' => 'text/plain; charset=UTF-8'],
-))->name('llms');
+))->middleware('throttle:30,1')->name('llms');
 
 Route::get('llms-full.txt', fn (): Response => response(
-    SeoService::current()->llmsFullTxt(),
+    resolve(PageCache::class)->rememberForContent('seo:llms-full', fn (): string => SeoService::current()->llmsFullTxt()),
     200,
     ['Content-Type' => 'text/plain; charset=UTF-8'],
-))->name('llms-full');
+))->middleware('throttle:30,1')->name('llms-full');
 
 Route::group(['prefix' => resolve('localization')->setLocale()], function (): void {
     Route::livewire('{recordType}/{slug}', 'pages::record')
@@ -94,7 +96,7 @@ Route::group(['prefix' => resolve('localization')->setLocale()], function (): vo
         ->name('record');
 
     Route::livewire('{slug}', 'pages::page')
-        ->where('slug', '^(?!admin).*')
+        ->where('slug', '^(?!admin(?:/|$)).*')
         ->middleware([CachePublicPages::class, RedirectHomepageSlug::class, MarkdownForAgents::class])
         ->name('page');
 });

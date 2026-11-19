@@ -192,8 +192,9 @@ final readonly class RemoteAccess
             ListCategoriesTool::class => [['categories.view']],
             CreateCategoryTool::class => [['categories.create']],
             ListContentTypesTool::class, ListMediaTool::class, ImportMediaFromUrlTool::class, ListImportFilesTool::class,
-            UploadMediaTool::class, UpdateMediaTool::class, DeleteMediaTool::class, RenderPageTool::class,
+            UploadMediaTool::class, UpdateMediaTool::class, DeleteMediaTool::class,
             ReadWebpageTool::class, SearchPexelsTool::class, ImportPexelsMediaTool::class => [],
+            RenderPageTool::class => isset($arguments['path']) ? [] : $this->pageOrRecord($arguments['page'] ?? null, $arguments['record'] ?? null, PermissionAction::View),
             GetSettingsTool::class, GetMenusTool::class, GetInterfaceTranslationsTool::class, ListRedirectsTool::class => [['settings.view']],
             default => [['settings.edit']],
         };
@@ -204,6 +205,10 @@ final readonly class RemoteAccess
      */
     private function pageOrRecord(mixed $page, mixed $record, PermissionAction $action, bool $pages = true): array
     {
+        if (is_bool($page) || is_bool($record)) {
+            return [[]];
+        }
+
         if (is_numeric($record)) {
             return $this->recordType(Record::query()->with('recordType')->find((int) $record)?->recordType->key, $action);
         }

@@ -58,7 +58,17 @@ it('knows whether a release has prebuilt assets from its published checksum', fu
     'published' => [fn (): mixed => Http::response(str_repeat('a', 64)."  build.tar.gz\n"), true],
     'missing' => [fn (): mixed => Http::response('Not Found', 404), false],
     'not a checksum' => [fn (): mixed => Http::response('<html>'), false],
-    'unreachable' => [fn (): mixed => Http::failedConnection(), false],
+]);
+
+it('says GitHub could not be reached instead of treating the release as unpublished', function (Closure $response): void {
+    Process::fake(['*get-url*' => Process::result(output: ReleaseArchive::REMOTE)]);
+    Http::fake([ReleaseArchive::url('v1.0.0', 'build.tar.gz.sha256') => $response()]);
+
+    expect(fn (): bool => new ReleaseAssets()->published('v1.0.0'))->toThrow(RuntimeException::class, 'GitHub could not be reached')
+        ->and(new ReleaseAssets()->stillBuilding('v1.0.0', 'v0.9.0'))->toBeTrue();
+})->with([
+    'unreachable' => [fn (): mixed => Http::failedConnection()],
+    'a server error' => [fn (): mixed => Http::response('Bad gateway', 502)],
 ]);
 
 it('treats a release as still building only while the installed release has prebuilt assets', function (bool $tagPublished, bool $currentPublished, bool $stillBuilding): void {

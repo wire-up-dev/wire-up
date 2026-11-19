@@ -183,6 +183,7 @@ final class DatabaseDumper
             ->run([
                 'psql',
                 '--quiet',
+                '--single-transaction',
                 '--set=ON_ERROR_STOP=1',
                 '--file='.$path,
                 '--host='.($this->setting('host') ?: '127.0.0.1'),

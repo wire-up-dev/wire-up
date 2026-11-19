@@ -55,18 +55,23 @@ return new class extends Component
     {
         $this->authorize('settings.edit');
 
-        $directory = config()->string('wireup.transfer_path');
-        $name = SiteExporter::bundleName();
+        $path = config()->string('wireup.transfer_path').'/'.SiteExporter::bundleName();
 
-        $exporter->export($directory.'/'.$name, $this->withSecrets);
+        $exporter->export($path, $this->withSecrets && $this->maySeeSecrets());
 
         return response()->streamDownload(
-            function () use ($directory, $name): void {
-                echo (string) File::get($directory.'/'.$name);
+            function () use ($path): void {
+                echo (string) File::get($path);
+                File::delete($path);
             },
-            $name,
+            basename($path),
             ['Content-Type' => 'application/zip'],
         );
+    }
+
+    public function maySeeSecrets(): bool
+    {
+        return (bool) auth()->user()?->role?->bypass;
     }
 
     public function inspect(SiteImporter $importer): void
@@ -188,12 +193,14 @@ return new class extends Component
                     <flux:subheading>{{ __('Pages, records, media, menus and design in one file you can move to another install.') }}</flux:subheading>
                 </div>
 
-                <flux:switch
-                    wire:model.live="withSecrets"
-                    :label="__('Include API keys and mail credentials')"
-                    :description="__('Off by default — these usually differ per environment.')"
-                    align="left"
-                />
+                @if ($this->maySeeSecrets())
+                    <flux:switch
+                        wire:model.live="withSecrets"
+                        :label="__('Include API keys and mail credentials')"
+                        :description="__('Off by default — these usually differ per environment.')"
+                        align="left"
+                    />
+                @endif
 
                 <flux:button wire:click="export" variant="primary" icon="arrow-down-tray">
                     {{ __('Download bundle') }}</flux:button>

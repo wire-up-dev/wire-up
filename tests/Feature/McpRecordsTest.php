@@ -582,3 +582,31 @@ it('creates and switches content types that take bookings', function (): void {
     expect($type->refresh()->bookable)->toBeTrue()
         ->and(array_column($type->fields, 'key'))->toBe(['topic', 'duration_minutes', 'current_price', 'charge_when_booking', 'booking_location']);
 });
+
+it('keeps the field labels of other languages when an agent updates a content type', function (): void {
+    $type = mcpProductType();
+    $fields = $type->fields;
+    $fields[1]['label'] = ['en' => 'SKU', 'nl' => 'Artikelnummer'];
+    $type->update(['fields' => $fields]);
+
+    WireUpServer::tool(UpdateContentTypeTool::class, ['type' => 'product', 'fields' => [
+        ['key' => 'sku', 'type' => 'text', 'label' => 'Stock code'],
+    ]])->assertOk();
+
+    expect($type->refresh()->fieldByKey('sku')['label'])->toBe(['en' => 'Stock code', 'nl' => 'Artikelnummer']);
+});
+
+it('drops record values that do not fit their field', function (): void {
+    $type = mcpProductType();
+
+    WireUpServer::tool(CreateRecordTool::class, [
+        'type' => 'product',
+        'title' => 'Odd Item',
+        'data' => ['sku' => ['not', 'a', 'string'], 'size' => 'XXL'],
+    ])->assertOk();
+
+    $record = Record::query()->where('record_type_id', $type->id)->firstOrFail();
+
+    expect($record->data['sku'] ?? null)->toBeNull()
+        ->and($record->data['size'] ?? null)->toBeNull();
+});

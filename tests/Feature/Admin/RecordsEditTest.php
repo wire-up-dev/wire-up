@@ -593,3 +593,60 @@ it('asks for a service length in minutes with a min suffix', function (): void {
         ->assertSeeHtml('step="any"')
         ->assertDontSeeHtml('step="5"');
 });
+
+it('keeps a new record block under the same id across later saves', function (): void {
+    $type = typeWithFields();
+    $record = makeRecord($type);
+
+    $this->actingAsAdmin();
+
+    $component = Livewire::test('pages::admin.records-edit', ['recordType' => $type, 'record' => $record])
+        ->set('data.summary.en', 'a short summary')
+        ->call('addBlock', 'rich-text')
+        ->call('update')
+        ->assertHasNoErrors();
+
+    $id = (string) $record->blocks()->sole()->id;
+
+    $component->assertSet('openAfterSave', [$id])->call('update');
+
+    expect($record->blocks()->pluck('id')->map(fn (int $blockId): string => (string) $blockId)->all())->toBe([$id]);
+});
+
+it('does not save over a record that changed after it was opened', function (): void {
+    $type = typeWithFields();
+    $record = makeRecord($type);
+
+    $this->actingAsAdmin();
+
+    $component = Livewire::test('pages::admin.records-edit', ['recordType' => $type, 'record' => $record]);
+
+    $this->travel(2)->seconds();
+    $record->update(['title' => 'Renamed by the assistant']);
+
+    $component->set('title.en', 'Overwritten')
+        ->set('data.summary.en', 'a short summary')
+        ->call('update')
+        ->assertSet('changedElsewhere', true);
+
+    expect($record->refresh()->title)->toBe('Renamed by the assistant');
+});
+
+it('lets the owner save a product while its stock changes from sales', function (): void {
+    $type = typeWithFields();
+    $record = makeRecord($type);
+    $record->update(['stock' => 5]);
+
+    $this->actingAsAdmin();
+
+    $component = Livewire::test('pages::admin.records-edit', ['recordType' => $type, 'record' => $record]);
+
+    Record::query()->whereKey($record->id)->decrement('stock');
+
+    $component->set('title.en', 'Renamed Widget')
+        ->set('data.summary.en', 'a short summary')
+        ->call('update')
+        ->assertSet('changedElsewhere', false);
+
+    expect($record->refresh()->title)->toBe('Renamed Widget');
+});

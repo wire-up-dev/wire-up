@@ -78,3 +78,31 @@ it('records why the site could not come back up and leaves it in maintenance mod
         ->and($state['site_down'])->toBeTrue()
         ->and(Activity::query()->count())->toBe(0);
 });
+
+it('drops a route cache an older updater left behind, so language prefixes keep working', function (): void {
+    $routes = dirname((string) config('wireup.version_file')).'/routes-v7.php';
+    File::ensureDirectoryExists(dirname($routes));
+    File::put($routes, '<?php');
+    $_SERVER['APP_ROUTES_CACHE'] = $routes;
+    resolve(UpdateService::class)->writeCurrentVersion('v1.0.0');
+
+    try {
+        $this->artisan(CompleteUpdateCommand::class, ['tag' => 'v1.0.0'])->assertExitCode(0);
+    } finally {
+        unset($_SERVER['APP_ROUTES_CACHE']);
+    }
+
+    expect(File::exists($routes))->toBeFalse();
+});
+
+it('still reports a finished update when checking for the next one fails afterwards', function (): void {
+    Process::fake(['*ls-remote*' => fn (): never => throw new RuntimeException('git timed out')]);
+    $updates = resolve(UpdateService::class);
+    $updates->writeCurrentVersion('v1.0.0');
+    app()->maintenanceMode()->activate([]);
+
+    $this->artisan(CompleteUpdateCommand::class, ['tag' => 'v1.0.0'])->assertExitCode(0);
+
+    expect($updates->state()['status'])->toBe('finished')
+        ->and(app()->maintenanceMode()->active())->toBeFalse();
+});

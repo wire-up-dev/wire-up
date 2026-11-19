@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Enums\ActivityEvent;
+use App\Models\User;
 use App\Services\ActivityLog;
 use App\Services\SiteImporter;
 use App\Services\TransferService;
@@ -57,7 +58,7 @@ final class RunSiteImport implements ShouldBeUnique, ShouldQueue
 
         $transfers->markRunning($bundle, __('Replacing site content'));
 
-        $report = $importer->import($this->path, $this->ownerId);
+        $report = $importer->import($this->path, $this->ownerId, keepPrivateSettings: ! (User::query()->find($this->ownerId)?->role->bypass ?? false));
 
         $transfers->markFinished($bundle, $this->summary($report));
 

@@ -531,7 +531,7 @@ final class SettingsService
 
     public function customCss(): string
     {
-        return mb_trim((string) config('site.custom_css', ''));
+        return ThemeCss::forStyleTag(mb_trim((string) config('site.custom_css', '')));
     }
 
     public function headScripts(): string

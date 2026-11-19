@@ -183,7 +183,7 @@ composer install --no-dev
 php artisan wireup:backup:restore-database db-backup-<date>-before-vNEW.sqlite
 # releases before v0.8.0 have no prebuilt assets: run npm ci && npm run build instead
 rm -rf public/build && curl -fsSL https://github.com/wire-up-dev/wire-up/releases/download/vPREVIOUS/build.tar.gz | tar -xz -C public
-php artisan optimize && php artisan up
+php artisan optimize --except=routes && php artisan up
 ```
 
 `wireup:backup:restore-database` replaces the whole database with a `db-backup-*` file from `storage/app/backups` (`.sql` for MySQL and PostgreSQL, which it clears first, `.sqlite` for SQLite).
