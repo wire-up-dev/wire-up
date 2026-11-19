@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  ci:
+  tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -44,7 +44,7 @@ jobs:
         run: php artisan key:generate
 
       - name: Install Node Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Assets
         run: npm run build
@@ -70,6 +70,50 @@ jobs:
         timeout-minutes: 5
         run: npx playwright install-deps chromium
 
+      - name: Tests
+        run: composer test:unit
+
+      - name: Store Artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-screenshots
+          path: |
+            tests/Browser/Screenshots
+
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
+        with:
+          php-version: 8.5
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Add Flux license
+        run: composer config http-basic.composer.fluxui.dev "${{ secrets.FLUX_USERNAME }}" "${{ secrets.FLUX_LICENSE_KEY }}"
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy Environment File
+        run: cp .env.example .env
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
+      - name: Install Node Dependencies
+        run: npm ci
+
       - name: Rector Cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -86,15 +130,14 @@ jobs:
           restore-keys: ${{ runner.os }}-phpstan-
       - run: mkdir -p /tmp/phpstan
 
-      - name: Tests
-        run: composer test
+      - name: Type Coverage
+        run: composer test:type-coverage
 
-      - name: Store Artifacts
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: browser-screenshots
-          path: |
-            tests/Browser/Screenshots
+      - name: Lint
+        run: composer test:lint
+
+      - name: Static Analysis
+        run: composer test:types
 
   databases:
     runs-on: ubuntu-latest
