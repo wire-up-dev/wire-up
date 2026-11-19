@@ -181,6 +181,9 @@ jobs:
       - name: Tests on PHP 8.6
         run: php -d memory_limit=-1 vendor/bin/pest --parallel --exclude-testsuite=Browser --display-deprecations
 
+      - name: Check that a real install accepts PHP 8.6
+        run: composer check-platform-reqs --no-dev
+
   databases:
     runs-on: ubuntu-latest
 
