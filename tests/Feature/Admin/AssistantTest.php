@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Ai\Agents\SiteAssistant;
 use App\Enums\ContentStatus;
 use App\Enums\RevisionSource;
+use App\Mcp\Support\RemoteAccess;
 use App\Models\Activity;
 use App\Models\Media;
 use App\Models\Page;
@@ -19,6 +20,8 @@ use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Responses\Data\ToolCall;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
+
+mutates(RemoteAccess::class);
 
 beforeEach(function (): void {
     ob_start(fn (string $buffer): string => '');

@@ -8,6 +8,8 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
+mutates(PublicUrlGuard::class);
+
 it('pins the request to the addresses it checked', function (string $url, array $addresses, string $pin): void {
     PublicUrlGuard::resolveHostsUsing(fn (): array => $addresses);
 

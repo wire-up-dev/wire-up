@@ -6,6 +6,8 @@ use App\Enums\ContentStatus;
 use App\Models\Page;
 use App\Services\BlockHtmlSanitizer;
 
+mutates(BlockHtmlSanitizer::class);
+
 it('leaves content that carries no dangerous markup byte-identical', function (string $value): void {
     expect(BlockHtmlSanitizer::value($value))->toBe($value);
 })->with([

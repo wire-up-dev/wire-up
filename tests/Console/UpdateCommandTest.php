@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Tests\Support\ReleaseArchive;
 
+mutates(UpdateService::class);
+
 beforeEach(function (): void {
     $root = storage_path('framework/testing/wireup-'.Str::random(8));
 

@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
+mutates(UpdateService::class);
+
 beforeEach(function (): void {
     config()->set('wireup.version_file', storage_path('framework/testing/wireup-'.Str::random(8).'/version'));
 });

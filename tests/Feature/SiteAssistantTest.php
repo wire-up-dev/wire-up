@@ -12,6 +12,7 @@ use App\Enums\ContentStatus;
 use App\Integrations\IntegrationRegistry;
 use App\Mcp\Resources\BlockTypesResource;
 use App\Mcp\Servers\WireUpServer;
+use App\Mcp\Support\RemoteAccess;
 use App\Mcp\Tools\CreatePageTool;
 use App\Mcp\Tools\GetPageTool;
 use App\Mcp\Tools\PublishPageTool;
@@ -30,6 +31,8 @@ use Laravel\Mcp\Request as McpRequest;
 use Laravel\Mcp\Response as McpResponse;
 use Laravel\Mcp\Server\Resource;
 use Laravel\Mcp\Server\Tool;
+
+mutates(RemoteAccess::class);
 
 final class HiddenAssistantTool extends Tool implements HiddenFromAssistant
 {

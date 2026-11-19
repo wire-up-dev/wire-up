@@ -9,6 +9,8 @@ use App\Models\Booking;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 
+mutates(ClaimBookingTimeAction::class);
+
 beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-11-16 08:00', 'UTC'));
     openBookingHours(['booking_buffer' => 15]);

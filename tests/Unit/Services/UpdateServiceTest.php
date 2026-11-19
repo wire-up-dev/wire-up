@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Tests\Support\ReleaseArchive;
 
+mutates(UpdateService::class);
+
 beforeEach(function (): void {
     config()->set('wireup.version_file', storage_path('framework/testing/wireup-'.Str::random(8).'/version'));
 });

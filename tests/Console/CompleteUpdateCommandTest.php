@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
+mutates(UpdateService::class);
+
 beforeEach(function (): void {
     $root = storage_path('framework/testing/wireup-'.Str::random(8));
 

@@ -13,6 +13,8 @@ use App\Services\BookingService;
 use App\Services\RecordFieldText;
 use Carbon\CarbonImmutable;
 
+mutates(BookingAvailability::class);
+
 beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-11-16 08:00', 'UTC'));
 });

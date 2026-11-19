@@ -6,6 +6,8 @@ use App\Models\BookingClaim;
 use App\Services\BookingAvailability;
 use Carbon\CarbonImmutable;
 
+mutates(BookingAvailability::class);
+
 /**
  * @param  array<string, mixed>  $overrides
  * @return array{timezone: string, hours: array<int, list<array{start: string, end: string}>>, interval: int, buffer: int, notice: int, daysAhead: int, closed: list<array{from: string, to: string}>}

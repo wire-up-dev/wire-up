@@ -6,6 +6,7 @@ use App\Enums\ActivityEvent;
 use App\Enums\RevisionSource;
 use App\Enums\TokenAccess;
 use App\Http\Middleware\AuthenticateMcpToken;
+use App\Mcp\Support\RemoteAccess;
 use App\Models\AccessToken;
 use App\Models\Activity;
 use App\Models\Page;
@@ -16,6 +17,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+
+mutates(RemoteAccess::class);
 
 beforeEach(function (): void {
     config()->set('site.remote_mcp_enabled', true);
