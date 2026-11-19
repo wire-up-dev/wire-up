@@ -21,11 +21,13 @@ use Livewire\Livewire;
 use Tests\Support\FakeOffsiteStorage;
 
 beforeEach(function (): void {
+    $this->defaultConnection = config()->string('database.default');
     config()->set('wireup.backup_path', storage_path('framework/testing/backup-screen-'.Str::random(8)));
     File::ensureDirectoryExists(config()->string('wireup.backup_path'));
 });
 
 afterEach(function (): void {
+    config()->set('database.default', $this->defaultConnection);
     File::deleteDirectory(config()->string('wireup.backup_path'));
 });
 
@@ -185,17 +187,18 @@ it('downloads a backup only for people who may change settings, and only real ba
 it('runs a queued backup and records the result', function (): void {
     $backups = new BackupService(new DatabaseDumper, new SiteBundle, fn (string $directory): float => 1.0e12);
     app()->instance(BackupService::class, $backups);
-    config()->set('database.default', 'mysql');
     Process::fake();
 
     $backups->markPending();
     new RunBackup()->failed(new RuntimeException('worker died'));
-    expect($backups->state())->toMatchArray(['status' => 'failed', 'output' => 'worker died']);
+    expect($backups->state())->toMatchArray(['status' => 'failed', 'output' => 'worker died'])
+        ->and(Activity::query()->where('event', ActivityEvent::BACKUP_FAILED)->sole()->properties)->toBe(['reason' => 'worker died']);
 
     $backups->clearState();
     new RunBackup()->handle($backups, resolve(OffsiteBackupService::class));
     expect($backups->state()['status'])->toBe('idle');
 
+    config()->set('database.default', 'mysql');
     $backups->markPending();
     expect(fn () => new RunBackup()->handle($backups, resolve(OffsiteBackupService::class)))->toThrow(RuntimeException::class, 'The database dump came out empty')
         ->and($backups->state()['status'])->toBe('running')

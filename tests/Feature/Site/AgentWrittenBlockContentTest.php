@@ -7,13 +7,15 @@ use App\Enums\ContentStatus;
 use App\Models\Block;
 use App\Models\Page;
 
-function pageWithBlock(string $slug, BlockType $type, array $content): Page
+function pageWithBlock(string $slug, BlockType $type, array $content, ?Page $page = null): Page
 {
-    $page = Page::factory()->create([
+    $page ??= Page::factory()->create([
         'status' => ContentStatus::PUBLISHED,
         'published_at' => now()->subDay(),
         'metadata' => ['published_locales' => ['en']],
     ]);
+    $page->slugs()->delete();
+    $page->blocks()->delete();
     $page->slugs()->create(['locale' => 'en', 'slug' => $slug]);
     $page->blocks()->create(['type' => $type, 'position' => 0, 'content' => $content]);
 
@@ -44,10 +46,11 @@ function itemFieldCombinations(): array
 
 it('renders every block type an agent left empty', function (): void {
     $failed = [];
+    $page = null;
 
     foreach (BlockType::cases() as $index => $type) {
         $slug = 'empty-block-'.$index;
-        pageWithBlock($slug, $type, []);
+        $page = pageWithBlock($slug, $type, [], $page);
 
         if ($this->get('/'.$slug)->getStatusCode() !== 200) {
             $failed[] = $type->value;
@@ -59,10 +62,11 @@ it('renders every block type an agent left empty', function (): void {
 
 it('renders every repeatable item an agent left without keys', function (): void {
     $failed = [];
+    $page = null;
 
     foreach (itemFieldCombinations() as $index => [$type, $listKey, $field]) {
         $slug = 'keyless-item-'.$index;
-        pageWithBlock($slug, $type, [$listKey => [[]]]);
+        $page = pageWithBlock($slug, $type, [$listKey => [[]]], $page);
 
         if ($this->get('/'.$slug)->getStatusCode() !== 200) {
             $failed[] = $type->value.'.'.$listKey;
@@ -74,10 +78,11 @@ it('renders every repeatable item an agent left without keys', function (): void
 
 it('renders when an agent puts an array where an item field expects a string', function (): void {
     $failed = [];
+    $page = null;
 
     foreach (itemFieldCombinations() as $index => [$type, $listKey, $field]) {
         $slug = 'array-field-'.$index;
-        pageWithBlock($slug, $type, [$listKey => [[$field => ['a', 'b']]]]);
+        $page = pageWithBlock($slug, $type, [$listKey => [[$field => ['a', 'b']]]], $page);
 
         if ($this->get('/'.$slug)->getStatusCode() !== 200) {
             $failed[] = $type->value.'.'.$listKey.'.'.$field;
@@ -90,12 +95,13 @@ it('renders when an agent puts an array where an item field expects a string', f
 it('renders when an agent puts an array where a top-level field expects a string', function (): void {
     $failed = [];
     $index = 0;
+    $page = null;
 
     foreach (BlockType::cases() as $type) {
         foreach (array_keys($type->defaultContent()) as $field) {
             foreach ([['a', 'b'], ['k' => 'v']] as $hostile) {
                 $slug = 'top-level-'.$index++;
-                pageWithBlock($slug, $type, [$field => $hostile]);
+                $page = pageWithBlock($slug, $type, [$field => $hostile], $page);
 
                 if ($this->get('/'.$slug)->getStatusCode() !== 200) {
                     $failed[] = $type->value.'.'.$field;
@@ -110,6 +116,7 @@ it('renders when an agent puts an array where a top-level field expects a string
 it('renders when an agent shapes a repeatable list as a map instead of a list', function (): void {
     $failed = [];
     $index = 0;
+    $page = null;
 
     foreach (BlockType::cases() as $type) {
         foreach ($type->defaultContent() as $listKey => $listValue) {
@@ -118,7 +125,7 @@ it('renders when an agent shapes a repeatable list as a map instead of a list', 
             }
 
             $slug = 'map-list-'.$index++;
-            pageWithBlock($slug, $type, [$listKey => ['first' => $listValue[0]]]);
+            $page = pageWithBlock($slug, $type, [$listKey => ['first' => $listValue[0]]], $page);
 
             if ($this->get('/'.$slug)->getStatusCode() !== 200) {
                 $failed[] = $type->value.'.'.$listKey;
