@@ -2,6 +2,10 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
+## Unreleased
+
+- The update-design MCP tool no longer refuses every change on a site with a custom colour theme that has no heading colour. It checks the palette only when the theme or colours change, and the heading colour stays optional, as it is on Settings → Design.
+
 ## v0.9.4 — 2026-11-20
 
 - Update now on Settings → Updates, and automatic updates, no longer get stuck on “The update has not reported progress” when an earlier update left its lock behind. This takes effect from the update after this one.

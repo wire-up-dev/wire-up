@@ -116,7 +116,7 @@ final class UpdateDesignTool extends Tool
         return [
             'theme' => $schema->string()->enum($options['themes'])->description('Color theme preset, or "custom" to use the colors argument.'),
             'theme_dark' => $schema->string()->enum($options['dark_modes'])->description('Whether visitors whose device prefers dark mode get the theme\'s dark palette: "on" or "none". The palette comes from the chosen theme, or from colors_dark when theme is "custom".'),
-            'colors' => $schema->object()->description('Custom palette keyed by slot (see options.color_slots in get-settings), hex values like "#1a2b3c". Requires theme "custom".'),
+            'colors' => $schema->object()->description('Custom palette keyed by slot (see options.color_slots in get-settings), hex values like "#1a2b3c". Requires theme "custom". Every slot needs a color except these optional ones: '.implode(', ', $this->optionalColorSlots()).'.'),
             'colors_dark' => $schema->object()->description('Custom dark-mode palette keyed by slot, hex values like "#1a2b3c". Requires theme "custom".'),
             'heading_font' => $schema->string()->enum($options['fonts'])->description('Heading font, or "custom" with heading_font_custom.'),
             'body_font' => $schema->string()->enum($options['fonts'])->description('Body font, or "custom" with body_font_custom.'),
@@ -162,6 +162,8 @@ final class UpdateDesignTool extends Tool
      */
     private function applyColors(array &$validated, array $slots): ?string
     {
+        $requiredSlots = array_values(array_diff($slots, $this->optionalColorSlots()));
+
         foreach (['colors', 'colors_dark'] as $colorsKey) {
             if (isset($validated[$colorsKey])) {
                 $unknown = array_diff(array_keys($validated[$colorsKey]), $slots);
@@ -176,19 +178,32 @@ final class UpdateDesignTool extends Tool
 
             $theme = $validated['theme'] ?? SiteSettings::design()['theme'];
 
-            if ($theme === 'custom' && ($colorsKey === 'colors' || isset($validated[$colorsKey]))) {
+            $paletteIsChanging = isset($validated[$colorsKey]) || ($colorsKey === 'colors' && isset($validated['theme']));
+
+            if ($theme === 'custom' && $paletteIsChanging) {
                 $colors = $validated[$colorsKey] ?? (is_array(config("site.$colorsKey")) ? config("site.$colorsKey") : []);
-                $missing = array_diff($slots, array_keys($colors));
+                $missing = array_diff($requiredSlots, array_keys($colors));
 
                 if ($missing !== []) {
                     $label = $colorsKey === 'colors' ? 'custom theme' : 'custom dark theme';
 
-                    return "The $label needs a color for every slot. Missing: ".implode(', ', $missing).'.';
+                    return "The $label needs a color for every required slot. Missing: ".implode(', ', $missing).'.';
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function optionalColorSlots(): array
+    {
+        return array_keys(array_filter(
+            config()->array('theme.slots'),
+            fn (mixed $slot): bool => is_array($slot) && ($slot['optional'] ?? false) === true,
+        ));
     }
 
     /**

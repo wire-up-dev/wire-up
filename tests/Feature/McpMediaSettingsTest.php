@@ -330,7 +330,7 @@ it('rejects incomplete or unknown custom colors', function (): void {
 
     WireUpServer::tool(UpdateDesignTool::class, ['theme' => 'custom', 'colors' => [$slots[0] => '#112233']])
         ->assertHasErrors()
-        ->assertSee('needs a color for every slot');
+        ->assertSee('needs a color for every required slot');
 
     WireUpServer::tool(UpdateDesignTool::class, ['colors' => ['sparkle' => '#112233']])
         ->assertHasErrors()
@@ -339,6 +339,28 @@ it('rejects incomplete or unknown custom colors', function (): void {
     WireUpServer::tool(UpdateDesignTool::class, ['colors' => [$slots[0] => 'blue']])
         ->assertHasErrors()
         ->assertSee('6-digit hex');
+});
+
+it('accepts a custom palette without the optional slots', function (): void {
+    $optional = array_keys(array_filter(config()->array('theme.slots'), fn (array $slot): bool => $slot['optional'] ?? false));
+    $colors = array_fill_keys(array_diff(array_keys(config()->array('theme.slots')), $optional), '#112233');
+
+    expect($optional)->not->toBeEmpty();
+
+    WireUpServer::tool(UpdateDesignTool::class, ['theme' => 'custom', 'colors' => $colors])->assertOk();
+
+    expect(Settings::get('colors'))->toEqual($colors);
+});
+
+it('changes other design settings on a custom theme whose palette lacks an optional slot', function (): void {
+    $optional = array_keys(array_filter(config()->array('theme.slots'), fn (array $slot): bool => $slot['optional'] ?? false));
+    $colors = array_fill_keys(array_diff(array_keys(config()->array('theme.slots')), $optional), '#112233');
+    Settings::set(['theme' => 'custom', 'colors' => $colors]);
+
+    WireUpServer::tool(UpdateDesignTool::class, ['footer_credit' => 'Website by Jane Doe'])->assertOk();
+
+    expect(Settings::get('footer_credit'))->toBe('Website by Jane Doe')
+        ->and(Settings::get('colors'))->toEqual($colors);
 });
 
 it('turns dark mode on and reports it', function (): void {
