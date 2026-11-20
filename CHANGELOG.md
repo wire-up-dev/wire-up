@@ -2,6 +2,10 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
+## Unreleased
+
+- Clicking Update now on Settings → Updates shows the progress straight away again. In v0.9.1 the box only appeared after reloading the page.
+
 ## v0.9.1 — 2026-11-20
 
 - A site with no contact or newsletter form no longer shows the Inbox in the menu and search, or the message cards on the dashboard. They come back once a page has a form, and stay while the Inbox holds messages.

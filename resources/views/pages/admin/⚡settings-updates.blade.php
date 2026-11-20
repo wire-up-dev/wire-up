@@ -189,7 +189,7 @@ return new class extends Component
                 </div>
             </div>
 
-            @island(name: 'update-progress')
+            @island(name: 'update-progress', always: true)
                 @php($progress = $this->state())
 
                 @if (in_array($progress['status'], ['pending', 'running'], true))

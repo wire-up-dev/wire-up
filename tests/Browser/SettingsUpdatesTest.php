@@ -6,6 +6,7 @@ use App\Services\SettingsNavigation;
 use App\Services\UpdateService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
 it('shows a note instead of an error box when the admin stops answering during an update', function (): void {
@@ -82,6 +83,21 @@ it('shows the first lines of long release notes so Update now stays in view', fu
     $page->click('Show all changes')
         ->assertSee('Show less')
         ->assertScript("(() => { const notes = document.querySelector('[data-release-notes]'); return notes.scrollHeight <= notes.clientHeight + 1; })()", true)
+        ->assertNoJavaScriptErrors();
+
+    File::deleteDirectory($root);
+});
+
+it('shows the progress as soon as the update is started', function (): void {
+    Queue::fake();
+    $root = offerReleaseWithNotes(['One small fix.']);
+    $this->actingAsAdmin();
+
+    visit(route('admin.settings-updates'))
+        ->click('Update now')
+        ->click('button[wire\\:click="startUpdate"]')
+        ->assertSee('Waiting for the scheduler to start the update.')
+        ->assertDontSee('One small fix.')
         ->assertNoJavaScriptErrors();
 
     File::deleteDirectory($root);
