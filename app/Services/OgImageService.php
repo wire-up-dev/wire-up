@@ -94,7 +94,7 @@ final readonly class OgImageService
         try {
             return $this->screenshot->capture('file://'.$source, '1200,630');
         } catch (Throwable $exception) {
-            report($exception);
+            report_unless($exception->getCode() === PageScreenshot::BROWSER_MISSING, $exception);
 
             return null;
         } finally {

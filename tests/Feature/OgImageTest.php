@@ -13,6 +13,7 @@ use App\Models\Settings;
 use App\Services\OgImageService;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
@@ -156,6 +157,27 @@ it('falls back to the site default when no browser can make a card', function ()
     expect(resolve(OgImageService::class)->generate($page, 'en'))->toBeFalse();
 
     $this->get('/no-browser')->assertOk()->assertDontSee('/og/page/', false)->assertSee('fallback.jpg', false);
+});
+
+it('logs nothing when the server has no headless browser', function (string $output): void {
+    Exceptions::fake();
+    Process::fake(['*' => Process::result(output: '', errorOutput: $output, exitCode: 1)]);
+
+    expect(resolve(OgImageService::class)->generate(sharedPage('quiet'), 'en'))->toBeFalse();
+
+    Exceptions::assertNothingReported();
+})->with([
+    'browser not installed' => ["Executable doesn't exist at /home/wireup/.cache/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell"],
+    'playwright not installed' => ['sh: npx: command not found'],
+]);
+
+it('still logs a card that fails for another reason', function (): void {
+    Exceptions::fake();
+    Process::fake(['*' => Process::result(output: '', errorOutput: 'Target page, context or browser has been closed', exitCode: 1)]);
+
+    expect(resolve(OgImageService::class)->generate(sharedPage('broken'), 'en'))->toBeFalse();
+
+    Exceptions::assertReported(fn (RuntimeException $exception): bool => str_contains($exception->getMessage(), 'Target page, context or browser has been closed'));
 });
 
 it('never puts the generated card in the media library', function (): void {

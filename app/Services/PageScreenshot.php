@@ -11,6 +11,8 @@ use RuntimeException;
 
 final readonly class PageScreenshot
 {
+    public const int BROWSER_MISSING = 1;
+
     private const array VIEWPORTS = [
         'desktop' => '1280,900',
         'tablet' => '834,1112',
@@ -40,7 +42,7 @@ final readonly class PageScreenshot
         if (! $result->successful()) {
             File::delete($file);
 
-            throw new RuntimeException($this->explain(mb_trim($result->output()."\n".$result->errorOutput())));
+            throw $this->failure(mb_trim($result->output()."\n".$result->errorOutput()));
         }
 
         throw_unless(is_file($file), RuntimeException::class, 'The browser ran but produced no image. Check that the URL is reachable from the server.');
@@ -61,16 +63,16 @@ final readonly class PageScreenshot
         return self::VIEWPORTS[$viewport] ?? self::VIEWPORTS['desktop'];
     }
 
-    private function explain(string $output): string
+    private function failure(string $output): RuntimeException
     {
         if (str_contains($output, 'Executable doesn\'t exist') || str_contains($output, 'playwright install')) {
-            return 'The headless browser is not installed on this server. Run "npx playwright install chromium" once, then try again.';
+            return new RuntimeException('The headless browser is not installed on this server. Run "npx playwright install chromium" once, then try again.', self::BROWSER_MISSING);
         }
 
         if (str_contains($output, 'not found') || str_contains($output, 'ENOENT')) {
-            return 'Playwright is not available on this server. Run "npm ci" and "npx playwright install chromium", then try again.';
+            return new RuntimeException('Playwright is not available on this server. Run "npm ci" and "npx playwright install chromium", then try again.', self::BROWSER_MISSING);
         }
 
-        return 'The screenshot failed: '.Str::limit($output, 300);
+        return new RuntimeException('The screenshot failed: '.Str::limit($output, 300));
     }
 }

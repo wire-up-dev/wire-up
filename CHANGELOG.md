@@ -2,6 +2,10 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
+## Unreleased
+
+- Saving a page on a server without a headless browser no longer logs an error each time. Links keep using the page's own share image or the site's default one.
+
 ## v0.9.0 — 2026-11-19
 
 - Bookings for people who sell their time, such as coaches. Turn on "Take bookings for these records" for a content type on Settings → Content Types and each record becomes a service with a length, price and place. A new Booking block lets visitors pick a service, a day and a free time in their own time zone, then book it. If Stripe is connected and the service charges when booking, they pay first. Settings → Availability holds your weekly hours, breaks, notice, closed days and a private calendar link for Google, Apple or Outlook, and no times are offered until you save it once. Visitors get a confirmation with a calendar file and a reminder, can cancel or move the booking themselves up to a cutoff, and members see their upcoming bookings on their account page. One email address can make at most three free bookings an hour, and one internet connection at most ten.
