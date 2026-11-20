@@ -294,6 +294,39 @@ it('persists header transparent, sticky, and footer transparent', function (): v
         ->and(Settings::get('footer_transparent'))->toBeTrue();
 });
 
+it('hydrates and saves the footer credit', function (): void {
+    Settings::set(['footer_credit' => 'Website by Jane Doe', 'footer_credit_url' => 'https://jane.example']);
+
+    $this->actingAsAdmin();
+
+    Livewire::test('pages::admin.settings-design')
+        ->assertSet('footer_credit', 'Website by Jane Doe')
+        ->assertSet('footer_credit_url', 'https://jane.example')
+        ->set('footer_credit', '  Website by Raz Iacob  ')
+        ->set('footer_credit_url', 'https://raziacob.com')
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect(Settings::get('footer_credit'))->toBe('Website by Raz Iacob')
+        ->and(Settings::get('footer_credit_url'))->toBe('https://raziacob.com');
+});
+
+it('needs a web address for the credit link and text to go with it', function (): void {
+    $this->actingAsAdmin();
+
+    Livewire::test('pages::admin.settings-design')
+        ->set('footer_credit', 'Website by Raz Iacob')
+        ->set('footer_credit_url', 'javascript:alert(1)')
+        ->call('update')
+        ->assertHasErrors(['footer_credit_url' => 'url']);
+
+    Livewire::test('pages::admin.settings-design')
+        ->set('footer_credit', '')
+        ->set('footer_credit_url', 'https://raziacob.com')
+        ->call('update')
+        ->assertHasErrors(['footer_credit' => 'required_with']);
+});
+
 it('validates header and footer layout are known keys', function (): void {
     $this->actingAsAdmin();
 

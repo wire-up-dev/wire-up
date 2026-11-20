@@ -71,6 +71,8 @@ final readonly class SiteSettings
             'header_transparent' => (bool) ($meta['header_transparent'] ?? false),
             'header_sticky' => (bool) ($meta['header_sticky'] ?? false),
             'footer_transparent' => (bool) ($meta['footer_transparent'] ?? false),
+            'footer_credit' => is_string($meta['footer_credit'] ?? null) ? $meta['footer_credit'] : '',
+            'footer_credit_url' => is_string($meta['footer_credit_url'] ?? null) ? $meta['footer_credit_url'] : '',
             'custom_css' => is_string($meta['custom_css'] ?? null) ? $meta['custom_css'] : '',
             'logo_header' => data_get($meta, 'logo_header.id'),
             'logo_footer' => data_get($meta, 'logo_footer.id'),

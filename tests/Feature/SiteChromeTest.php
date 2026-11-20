@@ -172,6 +172,41 @@ it('reflects the selected layout variants and sticky header', function (): void 
         ->assertSee('sticky top-0', false);
 });
 
+it('links the footer credit next to the Wire Up credit in every footer layout', function (string $layout): void {
+    setSiteMetadata([
+        'footer_layout' => $layout,
+        'footer_credit' => 'Website by Jane Doe',
+        'footer_credit_url' => 'https://jane.example',
+    ]);
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSeeInOrder(['href="https://jane.example"', 'Website by Jane Doe', 'Made with Wire Up'], false);
+})->with(['simple', 'centered', 'columns', 'minimal']);
+
+it('shows the footer credit as plain text without a link', function (): void {
+    setSiteMetadata(['footer_layout' => 'columns', 'footer_credit' => 'Website by Jane Doe']);
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('<span data-footer-credit >Website by Jane Doe</span>', false);
+});
+
+it('drops a footer credit link that is not a web address', function (): void {
+    setSiteMetadata(['footer_credit' => 'Website by Jane Doe', 'footer_credit_url' => 'javascript:alert(1)']);
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('Website by Jane Doe')
+        ->assertDontSee('javascript:alert(1)', false);
+});
+
+it('leaves the footer credit out until one is set', function (): void {
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertDontSee('data-footer-credit', false);
+});
+
 it('overlays a transparent header', function (): void {
     setSiteMetadata([
         'header_layout' => 'simple',

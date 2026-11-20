@@ -43,6 +43,12 @@ return new class extends Component
     #[Locked]
     public string $consentLink = '';
 
+    #[Locked]
+    public string $credit = '';
+
+    #[Locked]
+    public string $creditUrl = '';
+
     public function mount(): void
     {
         $service = SettingsService::current();
@@ -66,6 +72,11 @@ return new class extends Component
         if ($service->cookieConsentEnabled()) {
             $this->consentLink = $service->cookieConsentText('link') ?: __('Cookie settings');
         }
+
+        $credit = config('site.footer_credit');
+        $creditUrl = config('site.footer_credit_url');
+        $this->credit = is_string($credit) ? mb_trim($credit) : '';
+        $this->creditUrl = is_string($creditUrl) && preg_match('#^https?://#i', mb_trim($creditUrl)) === 1 ? mb_trim($creditUrl) : '';
     }
 };
 ?>
@@ -88,6 +99,10 @@ return new class extends Component
                 <x-site.social :links="$social" :variant="$socialVariant" class="mt-4 justify-center" />
                 <div class="mt-6 border-t border-current/10 pt-4 text-[length:calc(var(--wire-body-size)*0.75)] opacity-70">
                     &copy; {{ $year }} {{ $brand }} &nbsp;|&nbsp;
+                    @if ($credit !== '')
+                        <x-site.footer-credit :text="$credit" :url="$creditUrl" />
+                        &nbsp;|&nbsp;
+                    @endif
                     <a
                         href="https://wire-up.dev"
                         target="_blank"
@@ -139,9 +154,12 @@ return new class extends Component
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-4 border-t border-current/10 py-4 text-[length:calc(var(--wire-body-size)*0.75)] opacity-70">
                     <span>&copy; {{ $year }} {{ $brand }}. {{ __('All Rights Reserved') }}</span>
-                    <span @if ($consentLink !== '') class="flex flex-wrap items-center gap-4" @endif>
+                    <span @if ($consentLink !== '' || $credit !== '') class="flex flex-wrap items-center gap-4" @endif>
                         @if ($consentLink !== '')
                             <x-site.cookie-settings-link :label="$consentLink" />
+                        @endif
+                        @if ($credit !== '')
+                            <x-site.footer-credit :text="$credit" :url="$creditUrl" />
                         @endif
                         <a
                             href="https://wire-up.dev"
@@ -156,6 +174,10 @@ return new class extends Component
         @case ('minimal')
             <div class="mx-auto max-w-(--wire-container) px-(--wire-gutter) py-6 text-center text-[length:calc(var(--wire-body-size)*0.75)] opacity-70">
                 &copy; {{ $year }} {{ $brand }} &nbsp;|&nbsp;
+                @if ($credit !== '')
+                    <x-site.footer-credit :text="$credit" :url="$creditUrl" />
+                    &nbsp;|&nbsp;
+                @endif
                 <a
                     href="https://wire-up.dev"
                     target="_blank"
@@ -179,9 +201,12 @@ return new class extends Component
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-4 border-t border-current/10 py-4 text-[calc(var(--wire-body-size)*0.85)] opacity-70">
                     <span>&copy; {{ $year }} {{ $brand }}. {{ __('All Rights Reserved') }}</span>
-                    <span @if ($consentLink !== '') class="flex flex-wrap items-center gap-4" @endif>
+                    <span @if ($consentLink !== '' || $credit !== '') class="flex flex-wrap items-center gap-4" @endif>
                         @if ($consentLink !== '')
                             <x-site.cookie-settings-link :label="$consentLink" />
+                        @endif
+                        @if ($credit !== '')
+                            <x-site.footer-credit :text="$credit" :url="$creditUrl" />
                         @endif
                         <a
                             href="https://wire-up.dev"

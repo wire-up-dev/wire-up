@@ -79,6 +79,10 @@ return new class extends Component
 
     public bool $footer_transparent = false;
 
+    public string $footer_credit = '';
+
+    public string $footer_credit_url = '';
+
     public string $auth_layout;
 
     public string $auth_image_side;
@@ -147,6 +151,8 @@ return new class extends Component
         $this->header_nav_hover = is_string($meta['header_nav_hover'] ?? null) ? $meta['header_nav_hover'] : config()->string('theme.default_header_nav_hover');
         $this->footer_layout = is_string($meta['footer_layout'] ?? null) ? $meta['footer_layout'] : config()->string('theme.default_footer_layout');
         $this->footer_transparent = (bool) ($meta['footer_transparent'] ?? false);
+        $this->footer_credit = is_string($meta['footer_credit'] ?? null) ? $meta['footer_credit'] : '';
+        $this->footer_credit_url = is_string($meta['footer_credit_url'] ?? null) ? $meta['footer_credit_url'] : '';
         $this->auth_layout = is_string($meta['auth_layout'] ?? null) ? $meta['auth_layout'] : config()->string('theme.default_auth_layout');
         $this->auth_image_side = ($meta['auth_image_side'] ?? null) === 'right' ? 'right' : 'left';
         $this->custom_css = is_string($meta['custom_css'] ?? null) ? $meta['custom_css'] : '';
@@ -192,6 +198,8 @@ return new class extends Component
             'header_nav_hover' => ['required', 'string', Rule::in(array_keys(config()->array('theme.nav_hover_states')))],
             'footer_layout' => ['required', 'string', Rule::in(array_keys(config()->array('theme.footer_layouts')))],
             'footer_transparent' => ['boolean'],
+            'footer_credit' => ['nullable', 'string', 'max:80', 'required_with:footer_credit_url'],
+            'footer_credit_url' => ['nullable', 'string', 'max:255', 'url:http,https'],
             'auth_layout' => ['required', 'string', Rule::in(array_keys(config()->array('theme.auth_layouts')))],
             'auth_image_side' => ['required', 'string', Rule::in(['left', 'right'])],
             'custom_css' => ['nullable', 'string', 'max:50000'],
@@ -218,12 +226,18 @@ return new class extends Component
             'body_font_custom.required_if' => __('Enter the Google font name for the body.'),
             'heading_font_custom.regex' => __('Use only letters, numbers and spaces for the font name.'),
             'body_font_custom.regex' => __('Use only letters, numbers and spaces for the font name.'),
+            'footer_credit.required_with' => __('Add the credit text to go with the link.'),
+            'footer_credit.max' => __('Keep the credit under 80 characters.'),
+            'footer_credit_url.url' => __('Enter a full web address that starts with https://.'),
+            'footer_credit_url.max' => __('Use a web address under 255 characters.'),
         ]);
 
         $metadata = Arr::only($validated, ['theme', 'theme_dark', 'heading_font', 'body_font', 'heading_font_custom', 'body_font_custom', 'heading_size', 'body_size', 'radius', 'border_width', 'button_radius', 'body_leading', 'list_indent', 'container', 'container_width', 'gutter', 'block_spacing', 'block_space_top', 'header_layout', 'header_height', 'header_logo_height', 'header_transparent', 'header_sticky', 'header_theme_toggle', 'header_logo_size', 'header_nav_size', 'header_nav_hover', 'footer_layout', 'footer_transparent', 'auth_layout', 'auth_image_side']);
         $metadata['heading_font_custom'] = mb_trim((string) ($validated['heading_font_custom'] ?? ''));
         $metadata['body_font_custom'] = mb_trim((string) ($validated['body_font_custom'] ?? ''));
         $metadata['custom_css'] = mb_trim((string) ($validated['custom_css'] ?? ''));
+        $metadata['footer_credit'] = mb_trim((string) ($validated['footer_credit'] ?? ''));
+        $metadata['footer_credit_url'] = mb_trim((string) ($validated['footer_credit_url'] ?? ''));
         $metadata['theme_dark'] = $this->theme_dark ? 'on' : 'none';
 
         if ($this->theme === 'custom') {
@@ -682,7 +696,9 @@ return new class extends Component
                         class="flex items-center justify-between border-t border-current/10 px-4 py-2.5 opacity-60"
                     >
                         <span>&copy; {{ now()->year }} {{ $brand }}, {{ __('All Rights Reserved') }}</span>
-                        <span>{{ __('Made with Wire Up') }}</span>
+                        <span class="flex gap-3"
+                            ><span x-show="$wire.footer_credit" x-text="$wire.footer_credit"></span
+                            ><span>{{ __('Made with Wire Up') }}</span></span>
                     </div>
                 </div>
                 <div
@@ -719,7 +735,10 @@ return new class extends Component
                         :style="`font-size:${copyrightSize}`"
                         class="border-t border-current/10 px-4 py-2.5 text-center opacity-60"
                     >
-                        &copy; {{ now()->year }} {{ $brand }} &nbsp;|&nbsp; {{ __('Made with Wire Up') }}
+                        &copy; {{ now()->year }} {{ $brand }} &nbsp;|&nbsp;
+                        <span x-show="$wire.footer_credit"
+                            ><span x-text="$wire.footer_credit"></span> &nbsp;|&nbsp; </span
+                        >{{ __('Made with Wire Up') }}
                     </div>
                 </div>
                 <div
@@ -767,7 +786,9 @@ return new class extends Component
                         class="flex items-center justify-between border-t border-current/10 px-4 py-2.5 opacity-60"
                     >
                         <span>&copy; {{ now()->year }} {{ $brand }}, {{ __('All Rights Reserved') }}</span>
-                        <span>{{ __('Made with Wire Up') }}</span>
+                        <span class="flex gap-3"
+                            ><span x-show="$wire.footer_credit" x-text="$wire.footer_credit"></span
+                            ><span>{{ __('Made with Wire Up') }}</span></span>
                     </div>
                 </div>
                 <div
@@ -781,7 +802,9 @@ return new class extends Component
                         fontSize: copyrightSize,
                     }"
                 >
-                    &copy; {{ now()->year }} {{ $brand }} &nbsp;|&nbsp; {{ __('Made with Wire Up') }}
+                    &copy; {{ now()->year }} {{ $brand }} &nbsp;|&nbsp;
+                    <span x-show="$wire.footer_credit"><span x-text="$wire.footer_credit"></span> &nbsp;|&nbsp; </span
+                    >{{ __('Made with Wire Up') }}
                 </div>
             </div>
         </div>
@@ -1160,6 +1183,22 @@ return new class extends Component
                             align="left"
                             label="{{ __('Transparent background') }}"
                             description="{{ __('Footer sits over the page content.') }}"
+                        />
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <flux:input
+                            wire:model="footer_credit"
+                            label="{{ __('Credit') }}"
+                            description="{{ __('Shown next to “Made with Wire Up”.') }}"
+                            placeholder="{{ __('Website by …') }}"
+                        />
+                        <flux:input
+                            type="url"
+                            wire:model="footer_credit_url"
+                            label="{{ __('Credit link') }}"
+                            description="{{ __('Optional.') }}"
+                            placeholder="https://"
                         />
                     </div>
                 </div>

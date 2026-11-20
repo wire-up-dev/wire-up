@@ -61,6 +61,8 @@ final class UpdateDesignTool extends Tool
                 'header_nav_hover' => ['sometimes', 'string', Rule::in($options['nav_hover_states'])],
                 'footer_layout' => ['sometimes', 'string', Rule::in($options['footer_layouts'])],
                 'footer_transparent' => ['sometimes', 'boolean'],
+                'footer_credit' => ['sometimes', 'nullable', 'string', 'max:80'],
+                'footer_credit_url' => ['sometimes', 'nullable', 'string', 'max:255', 'url:http,https'],
                 'custom_css' => ['sometimes', 'string', 'max:50000'],
                 'logo_header' => ['sometimes', 'integer'],
                 'logo_footer' => ['sometimes', 'integer'],
@@ -74,8 +76,15 @@ final class UpdateDesignTool extends Tool
                 'colors_dark.*.regex' => 'Colors must be 6-digit hex values like #1a2b3c.',
                 'heading_font_custom.regex' => 'Use only letters, numbers and spaces for the Google Font name.',
                 'body_font_custom.regex' => 'Use only letters, numbers and spaces for the Google Font name.',
+                'footer_credit_url.url' => 'footer_credit_url must be a full web address that starts with https://.',
             ],
         );
+
+        foreach (['footer_credit', 'footer_credit_url'] as $creditKey) {
+            if (array_key_exists($creditKey, $validated)) {
+                $validated[$creditKey] = mb_trim((string) $validated[$creditKey]);
+            }
+        }
 
         if ($validated === []) {
             return Response::error('Pass at least one design setting to change. Use get-settings for the current design and valid options.');
@@ -135,6 +144,8 @@ final class UpdateDesignTool extends Tool
             'header_nav_hover' => $schema->string()->enum($options['nav_hover_states'])->description('Navigation hover effect.'),
             'footer_layout' => $schema->string()->enum($options['footer_layouts'])->description('Footer layout variant.'),
             'footer_transparent' => $schema->boolean()->description('Render the footer without a background.'),
+            'footer_credit' => $schema->string()->description('A short credit shown in the footer next to "Made with Wire Up", such as "Website by Jane Doe". Pass an empty string to remove it.'),
+            'footer_credit_url' => $schema->string()->description('Optional link for footer_credit, a full https:// address. Without it the credit shows as plain text.'),
             'custom_css' => $schema->string()->description('Extra CSS appended to the public site. Target the markup Wire Up emits rather than classes in the content, which the admin editor strips: every block wrapper carries data-block="<block key>" plus id="<anchor>" when the block has an anchor, a record page root carries data-record="<content type key>", a block heading wrapper matches [class*="--wire-heading-size"], and body copy carries .wire-prose. Cards all carry .wire-card and each kind adds one of .wire-card--collection, --feature, --testimonial, --pricing, --team, --stat, --search, or --media for a record photo frame, so a rule for one kind of card no longer leaks to the others. Scope header and footer rules to [data-site-header] and [data-site-footer], never bare header/footer.'),
             'logo_header' => $schema->integer()->description('Media id of the header logo image.'),
             'logo_footer' => $schema->integer()->description('Media id of the footer logo image.'),

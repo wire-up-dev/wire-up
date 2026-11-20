@@ -2,6 +2,10 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
+## Unreleased
+
+- Settings → Design has a footer credit: a short line such as “Website by …”, with an optional link, shown next to “Made with Wire Up” in every footer layout. The update-design MCP tool can set it too.
+
 ## v0.9.2 — 2026-11-20
 
 - Clicking Update now on Settings → Updates shows the progress straight away again. In v0.9.1 the box only appeared after reloading the page.

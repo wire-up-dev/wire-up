@@ -285,6 +285,29 @@ it('updates design tokens and reports the new design', function (): void {
         ->and(Settings::get('header_sticky'))->toBeTrue();
 });
 
+it('sets, reports and clears the footer credit', function (): void {
+    WireUpServer::tool(UpdateDesignTool::class, [
+        'footer_credit' => ' Website by Raz Iacob ',
+        'footer_credit_url' => 'https://raziacob.com',
+    ])->assertOk()->assertSee('"footer_credit":"Website by Raz Iacob"');
+
+    expect(Settings::get('footer_credit'))->toBe('Website by Raz Iacob')
+        ->and(Settings::get('footer_credit_url'))->toBe('https://raziacob.com');
+
+    WireUpServer::tool(GetSettingsTool::class)->assertOk()->assertSee('"footer_credit_url":"https://raziacob.com"');
+
+    WireUpServer::tool(UpdateDesignTool::class, ['footer_credit' => '', 'footer_credit_url' => null])->assertOk();
+
+    expect(Settings::get('footer_credit'))->toBe('')
+        ->and(Settings::get('footer_credit_url'))->toBe('');
+});
+
+it('refuses a footer credit link that is not a web address', function (): void {
+    WireUpServer::tool(UpdateDesignTool::class, ['footer_credit_url' => 'javascript:alert(1)'])
+        ->assertHasErrors()
+        ->assertSee('must be a full web address');
+});
+
 it('requires at least one design setting', function (): void {
     WireUpServer::tool(UpdateDesignTool::class, [])
         ->assertHasErrors()
