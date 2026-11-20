@@ -115,9 +115,11 @@ return new class extends Component
         Flux::toast(__('The site is back online.'), variant: 'success');
     }
 
-    public function refreshState(): void
+    public function refreshState(UpdateService $updates): void
     {
-        //
+        if (! $updates->updating()) {
+            $this->redirectRoute('admin.settings-updates');
+        }
     }
 
     public function updatedAutoUpdate(): void
@@ -187,20 +189,26 @@ return new class extends Component
                 </div>
             </div>
 
-            @if (in_array($state['status'], ['pending', 'running'], true))
-                <div wire:poll.3s="refreshState">
-                    <flux:callout icon="arrow-path" variant="secondary">
-                        <flux:callout.heading>
-                            {{ __('Updating to :tag…', ['tag' => (string) $state['tag']]) }}</flux:callout.heading>
-                        <flux:callout.text>
-                            {{ $state['step'] ?? __('Waiting for the scheduler to start the update. This takes up to a minute.') }}</flux:callout.text>
-                        <flux:callout.text data-update-interrupted class="hidden">
-                            {{ __('The admin is switching to the new version, so this page may not refresh for a moment.') }}
-                            <flux:link href="{{ route('admin.settings-updates') }}">{{ __('Reload') }}</flux:link>
-                        </flux:callout.text>
-                    </flux:callout>
-                </div>
-            @elseif ($state['status'] === 'finished')
+            @island(name: 'update-progress')
+                @php($progress = $this->state())
+
+                @if (in_array($progress['status'], ['pending', 'running'], true))
+                    <div wire:poll.3s="refreshState">
+                        <flux:callout icon="arrow-path" variant="secondary">
+                            <flux:callout.heading>
+                                {{ __('Updating to :tag…', ['tag' => (string) $progress['tag']]) }}</flux:callout.heading>
+                            <flux:callout.text>
+                                {{ $progress['step'] ?? __('Waiting for the scheduler to start the update. This takes up to a minute.') }}</flux:callout.text>
+                            <flux:callout.text data-update-interrupted class="hidden">
+                                {{ __('The admin is switching to the new version, so this page may not refresh for a moment.') }}
+                                <flux:link href="{{ route('admin.settings-updates') }}">{{ __('Reload') }}</flux:link>
+                            </flux:callout.text>
+                        </flux:callout>
+                    </div>
+                @endif
+            @endisland
+
+            @if ($state['status'] === 'finished')
                 <flux:callout icon="check-circle" variant="success">
                     <flux:callout.heading>
                         {{ __('Updated to :tag.', ['tag' => (string) $state['tag']]) }}</flux:callout.heading>

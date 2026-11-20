@@ -268,6 +268,25 @@ it('shows the running step while an update is underway', function (): void {
         ->assertSeeHtml('wire:poll.3s');
 });
 
+it('keeps polling without reloading while the update runs', function (): void {
+    $this->actingAsAdmin();
+    resolve(UpdateService::class)->markRunning('v1.0.0', 'Run database migrations');
+
+    Livewire::test('pages::admin.settings-updates')
+        ->call('refreshState')
+        ->assertNoRedirect();
+});
+
+it('reloads the whole page once the update stops running', function (): void {
+    $this->actingAsAdmin();
+    resolve(UpdateService::class)->markRunning('v1.0.0', 'Run database migrations');
+    $component = Livewire::test('pages::admin.settings-updates');
+
+    resolve(UpdateService::class)->markFinished('v1.0.0');
+
+    $component->call('refreshState')->assertRedirect(route('admin.settings-updates'));
+});
+
 it('shows the outcome of a finished update', function (): void {
     $this->actingAsAdmin();
     resolve(UpdateService::class)->markFinished('v1.0.0');

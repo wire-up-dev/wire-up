@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Services\SettingsNavigation;
 use App\Services\UpdateService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -22,6 +23,37 @@ it('shows a note instead of an error box when the admin stops answering during a
         ->assertScript("document.querySelector('[data-update-interrupted]').classList.contains('hidden')", false)
         ->assertScript("document.getElementById('livewire-error') === null", true)
         ->assertSee('The admin is switching to the new version');
+});
+
+it('refreshes only the progress while an update runs, so settings the new version has not migrated yet are left alone', function (): void {
+    $this->actingAsAdmin();
+    resolve(UpdateService::class)->markRunning('v1.0.0', 'Install PHP dependencies');
+
+    $page = visit(route('admin.settings-updates'));
+
+    $page->assertSee('Install PHP dependencies');
+
+    app()->bind(SettingsNavigation::class, fn (): never => throw new RuntimeException('The new version is not migrated yet'));
+    resolve(UpdateService::class)->markRunning('v1.0.0', 'Run database migrations');
+
+    $page->assertSee('Run database migrations')
+        ->assertScript("document.querySelector('[data-update-interrupted]').classList.contains('hidden')", true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('reloads the page to show the result once the update finishes', function (): void {
+    $this->actingAsAdmin();
+    resolve(UpdateService::class)->markRunning('v1.0.0', 'Install PHP dependencies');
+
+    $page = visit(route('admin.settings-updates'));
+
+    $page->assertSee('Install PHP dependencies');
+
+    resolve(UpdateService::class)->markFinished('v1.0.0');
+
+    $page->assertSee('Updated to v1.0.0.')
+        ->assertDontSee('Install PHP dependencies')
+        ->assertNoJavaScriptErrors();
 });
 
 /**
