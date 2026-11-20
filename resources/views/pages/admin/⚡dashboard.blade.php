@@ -122,6 +122,12 @@ return new class extends Component
     }
 
     #[Computed]
+    public function showsInbox(): bool
+    {
+        return Submission::inboxInUse();
+    }
+
+    #[Computed]
     public function showsOrders(): bool
     {
         return resolve(StripeService::class)->configured() || Order::query()->exists();
@@ -387,7 +393,8 @@ return new class extends Component
     @endcan
 
     @island
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        @php($showsUnreadMessages = $this->showsInbox && auth()->user()?->can('inbox.view'))
+        <div @class(['grid gap-4 sm:grid-cols-2', 'xl:grid-cols-4' => $showsUnreadMessages, 'xl:grid-cols-3' => ! $showsUnreadMessages])>
             @php($media = $this->mediaStats())
             <flux:card class="flex items-center gap-4">
                 <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
@@ -402,7 +409,7 @@ return new class extends Component
                 </div>
             </flux:card>
 
-            @can('inbox.view')
+            @if ($showsUnreadMessages)
                 <a href="{{ route('admin.inbox-index') }}" wire:navigate class="block">
                     <flux:card class="flex h-full items-center gap-4 transition hover:shadow-md">
                         <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
@@ -417,7 +424,7 @@ return new class extends Component
                         </div>
                     </flux:card>
                 </a>
-            @endcan
+            @endif
 
             <flux:card class="flex items-center gap-4">
                 <div class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
@@ -573,56 +580,58 @@ return new class extends Component
         <div class="space-y-6">
             @island
                 @can('inbox.view')
-                    <flux:card class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <flux:heading size="lg">{{ __('Latest messages') }}</flux:heading>
-                            <flux:button
-                                size="sm"
-                                variant="ghost"
-                                inset
-                                :href="route('admin.inbox-index')"
-                                wire:navigate
-                            >{{ __('View all') }}</flux:button>
-                        </div>
-                        @if ($this->latestMessages->isEmpty())
-                            <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('No messages yet.') }}</flux:text>
-                        @else
-                            <div class="divide-y divide-zinc-100 dark:divide-white/5">
-                                @foreach ($this->latestMessages as $message)
-                                    <a
-                                        href="{{ route('admin.inbox-show', $message) }}"
-                                        wire:navigate
-                                        wire:key="msg-{{ $message->id }}"
-                                        class="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
-                                    >
-                                        <div class="min-w-0 flex-1">
-                                            <div class="flex items-center gap-1">
-                                                <flux:heading
+                    @if ($this->showsInbox)
+                        <flux:card class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <flux:heading size="lg">{{ __('Latest messages') }}</flux:heading>
+                                <flux:button
+                                    size="sm"
+                                    variant="ghost"
+                                    inset
+                                    :href="route('admin.inbox-index')"
+                                    wire:navigate
+                                >{{ __('View all') }}</flux:button>
+                            </div>
+                            @if ($this->latestMessages->isEmpty())
+                                <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('No messages yet.') }}</flux:text>
+                            @else
+                                <div class="divide-y divide-zinc-100 dark:divide-white/5">
+                                    @foreach ($this->latestMessages as $message)
+                                        <a
+                                            href="{{ route('admin.inbox-show', $message) }}"
+                                            wire:navigate
+                                            wire:key="msg-{{ $message->id }}"
+                                            class="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
+                                        >
+                                            <div class="min-w-0 flex-1">
+                                                <div class="flex items-center gap-1">
+                                                    <flux:heading
+                                                        size="sm"
+                                                        class="truncate"
+                                                    >{{ $message->name ?: ($message->email ?: __('Anonymous')) }}</flux:heading>
+                                                    <span
+                                                        @class([
+                                                            'shrink-0 rounded-full',
+                                                            'size-2 bg-sky-500 animate-pulse' => $message->read_at === null,
+                                                        ])
+                                                    ></span>
+                                                </div>
+                                                <flux:text
                                                     size="sm"
                                                     class="truncate"
-                                                >{{ $message->name ?: ($message->email ?: __('Anonymous')) }}</flux:heading>
-                                                <span
-                                                    @class([
-                                                        'shrink-0 rounded-full',
-                                                        'size-2 bg-sky-500 animate-pulse' => $message->read_at === null,
-                                                    ])
-                                                ></span>
+                                                >{{ $message->subject ?: \Illuminate\Support\Str::limit(strip_tags((string) $message->message), 40) }}</flux:text>
                                             </div>
                                             <flux:text
                                                 size="sm"
-                                                class="truncate"
-                                            >{{ $message->subject ?: \Illuminate\Support\Str::limit(strip_tags((string) $message->message), 40) }}</flux:text>
-                                        </div>
-                                        <flux:text
-                                            size="sm"
-                                            class="shrink-0"
-                                            variant="subtle"
-                                        >{{ $message->created_at->diffForHumans(short: true) }}</flux:text>
-                                    </a>
-                                @endforeach
-                            </div>
-                        @endif
-                    </flux:card>
+                                                class="shrink-0"
+                                                variant="subtle"
+                                            >{{ $message->created_at->diffForHumans(short: true) }}</flux:text>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </flux:card>
+                    @endif
                 @endcan
 
                 @can('bookings.view')
@@ -759,13 +768,15 @@ return new class extends Component
                         <flux:heading size="lg" class="tabular-nums">{{ number_format($new['pages']) }}</flux:heading>
                         <flux:subheading>{{ __('Pages') }}</flux:subheading>
                     </div>
-                    <div>
-                        <flux:heading
-                            size="lg"
-                            class="tabular-nums"
-                        >{{ number_format($new['messages']) }}</flux:heading>
-                        <flux:subheading>{{ __('Messages') }}</flux:subheading>
-                    </div>
+                    @if ($this->showsInbox)
+                        <div>
+                            <flux:heading
+                                size="lg"
+                                class="tabular-nums"
+                            >{{ number_format($new['messages']) }}</flux:heading>
+                            <flux:subheading>{{ __('Messages') }}</flux:subheading>
+                        </div>
+                    @endif
                     <div>
                         <flux:heading size="lg" class="tabular-nums">{{ number_format($new['users']) }}</flux:heading>
                         <flux:subheading>{{ __('Users') }}</flux:subheading>

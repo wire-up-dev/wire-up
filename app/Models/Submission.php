@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\BlockType;
 use Carbon\CarbonInterface;
 use Database\Factories\SubmissionFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -41,6 +42,11 @@ final class Submission extends Model
     public static function unreadCount(): int
     {
         return once(fn (): int => self::query()->unread()->count());
+    }
+
+    public static function inboxInUse(): bool
+    {
+        return once(fn (): bool => self::query()->exists() || Block::query()->whereIn('type', [BlockType::CONTACT_FORM, BlockType::NEWSLETTER])->exists());
     }
 
     /**

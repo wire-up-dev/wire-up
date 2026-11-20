@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Enums\ActivityEvent;
+use App\Enums\BlockType;
 use App\Enums\ContentStatus;
 use App\Models\Activity;
+use App\Models\Block;
 use App\Models\Page;
 use App\Models\Record;
 use App\Models\RecordType;
@@ -120,6 +122,28 @@ it('shows unread message count and latest messages', function (): void {
         ->assertSee('Ada Lovelace')
         ->assertSee('Unread messages');
 });
+
+it('leaves messages off the dashboard and the sidebar while the site has no form', function (): void {
+    Block::query()->where('type', BlockType::CONTACT_FORM)->delete();
+
+    $this->actingAsAdmin()->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertDontSee(route('admin.inbox-index'), false)
+        ->assertDontSee('Unread messages')
+        ->assertDontSee('Latest messages')
+        ->assertDontSee('Messages');
+});
+
+it('shows messages on the dashboard and the sidebar once a page has a form', function (BlockType $form): void {
+    Block::query()->where('type', BlockType::CONTACT_FORM)->delete();
+    Page::factory()->create()->blocks()->create(['type' => $form, 'position' => 0, 'content' => $form->defaultContent()]);
+
+    $this->actingAsAdmin()->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee(route('admin.inbox-index'), false)
+        ->assertSee('Unread messages')
+        ->assertSee('No messages yet.');
+})->with([BlockType::CONTACT_FORM, BlockType::NEWSLETTER]);
 
 it('lists users who are currently online', function (): void {
     User::factory()->create(['name' => 'Recently Active', 'last_seen_at' => now()->subMinutes(2)]);

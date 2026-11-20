@@ -20,15 +20,17 @@
             {{ __('Dashboard') }}</flux:sidebar.item>
         <livewire:admin.sidebar-analytics />
         @can('inbox.view')
-            @php($unreadSubmissions = \App\Models\Submission::unreadCount())
-            <flux:sidebar.item
-                icon="inbox"
-                :href="route('admin.inbox-index')"
-                :current="request()->routeIs('admin.inbox-*')"
-                :badge="$unreadSubmissions > 0 ? $unreadSubmissions : null"
-                wire:navigate.hover
-            >
-                {{ __('Inbox') }}</flux:sidebar.item>
+            @if (\App\Models\Submission::inboxInUse())
+                @php($unreadSubmissions = \App\Models\Submission::unreadCount())
+                <flux:sidebar.item
+                    icon="inbox"
+                    :href="route('admin.inbox-index')"
+                    :current="request()->routeIs('admin.inbox-*')"
+                    :badge="$unreadSubmissions > 0 ? $unreadSubmissions : null"
+                    wire:navigate.hover
+                >
+                    {{ __('Inbox') }}</flux:sidebar.item>
+            @endif
         @endcan
         @can('orders.view')
             @if (resolve(\App\Services\StripeService::class)->configured() || \App\Models\Order::hasAny())

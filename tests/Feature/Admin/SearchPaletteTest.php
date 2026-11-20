@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Enums\BlockType;
+use App\Models\Block;
 use App\Models\Booking;
 use App\Models\Category;
 use App\Models\Page;
 use App\Models\Record;
 use App\Models\RecordType;
 use App\Models\Role;
+use App\Models\Submission;
 use App\Models\User;
 use App\Services\BookingService;
 use Carbon\CarbonImmutable;
@@ -125,6 +128,16 @@ it('leaves bookings out until they are in use, and away from roles without acces
     Booking::factory()->create(['name' => 'Grace Hopper']);
 
     expect(array_column(palette(limitedTo(['pages.view']))->set('query', 'grace')->get('groups'), 'heading'))->not->toContain('Bookings');
+});
+
+it('leaves the inbox out until the site has a form or a message', function (): void {
+    Block::query()->where('type', BlockType::CONTACT_FORM)->delete();
+
+    expect(array_column(palette()->get('groups')[0]['items'], 'label'))->not->toContain('Inbox');
+
+    Submission::factory()->create();
+
+    expect(array_column(palette()->get('groups')[0]['items'], 'label'))->toContain('Inbox');
 });
 
 it('puts the palette and its shortcut in the admin header', function (): void {

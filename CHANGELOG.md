@@ -6,6 +6,7 @@ Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater sh
 
 - Saving a page on a server without a headless browser no longer logs an error each time. Links keep using the page's own share image or the site's default one.
 - While an update runs, Settings → Updates refreshes only its progress box, so watching it no longer logs an error when the new version adds to the database, and the page reloads by itself when the update finishes. This takes effect from the update after this one.
+- A site with no contact or newsletter form no longer shows the Inbox in the menu and search, or the message cards on the dashboard. They come back once a page has a form, and stay while the Inbox holds messages.
 
 ## v0.9.0 — 2026-11-19
 
