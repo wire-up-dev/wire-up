@@ -6,6 +6,7 @@ use App\Console\Commands\CheckForUpdatesCommand;
 use App\Jobs\RunSystemUpdate;
 use App\Models\Settings;
 use App\Services\UpdateService;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -79,6 +80,23 @@ it('queues an automatic update when enabled', function (): void {
     Queue::assertPushedOn('system', RunSystemUpdate::class, fn (RunSystemUpdate $job): bool => $job->tag === 'v1.0.0');
 
     expect(resolve(UpdateService::class)->state()['status'])->toBe('pending');
+});
+
+it('queues an automatic update even when an earlier update job left its lock behind', function (): void {
+    Queue::fake();
+    Process::fake([
+        '*ls-remote*' => Process::result(output: "aaa\trefs/tags/v1.0.0"),
+        '*get-url*' => Process::result(),
+        '*fetch*' => Process::result(),
+        '*show*' => Process::result(output: ''),
+    ]);
+    Settings::set(['auto_update' => true]);
+    resolve(UpdateService::class)->writeCurrentVersion('v0.9.0');
+    Cache::lock(UniqueLock::getKey(new RunSystemUpdate('v0.9.9')))->get();
+
+    $this->artisan(CheckForUpdatesCommand::class)->assertExitCode(0);
+
+    Queue::assertPushedOn('system', RunSystemUpdate::class, fn (RunSystemUpdate $job): bool => $job->tag === 'v1.0.0');
 });
 
 it('does not queue an automatic update while a manual update holds the lock', function (): void {

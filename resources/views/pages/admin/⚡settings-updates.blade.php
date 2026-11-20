@@ -85,8 +85,7 @@ return new class extends Component
             return;
         }
 
-        $updates->markPending($tag);
-        dispatch(new App\Jobs\RunSystemUpdate($tag));
+        $updates->queueUpdate($tag);
 
         Flux::modal('confirm-update')->close();
     }

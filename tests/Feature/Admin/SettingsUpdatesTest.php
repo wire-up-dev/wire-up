@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\Settings;
 use App\Models\User;
 use App\Services\UpdateService;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -144,6 +145,18 @@ it('queues the update from the admin', function (): void {
     Queue::assertPushedOn('system', RunSystemUpdate::class, fn (RunSystemUpdate $job): bool => $job->tag === 'v1.0.0');
 
     expect(resolve(UpdateService::class)->state()['status'])->toBe('pending');
+});
+
+it('queues the update even when an earlier update job left its lock behind', function (): void {
+    Queue::fake();
+    $this->actingAsAdmin();
+    seedAvailableUpdate();
+    Cache::lock(UniqueLock::getKey(new RunSystemUpdate('v0.9.9')))->get();
+
+    Livewire::test('pages::admin.settings-updates')
+        ->call('startUpdate');
+
+    Queue::assertPushedOn('system', RunSystemUpdate::class, fn (RunSystemUpdate $job): bool => $job->tag === 'v1.0.0');
 });
 
 it('does not queue an update when none is available', function (): void {

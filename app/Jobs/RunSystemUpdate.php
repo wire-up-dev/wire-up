@@ -41,6 +41,11 @@ final class RunSystemUpdate implements ShouldBeUnique, ShouldQueue
         return 'wireup-update';
     }
 
+    public function uniqueFor(): int
+    {
+        return self::WAIT_HOURS * 3600 + UpdateService::TIME_LIMIT + 600;
+    }
+
     public function handle(UpdateService $updates): void
     {
         $state = $updates->state();

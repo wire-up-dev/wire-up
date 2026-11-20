@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Jobs\RunSystemUpdate;
 use App\Services\UpdateService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -35,8 +34,7 @@ final class CheckForUpdatesCommand extends Command
             && $updates->updateAvailable()
             && in_array($updates->state()['status'], ['idle', 'finished'], true)
             && ! $updates->updateIsLocked()) {
-            $updates->markPending($latest);
-            dispatch(new RunSystemUpdate($latest));
+            $updates->queueUpdate($latest);
             $this->components->info("Auto-update to {$latest} queued.");
         }
 

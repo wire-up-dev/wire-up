@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
 mutates(UpdateService::class);
@@ -201,6 +202,25 @@ it('keeps an existing failure when the job fails afterwards', function (): void 
     new RunSystemUpdate('v1.0.0')->failed(new RuntimeException('kaboom'));
 
     expect($service->state()['output'])->toBe('original failure');
+});
+
+it('lets a leftover lock expire once no queued update could still be running', function (): void {
+    Queue::fake();
+
+    dispatch(new RunSystemUpdate('v1.0.0'));
+    dispatch(new RunSystemUpdate('v1.0.0'));
+
+    Queue::assertPushed(RunSystemUpdate::class, 1);
+
+    $this->travel(RunSystemUpdate::WAIT_HOURS)->hours();
+    dispatch(new RunSystemUpdate('v1.0.0'));
+
+    Queue::assertPushed(RunSystemUpdate::class, 1);
+
+    $this->travel(UpdateService::TIME_LIMIT + 601)->seconds();
+    dispatch(new RunSystemUpdate('v1.0.0'));
+
+    Queue::assertPushed(RunSystemUpdate::class, 2);
 });
 
 it('has conservative queue settings', function (): void {

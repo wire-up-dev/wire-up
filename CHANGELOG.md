@@ -2,6 +2,10 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
+## Unreleased
+
+- Update now on Settings → Updates, and automatic updates, no longer get stuck on “The update has not reported progress” when an earlier update left its lock behind. This takes effect from the update after this one.
+
 ## v0.9.3 — 2026-11-20
 
 - Settings → Design has a footer credit: a short line such as “Website by …”, with an optional link, shown next to “Made with Wire Up” in every footer layout. The update-design MCP tool can set it too.

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Jobs\RunSystemUpdate;
 use App\Notifications\SystemUpdateCompleted;
 use Carbon\CarbonImmutable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -274,6 +276,17 @@ final readonly class UpdateService
     public function markPending(string $tag): void
     {
         $this->writeState('pending', $tag);
+    }
+
+    public function queueUpdate(string $tag): void
+    {
+        $job = new RunSystemUpdate($tag);
+
+        new UniqueLock(Cache::store())->release($job);
+
+        $this->markPending($tag);
+
+        dispatch($job);
     }
 
     public function markWaiting(string $tag): void
