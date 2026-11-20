@@ -2,7 +2,7 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
-## Unreleased
+## v0.9.2 — 2026-11-20
 
 - Clicking Update now on Settings → Updates shows the progress straight away again. In v0.9.1 the box only appeared after reloading the page.
 
