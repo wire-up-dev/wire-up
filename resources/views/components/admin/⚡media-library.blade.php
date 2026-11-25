@@ -15,6 +15,7 @@ use App\Services\PexelsService;
 use App\Services\UploadLimit;
 use Flux\Flux;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -477,11 +478,27 @@ return new class extends Component
         return UploadLimit::cappedKilobytes(UploadLimit::VIDEO_MAX_KILOBYTES);
     }
 
+    public function maxUploadKilobytes(): int
+    {
+        return $this->allowsVideo() ? $this->maxVideoKilobytes() : $this->maxImageKilobytes();
+    }
+
+    public function rejectOversizedFile(string $filename, int $kilobytes): void
+    {
+        Flux::toast(variant: 'danger', heading: __('Upload Failed'),
+            text: __('File ":filename" failed to upload: :error', [
+                'filename' => $filename,
+                'error' => __('It is :size, and the limit is :limit.', [
+                    'size' => Number::fileSize($kilobytes * 1024, precision: 0),
+                    'limit' => Number::fileSize($this->maxUploadKilobytes() * 1024, precision: 0),
+                ]),
+            ]), duration: 10000);
+    }
+
     /** @param array<int, array<string, mixed>> $metadata */
     public function save(array $metadata, StoreMediaFileAction $action): void
     {
-        $allowsVideo = $this->type === MediaType::VIDEO || in_array(MediaType::VIDEO->value, $this->allowedTypes, true);
-        $maxKilobytes = UploadLimit::enforcedKilobytes($allowsVideo ? UploadLimit::VIDEO_MAX_KILOBYTES : UploadLimit::IMAGE_MAX_KILOBYTES);
+        $maxKilobytes = $this->maxUploadKilobytes();
 
         $acceptedTypes = match (true) {
             $this->type instanceof MediaType => [$this->type],
@@ -552,6 +569,11 @@ return new class extends Component
         mt_srand();
 
         return "style=\"top: {$top}px; z-index: {$index}; transform: rotate({$rotation}deg )\";\"";
+    }
+
+    private function allowsVideo(): bool
+    {
+        return $this->type === MediaType::VIDEO || in_array(MediaType::VIDEO->value, $this->allowedTypes, true);
     }
 
     /**
@@ -786,7 +808,7 @@ return new class extends Component
                     </div>
                 </div>
 
-                <div @class(['hidden' => $pexelsMode])>
+                <div @class(['hidden' => $pexelsMode]) data-max-upload-kilobytes="{{ $this->maxUploadKilobytes() }}">
                     @php($acceptsVideo = $type === MediaType::VIDEO || in_array(MediaType::VIDEO->value, $allowedTypes, true))
                     @php($imageLimit = Number::fileSize($this->maxImageKilobytes() * 1024, precision: 0))
                     @php($videoLimit = Number::fileSize($this->maxVideoKilobytes() * 1024, precision: 0))
@@ -1439,8 +1461,18 @@ return new class extends Component
     const uploadFiles = async (files) => {
         const media = [];
         const metadata = [];
+        const dropzone = this.el.querySelector('[data-flux-file-upload-dropzone]');
+        const maxBytes =
+            Number(this.el.querySelector('[data-max-upload-kilobytes]')?.dataset.maxUploadKilobytes ?? 0) * 1024;
+
+        dropzone?.setAttribute('data-loading', '');
 
         for (let i = 0; i < files.length; i++) {
+            if (maxBytes > 0 && files[i].size > maxBytes) {
+                await this.call('rejectOversizedFile', files[i].name, Math.ceil(files[i].size / 1024));
+                continue;
+            }
+
             let etag = await window.fileMd5(files[i]);
             let exists = await this.call('checkFileExists', etag);
             if (exists) {
@@ -1453,11 +1485,10 @@ return new class extends Component
         }
 
         if (media.length === 0) {
+            dropzone?.removeAttribute('data-loading');
+
             return;
         }
-
-        const dropzone = this.el.querySelector('[data-flux-file-upload-dropzone]');
-        dropzone?.setAttribute('data-loading', '');
 
         let totalProgress = 0;
         let fileCount = media.length;
@@ -1465,12 +1496,14 @@ return new class extends Component
         this.uploadMultiple(
             'files',
             media,
-            (uploadedFilename) => {
+            async (uploadedFilename) => {
                 dropzone?.removeAttribute('data-loading');
-                this.call('save', metadata);
+                await this.call('save', metadata);
+                updateProgress(0);
             },
             (error) => {
                 dropzone?.removeAttribute('data-loading');
+                updateProgress(0);
                 console.log('Upload error', error);
             },
             (event) => {

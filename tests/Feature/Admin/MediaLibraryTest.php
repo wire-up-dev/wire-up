@@ -529,6 +529,26 @@ it('rejects uploads larger than the configured override limit', function (): voi
     $this->assertDatabaseMissing('media', ['mime_type' => 'video/mp4']);
 });
 
+it('tells the browser the upload limit that applies to the library', function (): void {
+    $imageLimit = UploadLimit::cappedKilobytes(UploadLimit::IMAGE_MAX_KILOBYTES);
+    $videoLimit = UploadLimit::cappedKilobytes(UploadLimit::VIDEO_MAX_KILOBYTES);
+
+    Livewire::test('admin.media-library')
+        ->dispatch('select-media', target: 'cover', type: MediaType::IMAGE->value, max: 1, media: null)
+        ->assertSeeHtml('data-max-upload-kilobytes="'.$imageLimit.'"')
+        ->dispatch('select-media', target: 'gallery', type: 'image,video', max: 10, media: null)
+        ->assertSeeHtml('data-max-upload-kilobytes="'.$videoLimit.'"');
+});
+
+it('explains why an oversized file was not uploaded', function (): void {
+    $limit = Number::fileSize(UploadLimit::cappedKilobytes(UploadLimit::IMAGE_MAX_KILOBYTES) * 1024, precision: 0);
+
+    Livewire::test('admin.media-library')
+        ->dispatch('select-media', target: 'cover', type: MediaType::IMAGE->value, max: 1, media: null)
+        ->call('rejectOversizedFile', 'IMG_4021.png', 14336)
+        ->assertDispatched('toast-show', toastSays('File "IMG_4021.png" failed to upload: It is 14 MB, and the limit is '.$limit.'.'));
+});
+
 it('rejects videos beyond the 300MB cap', function (): void {
     $video = UploadedFile::fake()->create('huge.mp4', 320000, 'video/mp4');
 
