@@ -480,7 +480,7 @@ return new class extends Component
 
     public function maxUploadKilobytes(): int
     {
-        return $this->allowsVideo() ? $this->maxVideoKilobytes() : $this->maxImageKilobytes();
+        return UploadLimit::cappedKilobytes($this->uploadCapKilobytes());
     }
 
     public function rejectOversizedFile(string $filename, int $kilobytes): void
@@ -498,7 +498,7 @@ return new class extends Component
     /** @param array<int, array<string, mixed>> $metadata */
     public function save(array $metadata, StoreMediaFileAction $action): void
     {
-        $maxKilobytes = $this->maxUploadKilobytes();
+        $maxKilobytes = UploadLimit::enforcedKilobytes($this->uploadCapKilobytes());
 
         $acceptedTypes = match (true) {
             $this->type instanceof MediaType => [$this->type],
@@ -571,9 +571,11 @@ return new class extends Component
         return "style=\"top: {$top}px; z-index: {$index}; transform: rotate({$rotation}deg )\";\"";
     }
 
-    private function allowsVideo(): bool
+    private function uploadCapKilobytes(): int
     {
-        return $this->type === MediaType::VIDEO || in_array(MediaType::VIDEO->value, $this->allowedTypes, true);
+        $allowsVideo = $this->type === MediaType::VIDEO || in_array(MediaType::VIDEO->value, $this->allowedTypes, true);
+
+        return $allowsVideo ? UploadLimit::VIDEO_MAX_KILOBYTES : UploadLimit::IMAGE_MAX_KILOBYTES;
     }
 
     /**
