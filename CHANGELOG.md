@@ -2,9 +2,9 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
-## Unreleased
+## v0.9.5 — 2026-11-26
 
-- The media library now refuses a file that is over the size limit before uploading it, and says how big the file is and what the limit is. Before, a photo over the limit uploaded all the way, stopped at 99% and only showed a short message. The progress bar also resets after a failed upload.
+- The media library refuses a file that is over the size limit before uploading it, and says how big the file is and what the limit is. Before, a photo over the limit uploaded all the way, stopped at 99% and only showed a brief message. The progress bar also resets after a failed upload.
 - The update-design MCP tool no longer refuses every change on a site with a custom colour theme that has no heading colour. It checks the palette only when the theme or colours change, and the heading colour stays optional, as it is on Settings → Design.
 
 ## v0.9.4 — 2026-11-20
