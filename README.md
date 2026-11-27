@@ -6,28 +6,33 @@
 
 <br>
 
-**Wire Up** is an open-source CMS built on Laravel and Livewire. You get a strict, fully tested app that updates itself. Your client gets an admin they can actually use — pages, products, members, languages — and stops calling you about copy changes.
+**Wire Up** is an open-source, self-hosted CMS built on Laravel 13 and Livewire 4, for developers who build websites for clients. It is a complete app, not a package: install it on your own server and it updates itself from signed releases.
+
+Your client gets an admin they can use on their own — pages built from blocks, their own content types, a shop, bookings, forms and more than one language — and stops calling you about copy changes. AI agents can build and edit the site through the built-in MCP server.
 
 ### [wire-up.dev](https://wire-up.dev)
 
 The live site is the fastest way to get a sense of what you are installing: a tour of the
 [features](https://wire-up.dev/features), the [block catalogue](https://wire-up.dev/blocks), and
-[twelve guides](https://wire-up.dev/guides) split between running a site and building one. It is
+[fourteen guides](https://wire-up.dev/guides) split between running a site and building one. It is
 itself a Wire Up site, built through the admin and the MCP server rather than by editing templates.
 
 ---
 
 ### Key Features
 
-- **Block-based page builder** - Compose pages from 20+ content blocks with a live desktop/tablet/mobile preview
+- **Block-based page builder** - Compose pages from 27 content blocks with a live desktop/tablet/mobile preview
 - **Records & content types** - Define your own content types and fields in the admin, with public detail pages and categories
+- **Shop and bookings** - Sell products through Stripe Checkout, or take bookings for services with weekly availability, a calendar feed and reminders
+- **Forms and inbox** - Contact and newsletter forms that land in an inbox, with automatic replies, webhooks, and Mailchimp, Kit or Buttondown
 - **Media library** - Crops, SVG sanitising, HEIC conversion, Pexels import, signed image URLs with a transform cache
 - **Design settings** - Colour tokens, light/dark schemes with per-theme logos, fonts, and site-wide custom CSS
 - **Multi-language** - Per-locale publishing, owner-editable interface translations
 - **Users, roles & members** - Per-action abilities, two-factor authentication, passkeys, member accounts and members-only content
-- **AI-native** - An in-admin AI assistant plus an MCP server, so agents can build and edit the site programmatically
+- **AI-native** - An in-admin AI assistant plus an MCP server with 48 tools, over SSH or HTTPS, so agents can build and edit the site
 - **SEO & AI discoverability** - Meta, JSON-LD, sitemap, `llms.txt`, and Markdown responses for agents
-- **Self-updating** - Install and update from git tags, with a database backup before every migration
+- **Self-updating** - Install and update from signed release tags, with a database backup before every migration and a rollback if an update fails
+- **Backups** - Daily or weekly backups of the database and media files, optionally copied off-site to S3-compatible storage
 
 ## Built With
 
