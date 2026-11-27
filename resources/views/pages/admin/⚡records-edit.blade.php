@@ -200,7 +200,7 @@ return new class extends Component
                 'published_locales' => array_values($validated['publishedLocales'] ?? []),
                 'noindex' => $this->noindex,
                 'members_only' => $this->members_only,
-                'layout' => $this->layout,
+                'layout' => $this->withStructuredDataGuard($this->record, $this->layout),
             ],
         ]);
 

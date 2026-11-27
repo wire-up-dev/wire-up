@@ -309,7 +309,7 @@ final class Record extends Model
     }
 
     /**
-     * @return array{hideHeader: bool, hideFooter: bool, backgroundColor: ?string, backgroundImage: ?string, backgroundFixed: bool, customCss: string, sidebar: array{menus: array<int, string>}}
+     * @return array{hideHeader: bool, hideFooter: bool, backgroundColor: ?string, backgroundImage: ?string, backgroundFixed: bool, customCss: string, structuredData: string, sidebar: array{menus: array<int, string>}}
      */
     public function resolvedLayout(): array
     {

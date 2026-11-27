@@ -222,6 +222,32 @@ it('embeds block-level structured data in the page JSON-LD', function (): void {
         ->and($offers[1])->not->toHaveKey('price');
 });
 
+it('adds the structured data written for a page to its JSON-LD', function (): void {
+    seoFeaturePage('wire-up', ['metadata' => [
+        'published_locales' => ['en'],
+        'layout' => ['structuredData' => '{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Wire Up", "offers": {"@type": "Offer", "price": "0"}}'],
+    ]]);
+    seoFeaturePage('plain');
+
+    $html = (string) $this->get('/wire-up')->assertOk()->getContent();
+    preg_match('#<script type="application/ld\+json">(.*?)</script>#s', $html, $m);
+    $graph = json_decode($m[1], true, flags: JSON_THROW_ON_ERROR)['@graph'];
+    $software = array_values(array_filter($graph, fn (array $node): bool => $node['@type'] === 'SoftwareApplication'));
+
+    expect($software)->toBe([['@type' => 'SoftwareApplication', 'name' => 'Wire Up', 'offers' => ['@type' => 'Offer', 'price' => '0']]]);
+
+    $this->get('/plain')->assertOk()->assertDontSee('SoftwareApplication');
+});
+
+it('keeps written structured data inside its script tag', function (): void {
+    seoFeaturePage('sneaky', ['metadata' => [
+        'published_locales' => ['en'],
+        'layout' => ['structuredData' => '{"@type": "Thing", "name": "</script><script>alert(1)</script>"}'],
+    ]]);
+
+    $this->get('/sneaky')->assertOk()->assertDontSee('<script>alert(1)', false);
+});
+
 it('emits a VideoObject using the default share image as thumbnail', function (): void {
     Settings::set(['default_og_image' => ['source' => 'default-share.jpg', 'crop' => ['default' => ['crop_w' => 1200, 'crop_h' => 630, 'crop_x' => 0, 'crop_y' => 0]]]]);
 

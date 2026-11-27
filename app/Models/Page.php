@@ -50,7 +50,7 @@ final class Page extends Model
 
     /**
      * @param  array<string, mixed>  $layout
-     * @return array{hideHeader: bool, hideFooter: bool, backgroundColor: ?string, backgroundImage: ?string, backgroundFixed: bool, customCss: string, sidebar: array{menus: array<int, string>}}
+     * @return array{hideHeader: bool, hideFooter: bool, backgroundColor: ?string, backgroundImage: ?string, backgroundFixed: bool, customCss: string, structuredData: string, sidebar: array{menus: array<int, string>}}
      */
     public static function normalizeLayout(array $layout): array
     {
@@ -63,6 +63,7 @@ final class Page extends Model
             'backgroundImage' => self::backgroundImageUrl($layout['backgroundImage'] ?? null),
             'backgroundFixed' => (bool) ($layout['backgroundFixed'] ?? false),
             'customCss' => self::sanitizeCustomCss((string) ($layout['customCss'] ?? '')),
+            'structuredData' => mb_trim((string) ($layout['structuredData'] ?? '')),
             'sidebar' => self::normalizeSidebar($layout['sidebar'] ?? null),
         ];
     }
@@ -139,7 +140,7 @@ final class Page extends Model
     }
 
     /**
-     * @return array{hideHeader: bool, hideFooter: bool, backgroundColor: ?string, backgroundImage: ?string, backgroundFixed: bool, customCss: string, sidebar: array{menus: array<int, string>}}
+     * @return array{hideHeader: bool, hideFooter: bool, backgroundColor: ?string, backgroundImage: ?string, backgroundFixed: bool, customCss: string, structuredData: string, sidebar: array{menus: array<int, string>}}
      */
     public function resolvedLayout(): array
     {

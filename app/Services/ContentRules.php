@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\BlockType;
 use App\Enums\ContentStatus;
+use Closure;
 use Illuminate\Validation\Rule;
 
 final class ContentRules
@@ -60,7 +61,7 @@ final class ContentRules
 
     /**
      * @param  list<string>  $backgroundImage
-     * @return array<string, list<string>>
+     * @return array<string, list<string|Closure>>
      */
     public static function layout(array $backgroundImage): array
     {
@@ -72,10 +73,18 @@ final class ContentRules
             'layout.backgroundColor' => ['nullable', 'string', 'max:30'],
             'layout.backgroundImage' => $backgroundImage,
             'layout.customCss' => ['nullable', 'string', 'max:50000'],
+            'layout.structuredData' => ['nullable', 'string', 'max:'.StructuredData::MAX_LENGTH, self::structuredData(...)],
             'layout.sidebar' => ['sometimes', 'array'],
             'layout.sidebar.menus' => ['array'],
             'layout.sidebar.menus.*' => ['string', 'max:255'],
         ];
+    }
+
+    public static function structuredData(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (is_string($value) && StructuredData::nodes($value) === null) {
+            $fail(__('Enter JSON-LD: an object with an "@type", or a list of them.'));
+        }
     }
 
     /**

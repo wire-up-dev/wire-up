@@ -48,6 +48,7 @@ use App\Mcp\Tools\UploadMediaTool;
 use App\Models\AccessToken;
 use App\Models\Record;
 use App\Models\RecordType;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\PermissionRegistry;
 use Illuminate\Support\Facades\Gate;
@@ -158,6 +159,14 @@ final readonly class RemoteAccess
     /**
      * @param  array<array-key, mixed>  $arguments
      */
+    private function changesStructuredData(array $arguments): bool
+    {
+        return is_array($arguments['layout'] ?? null) && array_key_exists('structuredData', $arguments['layout']);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $arguments
+     */
     private function publishes(Tool $tool, array $arguments): bool
     {
         return match (true) {
@@ -176,7 +185,8 @@ final readonly class RemoteAccess
         return match ($class) {
             ListPagesTool::class, GetPageTool::class => [['pages.view']],
             CreatePageTool::class => [['pages.create']],
-            UpdatePageBlocksTool::class, UpdatePageTool::class, PublishPageTool::class => [['pages.edit']],
+            UpdatePageBlocksTool::class, PublishPageTool::class => [['pages.edit']],
+            UpdatePageTool::class => [['pages.edit'], ...($this->changesStructuredData($arguments) ? [[Role::DEVELOPER]] : [])],
             DeletePageTool::class => [['pages.delete']],
             ScaffoldSiteTool::class => [['pages.create'], ['pages.edit'], ['settings.edit']],
             EditBlocksTool::class => $this->pageOrRecord($arguments['page'] ?? null, $arguments['record'] ?? null, PermissionAction::Edit),
@@ -310,6 +320,10 @@ final readonly class RemoteAccess
      */
     private function roleRefusal(array $anyOf): string
     {
+        if ($anyOf === [Role::DEVELOPER]) {
+            return __('Only developers can change structured data.');
+        }
+
         if (count($anyOf) !== 1) {
             return __('Your role doesn’t allow this.');
         }

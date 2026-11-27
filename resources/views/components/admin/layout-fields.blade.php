@@ -77,14 +77,25 @@
             </flux:description>
         </flux:field>
 
-        <div>
+        <div class="flex flex-wrap gap-2">
             <flux:modal.trigger name="{{ $name }}-custom-css">
                 <flux:button
                     icon="code-bracket"
                     variant="filled"
                 >{{ ($layout['customCss'] ?? '') !== '' ? __('Edit custom CSS') : __('Add custom CSS') }}</flux:button>
             </flux:modal.trigger>
+
+            @can('developer')
+                <flux:modal.trigger name="{{ $name }}-structured-data">
+                    <flux:button
+                        icon="code-bracket-square"
+                        variant="filled"
+                    >{{ ($layout['structuredData'] ?? '') !== '' ? __('Edit structured data') : __('Add structured data') }}</flux:button>
+                </flux:modal.trigger>
+            @endcan
         </div>
+
+        <flux:error name="layout.structuredData" />
 
         <flux:modal name="{{ $name }}-custom-css" class="w-full md:max-w-2xl">
             <div class="space-y-6">
@@ -105,5 +116,28 @@
                 </div>
             </div>
         </flux:modal>
+
+        @can('developer')
+            <flux:modal name="{{ $name }}-structured-data" class="w-full md:max-w-2xl">
+                <div class="space-y-6">
+                    <div>
+                        <flux:heading size="lg">{{ __('Structured data') }}</flux:heading>
+                        <flux:text class="mt-2">{{ __('JSON-LD added to the structured data of this page only.') }}</flux:text>
+                    </div>
+                    <flux:textarea
+                        wire:model.lazy="layout.structuredData"
+                        rows="14"
+                        class="font-mono text-sm"
+                        placeholder='{"@type": "SoftwareApplication", "name": "…"}'
+                    />
+                    <flux:error name="layout.structuredData" />
+                    <div class="flex justify-end">
+                        <flux:modal.close>
+                            <flux:button variant="primary">{{ __('Done') }}</flux:button>
+                        </flux:modal.close>
+                    </div>
+                </div>
+            </flux:modal>
+        @endcan
     </div>
 </flux:fieldset>

@@ -395,6 +395,31 @@ it('saves layout overrides for the record page', function (): void {
         ->and($record->resolvedLayout()['backgroundImage'])->toContain($media->source);
 });
 
+it('saves structured data on a record only for developers', function (): void {
+    $type = typeWithFields();
+    $record = makeRecord($type, 'Structured Sample');
+
+    $this->actingAsAdmin();
+
+    Livewire::test('pages::admin.records-edit', ['recordType' => $type, 'record' => $record])
+        ->set('data.summary.en', 'A sample product')
+        ->set('layout.structuredData', '{"@type": "Thing"}')
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect($record->fresh()->resolvedLayout()['structuredData'])->toBeEmpty();
+
+    $this->actingAs(User::factory()->developer()->create(['active' => true]));
+
+    Livewire::test('pages::admin.records-edit', ['recordType' => $type, 'record' => $record])
+        ->set('data.summary.en', 'A sample product')
+        ->set('layout.structuredData', '{"@type": "SoftwareApplication"}')
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect($record->fresh()->resolvedLayout()['structuredData'])->toBe('{"@type": "SoftwareApplication"}');
+});
+
 it('keeps existing record metadata when saving a layout', function (): void {
     $type = typeWithFields();
     $record = makeRecord($type, 'Metadata Sample');

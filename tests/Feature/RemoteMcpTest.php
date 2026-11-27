@@ -235,6 +235,26 @@ it('explains which part of the role is missing', function (array $abilities, str
     'searching pages without pages' => [['records.products.view'], 'search-content', fn (): array => ['find' => 'sale', 'pages' => [1]], 'Your role can’t view Pages.'],
 ]);
 
+it('leaves structured data to developers', function (): void {
+    $page = Page::factory()->create();
+    $arguments = ['page' => $page->id, 'layout' => ['structuredData' => '{"@type": "SoftwareApplication"}']];
+
+    remoteMcpCall(remoteMcpToken(remoteMcpOwner()), 'update-page', $arguments)
+        ->assertOk()
+        ->assertJsonPath('result.isError', true)
+        ->assertJsonPath('result.content.0.text', 'Only developers can change structured data.');
+
+    remoteMcpCall(remoteMcpToken(remoteMcpOwner()), 'update-page', ['page' => $page->id, 'layout' => ['customCss' => 'main { color: red }']])
+        ->assertOk()
+        ->assertJsonPath('result.isError', false);
+
+    remoteMcpCall(remoteMcpToken(User::factory()->developer()->create(['active' => true])), 'update-page', $arguments)
+        ->assertOk()
+        ->assertJsonPath('result.isError', false);
+
+    expect($page->fresh()->resolvedLayout()['structuredData'])->toBe('{"@type": "SoftwareApplication"}');
+});
+
 it('lets a role search the records it can see', function (): void {
     $products = RecordType::factory()->create(['key' => 'products', 'name' => 'Products']);
     RecordType::factory()->create(['key' => 'events', 'name' => 'Events']);

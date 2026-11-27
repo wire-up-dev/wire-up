@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Media;
 use App\Models\Page;
 use App\Models\Record;
+use App\Models\Role;
 use App\Services\ContentRules;
 use App\Services\MediaItem;
 use App\Services\SettingsService;
@@ -169,6 +170,19 @@ trait HasContentEditor
     }
 
     /**
+     * @param  array<string, mixed>  $layout
+     * @return array<string, mixed>
+     */
+    protected function withStructuredDataGuard(Page|Record $content, array $layout): array
+    {
+        if (auth()->user()?->can(Role::DEVELOPER) === true) {
+            return $layout;
+        }
+
+        return [...$layout, 'structuredData' => $content->resolvedLayout()['structuredData']];
+    }
+
+    /**
      * @return array{0: array<string, mixed>, 1: array<string, string>, 2: array<string, string>}
      */
     protected function contentValidation(Page|Record $content, string $basePath, string $scheduleMessage): array
@@ -186,6 +200,7 @@ trait HasContentEditor
             'publishedLocales.*' => (string) __('language'),
             'published_at' => (string) __('scheduled date'),
             'layout.customCss' => (string) __('custom CSS'),
+            'layout.structuredData' => (string) __('structured data'),
         ];
 
         foreach (array_keys($this->activeLocales) as $locale) {

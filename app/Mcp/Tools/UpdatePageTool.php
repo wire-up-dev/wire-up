@@ -174,7 +174,7 @@ final class UpdatePageTool extends Tool
                 ->description('Media id of the social sharing image, as returned by list-media or import-media-from-url. Pass null to remove it.'),
 
             'layout' => $schema->object()
-                ->description('Per-page layout overrides. Only the keys you pass are changed: {"hideHeader": bool, "hideFooter": bool, "backgroundColor": "#0b1220" or null, "backgroundImage": <media id> or null, "backgroundFixed": bool, "customCss": "css applied to this page only", "sidebar": {"menus": ["<menu key>"]}}. Sidebar menu keys come from get-menus or create-menu, and render the site sidebar layout beside the page content.'),
+                ->description('Per-page layout overrides. Only the keys you pass are changed: {"hideHeader": bool, "hideFooter": bool, "backgroundColor": "#0b1220" or null, "backgroundImage": <media id> or null, "backgroundFixed": bool, "customCss": "css applied to this page only", "structuredData": "a JSON-LD object or list, as a string, added to the structured data of this page, such as a SoftwareApplication (an empty string removes it)", "sidebar": {"menus": ["<menu key>"]}}. Sidebar menu keys come from get-menus or create-menu, and render the site sidebar layout beside the page content.'),
         ];
     }
 
@@ -205,6 +205,10 @@ final class UpdatePageTool extends Tool
 
         if (array_key_exists('customCss', $layout)) {
             $current['customCss'] = Page::sanitizeCustomCss((string) $layout['customCss']);
+        }
+
+        if (array_key_exists('structuredData', $layout)) {
+            $current['structuredData'] = mb_trim((string) $layout['structuredData']);
         }
 
         if (is_array($layout['sidebar'] ?? null) && array_key_exists('menus', $layout['sidebar'])) {

@@ -109,6 +109,25 @@ it('sets the layout flags, background colour and per-page css', function (): voi
         ->and($layout['customCss'])->not->toContain('</style');
 });
 
+it('sets and clears structured data for a page', function (): void {
+    $page = Page::factory()->create();
+
+    WireUpServer::tool(UpdatePageTool::class, ['page' => $page->id, 'layout' => ['structuredData' => ' {"@type": "SoftwareApplication"} ']])->assertOk();
+
+    expect(layoutOf($page)['structuredData'])->toBe('{"@type": "SoftwareApplication"}');
+
+    WireUpServer::tool(UpdatePageTool::class, ['page' => $page->id, 'layout' => ['structuredData' => '']])->assertOk();
+
+    expect($page->fresh()->resolvedLayout()['structuredData'])->toBeEmpty();
+});
+
+it('refuses structured data that is not JSON-LD', function (): void {
+    $page = Page::factory()->create();
+
+    WireUpServer::tool(UpdatePageTool::class, ['page' => $page->id, 'layout' => ['structuredData' => '{"name": "Wire Up"}']])
+        ->assertHasErrors(['Enter JSON-LD: an object with an "@type", or a list of them.']);
+});
+
 it('changes only the layout keys it is given', function (): void {
     $page = Page::factory()->create();
 

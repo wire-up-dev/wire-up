@@ -1074,6 +1074,43 @@ it('persists page layout options into metadata when saving', function (): void {
     ]);
 });
 
+it('lets a developer add structured data to a page', function (): void {
+    $this->actingAs(User::factory()->developer()->create(['active' => true]));
+
+    editor($this->page)
+        ->assertSee('Add structured data')
+        ->set('slugs.en', 'sample')
+        ->set('layout.structuredData', ' {"@type": "SoftwareApplication", "name": "Wire Up"} ')
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect($this->page->fresh()->resolvedLayout()['structuredData'])->toBe('{"@type": "SoftwareApplication", "name": "Wire Up"}');
+});
+
+it('refuses structured data that is not JSON-LD', function (string $json): void {
+    $this->actingAs(User::factory()->developer()->create(['active' => true]));
+
+    editor($this->page)
+        ->set('layout.structuredData', $json)
+        ->call('update')
+        ->assertHasErrors(['layout.structuredData']);
+})->with([
+    'not JSON' => ['{"@type": "Thing",}'],
+    'no type' => ['{"name": "Wire Up"}'],
+]);
+
+it('keeps structured data out of reach of everyone but developers', function (): void {
+    $page = Page::factory()->create(['title' => 'Sample', 'metadata' => ['layout' => ['structuredData' => '{"@type": "SoftwareApplication"}']]]);
+
+    editor($page)
+        ->assertDontSee('structured data')
+        ->set('layout.structuredData', '{"@type": "Thing", "name": "Changed"}')
+        ->call('update')
+        ->assertHasNoErrors();
+
+    expect($page->fresh()->resolvedLayout()['structuredData'])->toBe('{"@type": "SoftwareApplication"}');
+});
+
 it('normalizes an empty background color to null when saving', function (): void {
     $page = $this->page;
 

@@ -178,6 +178,8 @@ final class SeoService
             foreach ($content->blocks as $block) {
                 $graph = [...$graph, ...$blockSchema->nodes($block, app()->getLocale())];
             }
+
+            $graph = [...$graph, ...(StructuredData::nodes($content->resolvedLayout()['structuredData']) ?? [])];
         }
 
         return ['@context' => 'https://schema.org', '@graph' => $graph];

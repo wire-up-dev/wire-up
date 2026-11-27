@@ -141,7 +141,7 @@ return new class extends Component
                 'published_locales' => array_values($validated['publishedLocales'] ?? []),
                 'noindex' => (bool) ($validated['noindex'] ?? false),
                 'members_only' => (bool) ($validated['members_only'] ?? false),
-                'layout' => $this->layoutMetadata(),
+                'layout' => $this->withStructuredDataGuard($this->page, $this->layoutMetadata()),
             ],
         ]);
 
@@ -237,6 +237,7 @@ return new class extends Component
             'backgroundImage' => null,
             'backgroundFixed' => false,
             'customCss' => '',
+            'structuredData' => '',
             ...(is_array($metadata['layout'] ?? null) ? $metadata['layout'] : []),
             'sidebar' => Page::normalizeSidebar(($metadata['layout'] ?? [])['sidebar'] ?? null),
         ];
@@ -261,6 +262,7 @@ return new class extends Component
             'backgroundImage' => $this->layout['backgroundImage'] ?? null,
             'backgroundFixed' => (bool) ($this->layout['backgroundFixed'] ?? false),
             'customCss' => mb_trim((string) ($this->layout['customCss'] ?? '')),
+            'structuredData' => mb_trim((string) ($this->layout['structuredData'] ?? '')),
             'sidebar' => Page::normalizeSidebar($this->layout['sidebar'] ?? null),
         ];
     }

@@ -2,6 +2,10 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
+## Unreleased
+
+- Developers can give a page or record its own structured data (JSON-LD), such as a SoftwareApplication, with Add structured data under Layout in the editor or with the update-page MCP tool. Wire Up adds it to the structured data it already writes for that page, and other roles don't see the option.
+
 ## v0.9.5 — 2026-11-26
 
 - The media library refuses a file that is over the size limit before uploading it, and says how big the file is and what the limit is. Before, a photo over the limit uploaded all the way, stopped at 99% and only showed a brief message. The progress bar also resets after a failed upload.
