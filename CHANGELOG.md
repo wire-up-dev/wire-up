@@ -2,7 +2,7 @@
 
 Release notes for Wire Up. Each release is a `## vX.Y.Z` section; the updater shows the sections newer than the installed version on **Settings → Updates**.
 
-## Unreleased
+## v0.9.6 — 2026-11-27
 
 - Developers can give a page or record its own structured data (JSON-LD), such as a SoftwareApplication, with Add structured data under Layout in the editor or with the update-page MCP tool. Wire Up adds it to the structured data it already writes for that page, and other roles don't see the option.
 
